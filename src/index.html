@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenPLS Indonesia</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+</head>
+<body class="tema-gelap">
+  
+  <!-- ============ TITLE BAR ============ -->
+  <div class="title-bar">
+    <div class="title-bar-drag">
+      <div class="title-bar-logo">
+        <span class="material-icons-round logo-icon">hub</span>
+        <span class="title-text">OpenPLS Indonesia</span>
+      </div>
+    </div>
+    <div class="title-bar-actions">
+      <button class="title-btn tema-toggle" id="btnToggleTema" title="Ganti Tema">
+        <span class="material-icons-round">dark_mode</span>
+      </button>
+      <button class="title-btn" id="btnMinimize" title="Perkecil">
+        <span class="material-icons-round">remove</span>
+      </button>
+      <button class="title-btn" id="btnMaximize" title="Perbesar">
+        <span class="material-icons-round">crop_square</span>
+      </button>
+      <button class="title-btn btn-close" id="btnClose" title="Tutup">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+  </div>
+  
+  <!-- ============ MAIN CONTAINER ============ -->
+  <div class="main-container">
+    
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-menu">
+        <button class="sidebar-item active" data-halaman="beranda" title="Beranda">
+          <span class="material-icons-round">home</span>
+          <span class="sidebar-label">Beranda</span>
+        </button>
+        <button class="sidebar-item" data-halaman="editor" title="Editor Model">
+          <span class="material-icons-round">account_tree</span>
+          <span class="sidebar-label">Editor Model</span>
+        </button>
+        <button class="sidebar-item" data-halaman="data" title="Kelola Data">
+          <span class="material-icons-round">table_chart</span>
+          <span class="sidebar-label">Data</span>
+        </button>
+        <button class="sidebar-item" data-halaman="analisis" title="Analisis">
+          <span class="material-icons-round">analytics</span>
+          <span class="sidebar-label">Analisis</span>
+        </button>
+        <button class="sidebar-item" data-halaman="hasil" title="Hasil">
+          <span class="material-icons-round">assessment</span>
+          <span class="sidebar-label">Hasil & Laporan</span>
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <button class="sidebar-item" id="btnToggleSidebarMenu" title="Sembunyikan/Tampilkan Menu (Ctrl+B)">
+          <span class="material-icons-round" id="iconToggleSidebarMenu">menu_open</span>
+          <span class="sidebar-label" id="labelToggleSidebarMenu">Sembunyikan Menu</span>
+        </button>
+        <button class="sidebar-item" id="btnBukaTentang" title="Tentang Aplikasi & Bantuan">
+          <span class="material-icons-round" style="color: #60a5fa;">info</span>
+          <span class="sidebar-label">Tentang</span>
+        </button>
+        <button class="sidebar-item" data-halaman="pengaturan" title="Pengaturan">
+          <span class="material-icons-round">settings</span>
+          <span class="sidebar-label">Pengaturan</span>
+        </button>
+      </div>
+    </aside>
+    
+    <!-- ============ CONTENT AREA ============ -->
+    <main class="content" id="content">
+      
+      <!-- HALAMAN BERANDA -->
+      <section class="halaman" id="halaman-beranda">
+        <div class="beranda-hero">
+          <div class="hero-content">
+            <h1 class="hero-title">
+              <span class="gradient-text">OpenPLS</span> Indonesia
+            </h1>
+            <p class="hero-subtitle">Analisis Partial Least Squares - Structural Equation Modeling (PLS-SEM) Bebas & Terbuka untuk Riset Ilmiah</p>
+            <div class="hero-actions">
+              <button class="btn btn-primary btn-lg" id="btnProyekBaru">
+                <span class="material-icons-round">add_circle</span>
+                Proyek Baru
+              </button>
+              <button class="btn btn-outline btn-lg" id="btnImporProyek">
+                <span class="material-icons-round">folder_open</span>
+                Buka Proyek
+              </button>
+              <button class="btn btn-outline btn-lg" id="btnImporSmartPLSFile" title="Impor File Proyek Lengkap (.openpls / .smartpls / .json)">
+                <span class="material-icons-round">file_upload</span>
+                Impor File Proyek
+              </button>
+            </div>
+          </div>
+          <div class="hero-visual">
+            <div class="floating-node n1"><span>X₁</span></div>
+            <div class="floating-node n2"><span>X₂</span></div>
+            <div class="floating-node n3"><span>Y₁</span></div>
+            <div class="floating-node n4"><span>Y₂</span></div>
+            <svg class="hero-lines" viewBox="0 0 400 300">
+              <line x1="80" y1="80" x2="250" y2="120" class="hero-line"/>
+              <line x1="80" y1="220" x2="250" y2="180" class="hero-line"/>
+              <line x1="310" y1="120" x2="370" y2="80" class="hero-line"/>
+              <line x1="310" y1="180" x2="370" y2="220" class="hero-line"/>
+            </svg>
+          </div>
+        </div>
+        
+        <div class="stats-cards">
+          <div class="stat-card">
+            <span class="material-icons-round stat-icon">folder</span>
+            <div class="stat-info">
+              <span class="stat-value" id="totalProyek">0</span>
+              <span class="stat-label">Total Proyek</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <span class="material-icons-round stat-icon">table_chart</span>
+            <div class="stat-info">
+              <span class="stat-value" id="totalDataset">0</span>
+              <span class="stat-label">Dataset</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <span class="material-icons-round stat-icon">check_circle</span>
+            <div class="stat-info">
+              <span class="stat-value" id="totalAnalisis">0</span>
+              <span class="stat-label">Analisis Selesai</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="section-header">
+          <h2>Proyek Terbaru</h2>
+        </div>
+        <div class="proyek-grid" id="proyekGrid">
+          <!-- Akan diisi secara dinamis -->
+        </div>
+      </section>
+      
+      <!-- HALAMAN EDITOR MODEL -->
+      <section class="halaman tersembunyi" id="halaman-editor">
+        <div class="editor-toolbar">
+          <div class="toolbar-left">
+            <div class="toolbar-project-badge" title="Model PLS-SEM Aktif">
+              <span class="material-icons-round">account_tree</span>
+            </div>
+            <div class="toolbar-project-info">
+              <div class="toolbar-title-row">
+                <span class="proyek-nama-aktif" id="proyekNamaEditor" title="Klik untuk ubah nama proyek">Belum ada proyek dipilih</span>
+                <button class="btn btn-icon btn-ghost btn-toolbar-edit" id="btnRenameProyek" title="Ubah Nama Proyek">
+                  <span class="material-icons-round">edit</span>
+                </button>
+              </div>
+              <div class="toolbar-meta-row">
+                <!-- Version Chip Button -->
+                <button class="toolbar-pill-chip version-chip" id="btnVersiModel" title="Kelola Versi & Snapshot Model">
+                  <span class="material-icons-round chip-icon" style="color: #8b5cf6;">history</span>
+                  <span id="labelVersiAktif">Versi: Terkini</span>
+                  <span class="chip-counter" id="badgeTotalVersi">0</span>
+                </button>
+
+                <!-- Autosave Live Chip -->
+                <div class="toolbar-pill-chip autosave-chip" id="badgeAutosaveStatus" title="Status Sinkronisasi Otomatis">
+                  <span class="material-icons-round chip-icon" style="color: #10b981;">cloud_done</span>
+                  <span>Autosave Aktif</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar-right">
+            <!-- Undo / Redo Segmented Group -->
+            <div class="toolbar-btn-group" title="Riwayat Perubahan Model">
+              <button class="btn btn-sm btn-ghost btn-group-item" id="btnUndo" title="Undo / Urungkan (Ctrl+Z)" disabled>
+                <span class="material-icons-round">undo</span>
+              </button>
+              <button class="btn btn-sm btn-ghost btn-group-item" id="btnRedo" title="Redo / Ulangi (Ctrl+Y)" disabled>
+                <span class="material-icons-round">redo</span>
+              </button>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
+            <!-- Canvas Modeling Tools Segmented Group -->
+            <div class="toolbar-btn-group">
+              <button class="btn btn-sm btn-ghost btn-group-item" id="btnAutoLayout" title="Tata Letak Otomatis (Rapi)">
+                <span class="material-icons-round" style="color: #a855f7;">auto_awesome</span>
+                <span>Rapikan</span>
+              </button>
+              <button class="btn btn-sm btn-ghost btn-group-item btn-highlight-primary" id="btnTambahVariabel" title="Tambah Variabel Laten Baru">
+                <span class="material-icons-round" style="color: #009bf2;">add_circle</span>
+                <span>+ Variabel</span>
+              </button>
+              <button class="btn btn-sm btn-ghost btn-group-item" id="btnTambahJalur" title="Tambah Hubungan Jalur / Pengaruh">
+                <span class="material-icons-round" style="color: #ec4899;">trending_flat</span>
+                <span>+ Jalur</span>
+              </button>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
+            <!-- Dropdown Menu Lainnya (Catatan, Indikator, Template, Export File Project) -->
+            <div class="dropdown" id="dropdownLainnya">
+              <button class="btn btn-sm btn-ghost btn-dropdown-trigger" id="btnDropdownLainnya" title="Fitur Tambahan (Catatan, Indikator, Template, Backup)">
+                <span class="material-icons-round" style="color: #8b5cf6;">apps</span>
+                <span>Lainnya</span>
+                <span class="material-icons-round dropdown-chevron">expand_more</span>
+              </button>
+              <div class="dropdown-menu">
+                <div class="dropdown-header">FITUR TAMBAHAN</div>
+                <!-- Catatan Canvas -->
+                <button class="dropdown-item" id="btnTambahCatatan">
+                  <div class="dropdown-icon-box note-box">
+                    <span class="material-icons-round">note_add</span>
+                  </div>
+                  <div class="dropdown-text">
+                    <div class="dropdown-title">Catatan Canvas</div>
+                    <span class="dropdown-item-desc">Tambah sticky note keterangan</span>
+                  </div>
+                </button>
+                <!-- Toggle Indikator -->
+                <button class="dropdown-item" id="btnToggleIndikator">
+                  <div class="dropdown-icon-box eye-box">
+                    <span class="material-icons-round" id="iconToggleIndikator">visibility</span>
+                  </div>
+                  <div class="dropdown-text">
+                    <div class="dropdown-title" id="labelToggleIndikator">Indikator</div>
+                    <span class="dropdown-item-desc">Show / Hide kotak indikator</span>
+                  </div>
+                </button>
+                <!-- Template Model -->
+                <button class="dropdown-item" id="btnBukaTemplateModel">
+                  <div class="dropdown-icon-box template-box">
+                    <span class="material-icons-round">dashboard_customize</span>
+                  </div>
+                  <div class="dropdown-text">
+                    <div class="dropdown-title">Template Model</div>
+                    <span class="dropdown-item-desc">Model mediasi & template siap pakai</span>
+                  </div>
+                </button>
+                <div class="dropdown-divider"></div>
+                <!-- Export File Project -->
+                <button class="dropdown-item" id="btnEksporProyekFile">
+                  <div class="dropdown-icon-box backup-box">
+                    <span class="material-icons-round">file_download</span>
+                  </div>
+                  <div class="dropdown-text">
+                    <div class="dropdown-title">Ekspor File Proyek</div>
+                    <span class="dropdown-item-desc">Simpan backup lengkap (.openpls)</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
+            <!-- Export Gambar (600 DPI) & Simpan Model -->
+            <button class="btn btn-sm btn-outline btn-toolbar-export" id="btnBukaEksporGambar" title="Ekspor Gambar High-Resolution 600 DPI (PNG / JPG / SVG)">
+              <span class="material-icons-round" style="color: #3b82f6;">image</span>
+              <span>Export Gambar</span>
+            </button>
+
+            <button class="btn btn-sm btn-primary btn-toolbar-save" id="btnSimpanModel">
+              <span class="material-icons-round">save</span>
+              <span>Simpan</span>
+            </button>
+          </div>
+        </div>
+        
+        <div class="editor-container" id="editorContainer">
+          <div class="editor-canvas-wrapper" id="editorCanvasWrapper">
+            <canvas id="modelCanvas" width="1200" height="700"></canvas>
+            <div class="canvas-overlay" id="canvasOverlay">
+              <!-- Nodes akan dirender di sini -->
+            </div>
+
+            <!-- Floating Button Buka Sidebar Kiri (Muncul jika sidebar disembunyikan) -->
+            <button class="btn btn-icon btn-primary floating-canvas-btn floating-btn-sidebar" id="btnFloatingOpenSidebar" title="Tampilkan Sidebar Navigasi" style="position: absolute; top: 12px; left: 12px; z-index: 20; box-shadow: var(--shadow-lg);">
+              <span class="material-icons-round">menu</span>
+            </button>
+
+            <!-- Floating Button Buka Panel Properti Kanan (Muncul jika panel disembunyikan) -->
+            <button class="btn btn-sm btn-primary floating-canvas-btn floating-btn-panel" id="btnFloatingOpenPanel" title="Buka Panel Properti" style="position: absolute; top: 12px; right: 12px; z-index: 20; box-shadow: var(--shadow-lg); gap: 4px;">
+              <span class="material-icons-round" style="font-size: 16px;">tune</span>
+              <span>Properti</span>
+            </button>
+
+            <!-- Floating Zoom & Fullscreen Controls (Pojok Kanan Bawah Canvas) -->
+            <div class="canvas-floating-controls" style="position: absolute; bottom: 14px; right: 14px; z-index: 25; display: flex; align-items: center; background: var(--bg-card); backdrop-filter: blur(10px); border-radius: var(--radius-lg); border: 1.5px solid var(--border-color); padding: 4px 6px; box-shadow: var(--shadow-lg); gap: 2px;">
+              <button class="btn btn-icon btn-ghost" id="btnZoomOut" title="Zoom Out (Ctrl -)" style="width: 30px; height: 30px;">
+                <span class="material-icons-round" style="font-size: 17px;">remove</span>
+              </button>
+              <button class="btn btn-ghost" id="btnZoomReset" title="Reset Zoom (100% / Ctrl 0)" style="padding: 2px 8px; font-size: 11.5px; font-weight: 700; min-width: 46px; height: 30px;">
+                <span id="zoomLevelLabel">100%</span>
+              </button>
+              <button class="btn btn-icon btn-ghost" id="btnZoomIn" title="Zoom In (Ctrl +)" style="width: 30px; height: 30px;">
+                <span class="material-icons-round" style="font-size: 17px;">add</span>
+              </button>
+              <div style="width: 1px; height: 18px; background: var(--border-color); margin: 0 4px;"></div>
+              <button class="btn btn-icon btn-ghost" id="btnCanvasFullscreen" title="Layar Penuh Canvas (F / F11)" style="width: 30px; height: 30px;">
+                <span class="material-icons-round" style="font-size: 17px;">fullscreen</span>
+              </button>
+            </div>
+
+            <!-- Floating Navigation Hint (Pojok Kiri Bawah Canvas) -->
+            <div class="canvas-nav-hint" id="canvasNavHint">
+              <span class="material-icons-round" style="font-size: 15px; color: var(--color-primary);">keyboard</span>
+              <span><strong>Ctrl + A</strong>: Pilih Semua • <strong>Delete</strong>: Hapus • <strong>Drag Garis</strong>: Lengkungkan • <strong>Ctrl + Drag</strong>: Geser • <strong>Scroll</strong>: Zoom</span>
+              <button class="btn-close-hint" id="btnCloseNavHint" title="Sembunyikan Petunjuk">
+                <span class="material-icons-round" style="font-size: 14px;">close</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="editor-panel" id="editorPanel">
+            <div class="panel-header">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="material-icons-round" style="font-size: 18px; color: var(--color-primary);">tune</span>
+                <h3>Properti</h3>
+              </div>
+              <button class="btn btn-icon btn-ghost" id="btnTutupPanel" title="Sembunyikan Panel Properti">
+                <span class="material-icons-round">close</span>
+              </button>
+            </div>
+            <div class="panel-body" id="panelBody">
+              <p class="text-muted">Pilih variabel atau jalur untuk melihat propertinya</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- HALAMAN DATA -->
+      <section class="halaman tersembunyi" id="halaman-data">
+        <div class="editor-toolbar">
+          <div class="toolbar-left">
+            <h2 class="page-title">Kelola Data</h2>
+            <span class="proyek-nama-aktif" id="proyekNamaData">Belum ada proyek dipilih</span>
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-sm btn-primary" id="btnImporData">
+              <span class="material-icons-round">upload_file</span> Impor Data
+            </button>
+          </div>
+        </div>
+        
+        <div class="data-container">
+          <div class="dataset-list" id="datasetList">
+            <div class="empty-state">
+              <span class="material-icons-round">cloud_upload</span>
+              <p>Belum ada dataset. Impor file CSV atau Excel.</p>
+            </div>
+          </div>
+          <div class="data-preview" id="dataPreview">
+            <div class="empty-state">
+              <span class="material-icons-round">visibility</span>
+              <p>Pilih dataset untuk melihat pratinjau</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- HALAMAN ANALISIS -->
+      <section class="halaman tersembunyi" id="halaman-analisis">
+        <div class="editor-toolbar">
+          <div class="toolbar-left">
+            <h2 class="page-title">Analisis PLS-SEM</h2>
+            <span class="proyek-nama-aktif" id="proyekNamaAnalisis">Belum ada proyek dipilih</span>
+          </div>
+        </div>
+        
+        <div class="analisis-container">
+          <div class="analisis-card">
+            <div class="analisis-card-icon">
+              <span class="material-icons-round">calculate</span>
+            </div>
+            <h3>Algoritma PLS</h3>
+            <p>Jalankan algoritma PLS-SEM untuk menghitung koefisien jalur, outer loading, dan nilai R²</p>
+            <div class="analisis-options">
+              <div class="form-group">
+                <label>Iterasi Maksimum</label>
+                <input type="number" class="form-input" id="maxIterasi" value="300" min="1" max="1000">
+              </div>
+              <div class="form-group">
+                <label>Toleransi Konvergensi</label>
+                <input type="number" class="form-input" id="toleransi" value="0.00001" step="0.00001">
+              </div>
+              <div class="form-group">
+                <label>Skema Bobot</label>
+                <select class="form-input" id="skemaBobot">
+                  <option value="path">Skema Jalur (Path)</option>
+                  <option value="centroid">Skema Centroid</option>
+                  <option value="factorial">Skema Faktorial</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btnJalankanPLS">
+              <span class="material-icons-round">play_arrow</span> Jalankan Algoritma PLS
+            </button>
+          </div>
+          
+          <div class="analisis-card">
+            <div class="analisis-card-icon">
+              <span class="material-icons-round">shuffle</span>
+            </div>
+            <h3>Bootstrapping</h3>
+            <p>Uji signifikansi koefisien jalur menggunakan metode bootstrapping</p>
+            <div class="analisis-options">
+              <div class="form-group">
+                <label>Jumlah Subsampel</label>
+                <input type="number" class="form-input" id="jumlahBootstrap" value="5000" min="500" max="10000">
+              </div>
+              <div class="form-group">
+                <label>Tingkat Signifikansi</label>
+                <select class="form-input" id="tingkatSignifikansi">
+                  <option value="0.05">0.05 (95%)</option>
+                  <option value="0.01">0.01 (99%)</option>
+                  <option value="0.10">0.10 (90%)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Tipe Uji</label>
+                <select class="form-input" id="tipeUji">
+                  <option value="two-tailed">Dua Sisi (Two-tailed)</option>
+                  <option value="one-tailed">Satu Sisi (One-tailed)</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btnJalankanBootstrap">
+              <span class="material-icons-round">play_arrow</span> Jalankan Bootstrapping
+            </button>
+          </div>
+        </div>
+      </section>
+      
+      <!-- HALAMAN HASIL -->
+      <section class="halaman tersembunyi" id="halaman-hasil">
+        <div class="editor-toolbar">
+          <div class="toolbar-left">
+            <h2 class="page-title">Hasil Analisis</h2>
+            <span class="proyek-nama-aktif" id="proyekNamaHasil">Belum ada proyek dipilih</span>
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-sm btn-ghost" id="btnEksporHasil">
+              <span class="material-icons-round">download</span> Ekspor
+            </button>
+          </div>
+        </div>
+        
+        <div class="hasil-container">
+          <div class="hasil-tabs">
+            <button class="hasil-tab active" data-tab="ringkasan">Ringkasan</button>
+            <button class="hasil-tab" data-tab="outer-model">Model Pengukuran</button>
+            <button class="hasil-tab" data-tab="inner-model">Model Struktural</button>
+            <button class="hasil-tab" data-tab="bootstrap">Bootstrapping</button>
+          </div>
+          
+          <div class="hasil-content" id="hasilContent">
+            <!-- Tab Ringkasan -->
+            <div class="hasil-panel active" id="tab-ringkasan">
+              <div class="empty-state">
+                <span class="material-icons-round">bar_chart</span>
+                <p>Belum ada hasil analisis. Jalankan algoritma PLS terlebih dahulu.</p>
+              </div>
+            </div>
+            
+            <!-- Tab Outer Model -->
+            <div class="hasil-panel" id="tab-outer-model">
+              <div class="empty-state">
+                <span class="material-icons-round">bar_chart</span>
+                <p>Belum ada hasil model pengukuran.</p>
+              </div>
+            </div>
+            
+            <!-- Tab Inner Model -->
+            <div class="hasil-panel" id="tab-inner-model">
+              <div class="empty-state">
+                <span class="material-icons-round">bar_chart</span>
+                <p>Belum ada hasil model struktural.</p>
+              </div>
+            </div>
+            
+            <!-- Tab Bootstrap -->
+            <div class="hasil-panel" id="tab-bootstrap">
+              <div class="empty-state">
+                <span class="material-icons-round">bar_chart</span>
+                <p>Belum ada hasil bootstrapping.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- HALAMAN PENGATURAN -->
+      <section class="halaman tersembunyi" id="halaman-pengaturan">
+        <div class="pengaturan-container">
+          <h2 class="page-title">Pengaturan</h2>
+          
+          <div class="pengaturan-group">
+            <h3>Tampilan</h3>
+            <div class="pengaturan-item">
+              <div class="pengaturan-info">
+                <span class="material-icons-round">palette</span>
+                <div>
+                  <strong>Tema Aplikasi</strong>
+                  <p>Pilih antara mode terang atau gelap</p>
+                </div>
+              </div>
+              <div class="tema-switch">
+                <button class="tema-option" data-tema="terang">
+                  <span class="material-icons-round">light_mode</span> Terang
+                </button>
+                <button class="tema-option active" data-tema="gelap">
+                  <span class="material-icons-round">dark_mode</span> Gelap
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="pengaturan-group">
+            <h3>Tentang Aplikasi</h3>
+            <div class="pengaturan-item">
+              <div class="pengaturan-info">
+                <span class="material-icons-round">info</span>
+                <div>
+                  <strong>OpenPLS Indonesia v1.0.0</strong>
+                  <p>Aplikasi open-source analisis PLS-SEM untuk riset akademik dan edukasi berlisensi CC BY-NC 4.0. Dibuat dengan ❤️ di Indonesia.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+    </main>
+  </div>
+  
+  <!-- ============ MODAL PROYEK BARU ============ -->
+  <div class="modal-overlay tersembunyi" id="modalProyekBaru">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Buat Proyek Baru</h3>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="inputNamaProyek">Nama Proyek</label>
+          <input type="text" class="form-input" id="inputNamaProyek" placeholder="Contoh: Penelitian Skripsi 2024">
+        </div>
+        <div class="form-group">
+          <label for="inputDeskripsiProyek">Deskripsi (opsional)</label>
+          <textarea class="form-input" id="inputDeskripsiProyek" rows="3" placeholder="Deskripsi singkat proyek penelitian Anda..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-close">Batal</button>
+        <button class="btn btn-primary" id="btnSimpanProyekBaru">
+          <span class="material-icons-round">add</span> Buat Proyek
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ============ MODAL TAMBAH VARIABEL ============ -->
+  <div class="modal-overlay tersembunyi" id="modalTambahVariabel">
+    <div class="modal modal-md">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--color-primary-light); color: var(--color-primary); display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons-round" style="font-size: 20px;">add_circle</span>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px;">Tambah Variabel Laten</h3>
+            <span style="font-size: 12px; color: var(--text-secondary);">Definisikan konstruk laten dan indikator pengukurannya</span>
+          </div>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="inputNamaVariabel">Nama Variabel Laten</label>
+          <input type="text" class="form-input" id="inputNamaVariabel" placeholder="Contoh: Kualitas Layanan / Corporate Image">
+        </div>
+
+        <div class="form-group">
+          <label>Tipe Model Pengukuran</label>
+          <div class="tipe-selector-grid">
+            <label class="tipe-card active">
+              <input type="radio" name="tipeVariabel" value="reflektif" checked>
+              <div class="tipe-card-inner">
+                <span class="material-icons-round tipe-icon">call_made</span>
+                <div class="tipe-info">
+                  <strong>Reflektif (Mode A)</strong>
+                  <small>Panah dari laten menuju indikator (Standar Kuesioner)</small>
+                </div>
+              </div>
+            </label>
+            <label class="tipe-card">
+              <input type="radio" name="tipeVariabel" value="formatif">
+              <div class="tipe-card-inner">
+                <span class="material-icons-round tipe-icon">call_received</span>
+                <div class="tipe-info">
+                  <strong>Formatif (Mode B)</strong>
+                  <small>Panah dari indikator menuju laten (Komposit)</small>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Posisi Kotak Indikator (Orientasi)</label>
+          <div class="orientasi-selector-grid">
+            <label class="orientasi-card active">
+              <input type="radio" name="orientasiIndikator" value="kiri" checked>
+              <div class="orientasi-card-inner">
+                <span class="material-icons-round">arrow_back</span>
+                <span>Kiri</span>
+              </div>
+            </label>
+            <label class="orientasi-card">
+              <input type="radio" name="orientasiIndikator" value="kanan">
+              <div class="orientasi-card-inner">
+                <span class="material-icons-round">arrow_forward</span>
+                <span>Kanan</span>
+              </div>
+            </label>
+            <label class="orientasi-card">
+              <input type="radio" name="orientasiIndikator" value="atas">
+              <div class="orientasi-card-inner">
+                <span class="material-icons-round">arrow_upward</span>
+                <span>Atas</span>
+              </div>
+            </label>
+            <label class="orientasi-card">
+              <input type="radio" name="orientasiIndikator" value="bawah">
+              <div class="orientasi-card-inner">
+                <span class="material-icons-round">arrow_downward</span>
+                <span>Bawah</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label style="margin: 0;">Daftar Indikator (Manifest Variables)</label>
+            <button type="button" class="btn btn-sm btn-ghost" id="btnToggleBatchInput" style="font-size: 11.5px; padding: 2px 8px;">
+              <span class="material-icons-round" style="font-size: 14px;">flash_on</span> Input Cepat / Batch
+            </button>
+          </div>
+          <small style="font-size: 11.5px; color: var(--color-primary); display: block; margin-bottom: 6px;">
+            💡 <strong>Opsional:</strong> Boleh dikosongkan jika Anda ingin membuat kerangka pemikiran konseptual sebelum instrumen penelitian disebarkan.
+          </small>
+
+          <!-- Quick Batch Input Container (Hidden by default) -->
+          <div id="batchInputContainer" class="batch-input-box tersembunyi">
+            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Ketik atau paste nama indikator dipisah koma atau baris baru:</label>
+            <textarea class="form-input" id="inputBatchIndikator" rows="2" placeholder="Contoh: SQ1, SQ2, SQ3, SQ4, SQ5"></textarea>
+            <div style="margin-top: 6px; display: flex; justify-content: flex-end;">
+              <button type="button" class="btn btn-sm btn-primary" id="btnTerapkanBatch">Terapkan Indikator</button>
+            </div>
+          </div>
+
+          <!-- Dataset Column Suggestions -->
+          <div id="datasetColumnsSuggestion" class="dataset-chips-container tersembunyi">
+            <span style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Pilih dari kolom dataset:</span>
+            <div class="dataset-chips" id="datasetChipsList"></div>
+          </div>
+
+          <!-- Individual Indicators List -->
+          <div id="indikatorContainer" style="margin-top: 8px;">
+            <!-- Indikator rows akan diisi di sini -->
+          </div>
+          
+          <button type="button" class="btn btn-sm btn-outline btn-block" id="btnTambahIndikator" style="margin-top: 6px;">
+            <span class="material-icons-round">add</span> Tambah Baris Indikator
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-close">Batal</button>
+        <button class="btn btn-primary" id="btnSimpanVariabel">
+          <span class="material-icons-round">check</span> Simpan Variabel
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ============ MODAL TAMBAH JALUR ============ -->
+  <div class="modal-overlay tersembunyi" id="modalTambahJalur">
+    <div class="modal modal-md">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--color-primary-light); color: var(--color-primary); display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons-round" style="font-size: 20px;">trending_flat</span>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px;">Tambah Jalur Struktural (Path)</h3>
+            <span style="font-size: 12px; color: var(--text-secondary);">Hubungan langsung maupun mediasi (tidak langsung) antar variabel</span>
+          </div>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Pilihan Jenis Hubungan: Langsung vs Mediasi -->
+        <div class="form-group">
+          <label>Jenis Hubungan Pengaruh</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <label class="tipe-hubungan-card active" id="cardHubunganLangsung" style="cursor: pointer; padding: 10px; border: 1.5px solid var(--color-primary); background: var(--color-primary-light); border-radius: var(--radius-md); display: flex; align-items: center; gap: 8px;">
+              <input type="radio" name="tipeHubunganJalur" value="langsung" checked style="accent-color: var(--color-primary);">
+              <div>
+                <strong style="font-size: 12.5px; display: block;">Pengaruh Langsung</strong>
+                <span style="font-size: 10.5px; color: var(--text-secondary);">Dari Asal (X) → Langsung ke Tujuan (Y)</span>
+              </div>
+            </label>
+            <label class="tipe-hubungan-card" id="cardHubunganMediasi" style="cursor: pointer; padding: 10px; border: 1.5px solid var(--border-color); background: var(--bg-hover); border-radius: var(--radius-md); display: flex; align-items: center; gap: 8px;">
+              <input type="radio" name="tipeHubunganJalur" value="mediasi" style="accent-color: var(--color-primary);">
+              <div>
+                <strong style="font-size: 12.5px; display: block;">Pengaruh Mediasi</strong>
+                <span style="font-size: 10.5px; color: var(--text-secondary);">Dari X → Lewat Mediator (Z) → Ke Y</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label for="selectDariVariabel">Variabel Asal / Eksogen (X)</label>
+            <select class="form-input" id="selectDariVariabel">
+              <option value="">-- Pilih Variabel Asal --</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="selectKeVariabel">Variabel Tujuan / Endogen (Y)</label>
+            <select class="form-input" id="selectKeVariabel">
+              <option value="">-- Pilih Variabel Tujuan --</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Container Pilihan Mediator (Hanya tampil jika tipe hubungan = mediasi) -->
+        <div class="form-group tersembunyi" id="containerPilihMediator" style="background: rgba(245, 158, 11, 0.08); border: 1.5px dashed #f59e0b; padding: 10px 14px; border-radius: 8px;">
+          <label for="selectMediatorVariabel" style="color: #d97706; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+            <span class="material-icons-round" style="font-size: 16px;">mediation</span>
+            Melalui Variabel Mediator (Z)
+          </label>
+          <select class="form-input" id="selectMediatorVariabel">
+            <option value="">-- Pilih Variabel Mediator (Z) --</option>
+          </select>
+          <small style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">Sistem akan menghubungkan jalur dari X ke Z dan dari Z ke Y secara berurutan.</small>
+        </div>
+
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label for="inputLabelJalur">Label Hipotesis</label>
+            <input type="text" class="form-input" id="inputLabelJalur" placeholder="Contoh: H1, H2, H8 (X1->Z->Y)">
+          </div>
+
+          <div class="form-group">
+            <label>Gaya Garis</label>
+            <div class="tipe-garis-selector" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <label class="tipe-garis-card active" style="cursor: pointer; padding: 8px; border: 1.5px solid var(--color-primary); background: var(--color-primary-light); border-radius: var(--radius-md); display: flex; align-items: center; gap: 6px;">
+                <input type="radio" name="tipeGarisJalur" value="solid" checked style="accent-color: var(--color-primary);">
+                <span style="font-size: 11.5px; font-weight: 600;">Solid (—)</span>
+              </label>
+              <label class="tipe-garis-card" style="cursor: pointer; padding: 8px; border: 1.5px solid var(--border-color); background: var(--bg-hover); border-radius: var(--radius-md); display: flex; align-items: center; gap: 6px;">
+                <input type="radio" name="tipeGarisJalur" value="dashed" style="accent-color: var(--color-primary);">
+                <span style="font-size: 11.5px; font-weight: 600;">Putus (- -)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ketebalan Garis -->
+        <div class="form-group">
+          <label>Ketebalan Garis</label>
+          <div class="tipe-tebal-selector" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+            <label class="tipe-tebal-card" style="cursor: pointer; padding: 7px 6px; border: 1.5px solid var(--border-color); background: var(--bg-hover); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <input type="radio" name="tipeTebalGarisJalur" value="1.5" style="accent-color: var(--color-primary);">
+              <span style="font-size: 11px;">1.5px (Tipis)</span>
+            </label>
+            <label class="tipe-tebal-card active" style="cursor: pointer; padding: 7px 6px; border: 1.5px solid var(--color-primary); background: var(--color-primary-light); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <input type="radio" name="tipeTebalGarisJalur" value="2.5" checked style="accent-color: var(--color-primary);">
+              <span style="font-size: 11px; font-weight: 700;">2.5px (Normal)</span>
+            </label>
+            <label class="tipe-tebal-card" style="cursor: pointer; padding: 7px 6px; border: 1.5px solid var(--border-color); background: var(--bg-hover); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <input type="radio" name="tipeTebalGarisJalur" value="4" style="accent-color: var(--color-primary);">
+              <span style="font-size: 11px;">4px (Tebal)</span>
+            </label>
+            <label class="tipe-tebal-card" style="cursor: pointer; padding: 7px 6px; border: 1.5px solid var(--border-color); background: var(--bg-hover); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <input type="radio" name="tipeTebalGarisJalur" value="6" style="accent-color: var(--color-primary);">
+              <span style="font-size: 11px;">6px (Ekstra)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Kelengkungan Garis / Bengkok (Line Curvature) -->
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label style="margin: 0;">Kelengkungan Garis Awal (Bisa di-drag langsung di canvas)</label>
+            <span id="labelNilaiKelengkungan" style="font-size: 11.5px; font-weight: 700; color: var(--color-primary);">Lurus (0)</span>
+          </div>
+          <input type="range" class="form-range" id="inputKelengkunganJalur" min="-80" max="80" value="0" step="5" style="width: 100%; cursor: pointer;">
+          <div style="display: flex; justify-content: space-between; gap: 6px; margin-top: 6px;">
+            <button type="button" class="btn btn-xs btn-outline" onclick="setPresetKelengkungan(-35)">Lengkung Bawah (-35)</button>
+            <button type="button" class="btn btn-xs btn-outline active" onclick="setPresetKelengkungan(0)">Lurus (0)</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick="setPresetKelengkungan(35)">Lengkung Atas (+35)</button>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-close">Batal</button>
+        <button class="btn btn-primary" id="btnSimpanJalur">
+          <span class="material-icons-round">check</span> Tambah Jalur
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ============ MODAL TEMPLATE MODEL ============ -->
+  <div class="modal-overlay tersembunyi" id="modalTemplateModel">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(245, 158, 11, 0.15); color: #f59e0b; display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons-round" style="font-size: 22px;">dashboard_customize</span>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 17px;">Galeri Template Model Penelitian</h3>
+            <span style="font-size: 12px; color: var(--text-secondary);">Pilih kerangka konseptual siap pakai untuk skripsi, tesis, dan publikasi</span>
+          </div>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="template-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+          
+          <!-- Template 1: Mediasi UMKM (Sesuai Gambar User) -->
+          <div class="template-card" style="border: 2px solid var(--color-primary); background: var(--bg-hover); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; justify-content: space-between; transition: var(--transition-normal); position: relative; overflow: hidden;">
+            <div style="position: absolute; top: 12px; right: 12px; background: var(--gradient-primary); color: #fff; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px;">
+              🌟 Rekomendasi
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span class="material-icons-round" style="color: var(--color-primary); font-size: 22px;">mediation</span>
+                <h4 style="margin: 0; font-size: 15px; font-weight: 700;">Model Mediasi / Pengaruh Tidak Langsung (3 Eksogen → Z → Y)</h4>
+              </div>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
+                Model lengkap sesuai lampiran: <strong>Literasi Keuangan (X1)</strong>, <strong>Kompetensi SDM (X2)</strong>, <strong>Inklusi Keuangan (X3)</strong> mempengaruhi <strong>Keberlanjutan UMKM (Y)</strong> secara langsung & melalui <strong>Adaptasi Fintech (Z)</strong> dengan jalur solid (H1-H7) dan putus-putus (H8-H10).
+              </p>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;">
+                <span class="badge badge-sukses">5 Variabel</span>
+                <span class="badge badge-peringatan">10 Hipotesis (H1-H10)</span>
+                <span class="badge" style="background: rgba(99,102,241,0.2); color: var(--color-primary);">Solid & Putus-putus</span>
+                <span class="badge badge-sukses">Auto Dataset Sampel</span>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" onclick="terapkanTemplateModel('mediasi_umkm')">
+              <span class="material-icons-round">play_arrow</span> Terapkan Template Ini
+            </button>
+          </div>
+
+          <!-- Template 2: Technology Acceptance Model (TAM) -->
+          <div class="template-card" style="border: 1px solid var(--border-color); background: var(--bg-hover); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; justify-content: space-between; transition: var(--transition-normal);">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span class="material-icons-round" style="color: #0ea5e9; font-size: 22px;">devices</span>
+                <h4 style="margin: 0; font-size: 15px; font-weight: 700;">Technology Acceptance Model (TAM)</h4>
+              </div>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
+                Model adopsi teknologi standar dunia: <strong>Perceived Ease of Use (PEOU)</strong> & <strong>Perceived Usefulness (PU)</strong> $\rightarrow$ <strong>Attitude Toward Using (ATU)</strong> $\rightarrow$ <strong>Behavioral Intention (BI)</strong> $\rightarrow$ <strong>Actual Use (AU)</strong>.
+              </p>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;">
+                <span class="badge badge-sukses">5 Variabel Laten</span>
+                <span class="badge badge-peringatan">6 Jalur Hipotesis</span>
+                <span class="badge badge-sukses">Auto Dataset</span>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" onclick="terapkanTemplateModel('tam')">
+              <span class="material-icons-round">play_arrow</span> Terapkan Template Ini
+            </button>
+          </div>
+
+          <!-- Template 3: Customer Satisfaction & Loyalty -->
+          <div class="template-card" style="border: 1px solid var(--border-color); background: var(--bg-hover); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; justify-content: space-between; transition: var(--transition-normal);">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span class="material-icons-round" style="color: #10b981; font-size: 22px;">sentiment_satisfied_alt</span>
+                <h4 style="margin: 0; font-size: 15px; font-weight: 700;">Kepuasan & Loyalitas Pelanggan</h4>
+              </div>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
+                Model pemasaran: <strong>Kualitas Produk (X1)</strong>, <strong>Kualitas Layanan (X2)</strong>, <strong>Persepsi Harga (X3)</strong> $\rightarrow$ <strong>Kepuasan Pelanggan (Y1)</strong> $\rightarrow$ <strong>Loyalitas Pelanggan (Y2)</strong>.
+              </p>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;">
+                <span class="badge badge-sukses">5 Variabel</span>
+                <span class="badge badge-peringatan">5 Jalur Hipotesis</span>
+                <span class="badge badge-sukses">Auto Dataset</span>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" onclick="terapkanTemplateModel('customer_satisfaction')">
+              <span class="material-icons-round">play_arrow</span> Terapkan Template Ini
+            </button>
+          </div>
+
+          <!-- Template 4: Model Moderasi -->
+          <div class="template-card" style="border: 1px solid var(--border-color); background: var(--bg-hover); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; justify-content: space-between; transition: var(--transition-normal);">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span class="material-icons-round" style="color: #ec4899; font-size: 22px;">tune</span>
+                <h4 style="margin: 0; font-size: 15px; font-weight: 700;">Model Pengaruh Moderasi (Moderating Effect)</h4>
+              </div>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
+                <strong>Pengaruh Independen (X)</strong> $\rightarrow$ <strong>Kinerja (Y)</strong> dengan variabel moderasi <strong>Budaya Organisasi (M)</strong> serta efek interaksi (X*M).
+              </p>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;">
+                <span class="badge badge-sukses">4 Variabel</span>
+                <span class="badge badge-peringatan">Efek Moderasi</span>
+                <span class="badge badge-sukses">Auto Dataset</span>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" onclick="terapkanTemplateModel('moderasi')">
+              <span class="material-icons-round">play_arrow</span> Terapkan Template Ini
+            </button>
+          </div>
+
+          <!-- Template 5: Standar 2 Eksogen 1 Endogen -->
+          <div class="template-card" style="border: 1px solid var(--border-color); background: var(--bg-hover); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; justify-content: space-between; transition: var(--transition-normal);">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span class="material-icons-round" style="color: #8b5cf6; font-size: 22px;">schema</span>
+                <h4 style="margin: 0; font-size: 15px; font-weight: 700;">Model Regresi Struktural Standar (2 Eksogen → 1 Endogen)</h4>
+              </div>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
+                Model dasar klasik skripsi/penelitian: <strong>Motivasi Kerja (X1)</strong> & <strong>Disiplin Kerja (X2)</strong> $\rightarrow$ <strong>Kinerja Karyawan (Y)</strong>.
+              </p>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;">
+                <span class="badge badge-sukses">3 Variabel</span>
+                <span class="badge badge-peringatan">2 Hipotesis</span>
+                <span class="badge badge-sukses">Auto Dataset</span>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" onclick="terapkanTemplateModel('standar_regresi')">
+              <span class="material-icons-round">play_arrow</span> Terapkan Template Ini
+            </button>
+          </div>
+
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-close">Tutup</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ============ MODAL EKSPOR GAMBAR 600 DPI ============ -->
+  <div class="modal-overlay tersembunyi" id="modalEksporGambar">
+    <div class="modal modal-md">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: var(--color-primary);">photo_camera</span>
+          <h3>Ekspor Gambar Diagram Model</h3>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="info-alert" style="background: rgba(102, 126, 234, 0.12); border-left: 4px solid var(--color-primary); padding: 10px 14px; border-radius: 6px; margin-bottom: 16px;">
+          <strong style="display: block; color: var(--color-primary); margin-bottom: 2px;">📐 Standar Publikasi Jurnal (600 DPI)</strong>
+          <span style="font-size: 12px; color: var(--text-secondary);">Gambar dirender dengan resolusi ultra-tajam anti-pecah, siap untuk artikel ilmiah, Scopus / WoS, tesis, dan skripsi.</span>
+        </div>
+        
+        <div class="form-group">
+          <label>Resolusi (DPI)</label>
+          <div class="dpi-selector-grid">
+            <label class="dpi-card active">
+              <input type="radio" name="exportDpi" value="600" checked>
+              <div class="dpi-card-inner">
+                <span class="dpi-badge">Rekomendasi</span>
+                <strong>600 DPI</strong>
+                <small>Jurnal Scopus / Q1</small>
+              </div>
+            </label>
+            <label class="dpi-card">
+              <input type="radio" name="exportDpi" value="1200">
+              <div class="dpi-card-inner">
+                <span class="dpi-badge" style="background: #e056fd;">Ultra HD</span>
+                <strong>1200 DPI</strong>
+                <small>Cetak Skala Besar</small>
+              </div>
+            </label>
+            <label class="dpi-card">
+              <input type="radio" name="exportDpi" value="300">
+              <div class="dpi-card-inner">
+                <strong>300 DPI</strong>
+                <small>Standar Cetak</small>
+              </div>
+            </label>
+            <label class="dpi-card">
+              <input type="radio" name="exportDpi" value="96">
+              <div class="dpi-card-inner">
+                <strong>96 DPI</strong>
+                <small>Tampilan Web</small>
+              </div>
+            </label>
+          </div>
+        </div>
+        
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label for="exportFormat">Format File</label>
+            <select class="form-input" id="exportFormat">
+              <option value="png" selected>PNG (Lossless High Quality)</option>
+              <option value="jpg">JPEG (Standar Gambar)</option>
+              <option value="svg">SVG (Vektor Tak Terbatas)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="exportBackground">Latar Belakang</label>
+            <select class="form-input" id="exportBackground">
+              <option value="white" selected>Putih Bersih (Publikasi)</option>
+              <option value="transparent">Transparan (PNG/SVG)</option>
+              <option value="dark">Tema Gelap (Dark Mode)</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Opsi Tampilan Diagram</label>
+          <div class="checkbox-group" style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="checkShowIndicators" checked>
+              <span><strong>Tampilkan Kotak Indikator (Outer Model)</strong> (Hilangkan centang untuk ekspor model struktural saja)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="checkShowR2" checked>
+              <span>Tampilkan Nilai R² di dalam Variabel Laten</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="checkShowLoadings" checked>
+              <span>Tampilkan Nilai Outer Loading pada Panah Indikator</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="checkShowPathCoeff" checked>
+              <span>Tampilkan Nilai Path Coefficient pada Panah Struktural</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="checkShowPValues" checked>
+              <span>Tampilkan P-Values / T-Statistik (jika ada Bootstrap)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="checkShowLegend" checked>
+              <span>Tampilkan Kotak Keterangan / Legenda (Pengaruh Langsung & Tak Langsung)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between;">
+        <button class="btn btn-ghost modal-close">Batal</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-outline" id="btnSalinGambar" title="Salin gambar resolusi tinggi ke clipboard">
+            <span class="material-icons-round">content_copy</span> Salin Gambar
+          </button>
+          <button class="btn btn-primary" id="btnDownloadGambar">
+            <span class="material-icons-round">file_download</span> Simpan Gambar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ============ MODAL PILIH PROYEK ============ -->
+  <div class="modal-overlay tersembunyi" id="modalPilihProyek">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3>Pilih Proyek</h3>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="proyek-list" id="proyekListModal">
+          <!-- Akan diisi secara dinamis -->
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ============ MODAL KONFIRMASI KUSTOM ============ -->
+  <div class="modal-overlay tersembunyi" id="modalKonfirmasi">
+    <div class="modal modal-sm modal-confirm">
+      <div class="modal-confirm-body">
+        <div class="modal-confirm-icon-wrapper" id="confirmIconWrapper">
+          <span class="material-icons-round" id="confirmIcon">delete_outline</span>
+        </div>
+        <h3 id="confirmTitle" class="confirm-title">Konfirmasi Hapus</h3>
+        <p id="confirmMessage" class="confirm-message">Apakah Anda yakin ingin menghapus item ini?</p>
+      </div>
+      <div class="modal-footer modal-confirm-footer">
+        <button class="btn btn-ghost" id="btnConfirmBatal">Batal</button>
+        <button class="btn btn-danger" id="btnConfirmOk">
+          <span class="material-icons-round" id="confirmOkIcon">delete</span>
+          <span id="confirmOkText">Ya, Hapus</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ============ MODAL UBAH NAMA PROYEK ============ -->
+  <div class="modal-overlay tersembunyi" id="modalRenameProyek">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: var(--color-primary);">drive_file_rename_outline</span>
+          <h3>Ubah Nama Proyek</h3>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="inputRenameNamaProyek">Nama Proyek</label>
+          <input type="text" class="form-input" id="inputRenameNamaProyek" placeholder="Nama proyek penelitian...">
+        </div>
+        <div class="form-group">
+          <label for="inputRenameDeskripsiProyek">Deskripsi (opsional)</label>
+          <textarea class="form-input" id="inputRenameDeskripsiProyek" rows="3" placeholder="Deskripsi singkat proyek..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-close">Batal</button>
+        <button class="btn btn-primary" id="btnSimpanRenameProyek">
+          <span class="material-icons-round">save</span> Simpan Perubahan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL RIWAYAT VERSI PROYEK ============ -->
+  <div class="modal-overlay tersembunyi" id="modalRiwayatVersi">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(59, 130, 246, 0.15); color: #3b82f6; display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons-round" style="font-size: 20px;">history</span>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px;">Riwayat & Snapshot Versi Proyek</h3>
+            <span style="font-size: 12px; color: var(--text-secondary);">Kelola berbagai variasi model (misal: Model Lengkap, Model Terpangkas, Uji Mediasi)</span>
+          </div>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- Buat Snapshot Versi Baru -->
+        <div class="snapshot-card-create" style="background: var(--bg-surface-secondary, rgba(255,255,255,0.05)); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 18px;">
+          <h4 style="margin: 0 0 10px 0; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+            <span class="material-icons-round" style="font-size: 18px; color: var(--color-primary);">bookmark_add</span>
+            Simpan Versi Snapshot Baru dari Model Saat Ini
+          </h4>
+          <div style="display: grid; grid-template-columns: 1fr 1.5fr auto; gap: 10px; align-items: flex-end;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="inputNamaVersiBaru" style="font-size: 12px;">Nama Versi</label>
+              <input type="text" class="form-input" id="inputNamaVersiBaru" placeholder="Contoh: Versi 2 - Hapus SQ4">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="inputCatatanVersiBaru" style="font-size: 12px;">Catatan Perubahan (opsional)</label>
+              <input type="text" class="form-input" id="inputCatatanVersiBaru" placeholder="Keterangan modifikasi variabel/jalur...">
+            </div>
+            <button class="btn btn-primary" id="btnSimpanVersiSnapshot" style="white-space: nowrap;">
+              <span class="material-icons-round">save</span> Simpan Snapshot
+            </button>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h4 style="margin: 0; font-size: 14px; color: var(--text-primary);">Daftar Snapshot Versi Tersimpan</h4>
+          <span style="font-size: 12px; color: var(--text-muted);">💡 Versi terbaru otomatis dimuat sebagai default jika belum memilih versi lain.</span>
+        </div>
+
+        <div id="listRiwayatVersi" class="versi-list-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto;">
+          <!-- Diisi secara dinamis via JavaScript -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-close">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL EDIT CATATAN / KETERANGAN CANVAS ============ -->
+  <div class="modal-overlay tersembunyi" id="modalEditCatatan">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: #f59e0b;">sticky_note_2</span>
+          <h3 id="modalCatatanTitle">Tambah Keterangan / Catatan</h3>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="inputTeksCatatan">Isi Keterangan / Catatan</label>
+          <textarea class="form-input" id="inputTeksCatatan" rows="4" placeholder="Tuliskan catatan hipotesis, informasi konstruk, atau penjelasan model di sini..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Warna Catatan</label>
+          <div class="warna-catatan-selector" style="display: flex; gap: 10px; margin-top: 6px;">
+            <label class="color-chip active" style="background: #fef08a; border: 2px solid #eab308; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+              <input type="radio" name="warnaCatatan" value="#fef08a" checked style="display: none;">
+              <span class="material-icons-round check-mark" style="font-size: 16px; color: #713f12;">check</span>
+            </label>
+            <label class="color-chip" style="background: #bae6fd; border: 2px solid #0284c7; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+              <input type="radio" name="warnaCatatan" value="#bae6fd" style="display: none;">
+              <span class="material-icons-round check-mark tersembunyi" style="font-size: 16px; color: #0369a1;">check</span>
+            </label>
+            <label class="color-chip" style="background: #bbf7d0; border: 2px solid #16a34a; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+              <input type="radio" name="warnaCatatan" value="#bbf7d0" style="display: none;">
+              <span class="material-icons-round check-mark tersembunyi" style="font-size: 16px; color: #15803d;">check</span>
+            </label>
+            <label class="color-chip" style="background: #fbcfe8; border: 2px solid #db2777; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+              <input type="radio" name="warnaCatatan" value="#fbcfe8" style="display: none;">
+              <span class="material-icons-round check-mark tersembunyi" style="font-size: 16px; color: #be185d;">check</span>
+            </label>
+            <label class="color-chip" style="background: #e9d5ff; border: 2px solid #9333ea; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+              <input type="radio" name="warnaCatatan" value="#e9d5ff" style="display: none;">
+              <span class="material-icons-round check-mark tersembunyi" style="font-size: 16px; color: #7e22ce;">check</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between;">
+        <button class="btn btn-danger btn-sm tersembunyi" id="btnHapusCatatan">
+          <span class="material-icons-round">delete</span> Hapus
+        </button>
+        <div style="display: flex; gap: 8px; margin-left: auto;">
+          <button class="btn btn-ghost modal-close">Batal</button>
+          <button class="btn btn-primary" id="btnSimpanCatatan">
+            <span class="material-icons-round">check</span> Simpan Catatan
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL TENTANG & BANTUAN ============ -->
+  <div class="modal-overlay tersembunyi" id="modalTentang">
+    <div class="modal modal-md" style="max-width: 640px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #a855f7); display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">
+            <span class="material-icons-round" style="font-size: 20px;">info</span>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Tentang OpenPLS Indonesia</h3>
+            <span style="font-size: 11px; color: var(--text-muted);">Versi 1.0.0 • Open Source PLS-SEM Research & Education Software</span>
+          </div>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px; max-height: 70vh; overflow-y: auto; padding-right: 4px;">
+        
+        <!-- App Intro Card -->
+        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(168, 85, 247, 0.08)); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px; padding: 14px 16px; display: flex; gap: 14px; align-items: flex-start;">
+          <div style="font-size: 30px; line-height: 1;">📊</div>
+          <div>
+            <h4 style="margin: 0 0 4px 0; font-size: 14.5px; font-weight: 700; color: var(--color-primary);">OpenPLS Indonesia</h4>
+            <p style="margin: 0; font-size: 12.5px; color: var(--text-color); line-height: 1.55;">
+              Perangkat lunak analisis statistik <strong>PLS-SEM (Partial Least Squares - Structural Equation Modeling)</strong> independen dan terbuka yang dirancang khusus untuk memfasilitasi riset akademik, skripsi, tesis, disertasi, dan pembelajaran sains terbuka.
+            </p>
+          </div>
+        </div>
+
+        <!-- Ethical & Legal Disclaimer Card -->
+        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 14px 16px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <span class="material-icons-round" style="color: #f59e0b; font-size: 20px;">gavel</span>
+            <h4 style="margin: 0; font-size: 13.5px; font-weight: 700; color: #f59e0b;">Disclaimer Etis & Independensi</h4>
+          </div>
+          <p style="font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.55;">
+            OpenPLS Indonesia adalah proyek non-komersial independen dan <strong>TIDAK berafiliasi dengan, disponsori, atau didukung oleh SmartPLS GmbH</strong> atau entitas komersial lainnya. Seluruh algoritma dibangun secara mandiri berdasarkan literatur ilmiah dan metodologi statistik domain publik (Wold, Lohmöller, Hair et al.).
+          </p>
+        </div>
+
+        <!-- License Card (CC BY-NC 4.0) -->
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 14px 16px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <span class="material-icons-round" style="color: #10b981; font-size: 20px;">verified</span>
+            <h4 style="margin: 0; font-size: 13.5px; font-weight: 700; color: #10b981;">Lisensi: Creative Commons Attribution-NonCommercial 4.0 (CC BY-NC 4.0)</h4>
+          </div>
+          <p style="font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.55;">
+            Perangkat lunak ini bebas digunakan, dimodifikasi, dan dibagikan untuk <strong>tujuan riset akademik, tugas akhir, dan edukasi non-komersial</strong>. Dilarang diperjualbelikan atau digunakan untuk keuntungan finansial langsung tanpa persetujuan.
+          </p>
+        </div>
+
+        <!-- Bantuan & Kontak Email Card -->
+        <div style="background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span class="material-icons-round" style="color: #3b82f6; font-size: 20px;">support_agent</span>
+            <h4 style="margin: 0; font-size: 13.5px; font-weight: 700;">Bantuan & Diskusi Riset</h4>
+          </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.5;">
+            Untuk konsultasi metodologi, pelaporan bug, atau kontribusi pengembangan open-source:
+          </p>
+
+          <div style="background: var(--bg-card); border: 1.5px dashed var(--color-primary); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 34px; height: 34px; border-radius: 8px; background: rgba(59, 130, 246, 0.12); color: #3b82f6; display: flex; align-items: center; justify-content: center;">
+                <span class="material-icons-round" style="font-size: 18px;">mail</span>
+              </div>
+              <div>
+                <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Email Komunitas</span>
+                <div style="font-size: 13.5px; font-weight: 700; color: var(--color-primary); user-select: all;" id="textSupportEmail">test@gmail.com</div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-sm btn-outline" id="btnSalinEmailSupport" style="gap: 4px; padding: 4px 10px; font-size: 11.5px;">
+                <span class="material-icons-round" style="font-size: 14px;">content_copy</span>
+                <span>Salin Email</span>
+              </button>
+              <button class="btn btn-sm btn-primary" id="btnKirimEmailSupport" style="gap: 4px; padding: 4px 12px; font-size: 11.5px;">
+                <span class="material-icons-round" style="font-size: 14px;">send</span>
+                <span>Kirim Email</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pintasan Keyboard Populer -->
+        <div style="background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span class="material-icons-round" style="color: #f59e0b; font-size: 17px;">keyboard</span>
+            <h4 style="margin: 0; font-size: 13px; font-weight: 700;">Pintasan Keyboard</h4>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11.5px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <span style="color: var(--text-muted);">Undo Perubahan</span>
+              <kbd style="background: var(--bg-hover); padding: 2px 5px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">Ctrl + Z</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <span style="color: var(--text-muted);">Redo Perubahan</span>
+              <kbd style="background: var(--bg-hover); padding: 2px 5px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">Ctrl + Y</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <span style="color: var(--text-muted);">Pilih Semua Elemen</span>
+              <kbd style="background: var(--bg-hover); padding: 2px 5px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">Ctrl + A</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <span style="color: var(--text-muted);">Hapus Terpilih</span>
+              <kbd style="background: var(--bg-hover); padding: 2px 5px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">Delete</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <span style="color: var(--text-muted);">Toggle Menu</span>
+              <kbd style="background: var(--bg-hover); padding: 2px 5px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">Ctrl + B</kbd>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <span style="color: var(--text-muted);">Fullscreen Canvas</span>
+              <kbd style="background: var(--bg-hover); padding: 2px 5px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">F / Esc</kbd>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 11px; color: var(--text-muted);">© 2026 OpenPLS Indonesia Contributors • Lisensi CC BY-NC 4.0</span>
+        <button class="btn btn-primary modal-close">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TOAST NOTIFICATION ============ -->
+  <div class="toast-container" id="toastContainer"></div>
+  
+  <!-- ============ LOADING OVERLAY ============ -->
+  <div class="loading-overlay tersembunyi" id="loadingOverlay">
+    <div class="loading-spinner">
+      <div class="spinner"></div>
+      <p id="loadingText">Memproses...</p>
+    </div>
+  </div>
+  
+  <script src="pls-engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+
