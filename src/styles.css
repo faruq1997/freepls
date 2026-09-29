@@ -2394,6 +2394,117 @@ select.form-input {
   font-weight: 700;
 }
 
+/* ============ APA 7TH EDITION TABLE STYLING ============ */
+.apa-table-wrapper {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.apa-table-header-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.apa-table-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.apa-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 13px;
+  border-top: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  margin: 8px 0;
+}
+
+.apa-table th {
+  border-bottom: 1px solid currentColor;
+  padding: 6px 10px;
+  text-align: left;
+  font-weight: 700;
+  font-style: italic;
+}
+
+.apa-table td {
+  padding: 5px 10px;
+  border: none;
+}
+
+.apa-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+.apa-table-note {
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ============ NARASI LAPORAN BAB 4 CARD ============ */
+.narasi-laporan-card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05));
+  border: 1.5px solid rgba(99, 102, 241, 0.25);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  line-height: 1.65;
+  color: var(--text-primary);
+  position: relative;
+}
+
+.narasi-laporan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+  padding-bottom: 8px;
+}
+
+.narasi-laporan-body {
+  font-size: 13.5px;
+  text-align: justify;
+}
+
+.narasi-laporan-body p {
+  margin-bottom: 10px;
+}
+
+.fit-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.fit-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fit-card .fit-val {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
 /* ============ RESPONSIVE ============ */
 @media (max-width: 900px) {
   .beranda-hero {

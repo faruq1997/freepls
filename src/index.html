@@ -348,7 +348,16 @@
             <h2 class="page-title">Kelola Data</h2>
             <span class="proyek-nama-aktif" id="proyekNamaData" title="Klik untuk membuat proyek baru atau mengubah nama proyek">Belum ada proyek dipilih</span>
           </div>
-          <div class="toolbar-right">
+          <div class="toolbar-right" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-sm btn-outline" id="btnBukaImputasiData" title="Imputasi data kosong (Missing Values)">
+              <span class="material-icons-round" style="font-size: 16px; color: #f59e0b;">healing</span> Imputasi Data
+            </button>
+            <button class="btn btn-sm btn-outline" id="btnBukaReverseScore" title="Balik skor indikator negatif (Reverse Coding)">
+              <span class="material-icons-round" style="font-size: 16px; color: #8b5cf6;">swap_horiz</span> Reverse Skala
+            </button>
+            <button class="btn btn-sm btn-outline" id="btnBukaDeteksiOutlier" title="Deteksi data pencilan ekstrem (Outliers)">
+              <span class="material-icons-round" style="font-size: 16px; color: #ec4899;">rule</span> Cek Outlier
+            </button>
             <button class="btn btn-sm btn-primary" id="btnImporData">
               <span class="material-icons-round">upload_file</span> Impor Data
             </button>
@@ -386,7 +395,7 @@
               <span class="material-icons-round">calculate</span>
             </div>
             <h3>Algoritma PLS</h3>
-            <p>Jalankan algoritma PLS-SEM untuk menghitung koefisien jalur, outer loading, dan nilai R²</p>
+            <p>Jalankan algoritma PLS-SEM untuk menghitung koefisien jalur, outer loading, HTMT, VIF, Model Fit, dan nilai R²</p>
             <div class="analisis-options">
               <div class="form-group">
                 <label>Iterasi Maksimum</label>
@@ -399,7 +408,7 @@
               <div class="form-group">
                 <label>Skema Bobot</label>
                 <select class="form-input" id="skemaBobot">
-                  <option value="path">Skema Jalur (Path)</option>
+                  <option value="path">Skema Jalur (Path - Standar Hair et al.)</option>
                   <option value="centroid">Skema Centroid</option>
                   <option value="factorial">Skema Faktorial</option>
                 </select>
@@ -415,7 +424,7 @@
               <span class="material-icons-round">shuffle</span>
             </div>
             <h3>Bootstrapping</h3>
-            <p>Uji signifikansi koefisien jalur menggunakan metode bootstrapping</p>
+            <p>Uji signifikansi koefisien jalur, efek mediasi tidak langsung (Specific Indirect Effects), dan outer loadings</p>
             <div class="analisis-options">
               <div class="form-group">
                 <label>Jumlah Subsampel</label>
@@ -424,9 +433,9 @@
               <div class="form-group">
                 <label>Tingkat Signifikansi</label>
                 <select class="form-input" id="tingkatSignifikansi">
-                  <option value="0.05">0.05 (95%)</option>
-                  <option value="0.01">0.01 (99%)</option>
-                  <option value="0.10">0.10 (90%)</option>
+                  <option value="0.05">0.05 (95% Confidence Interval)</option>
+                  <option value="0.01">0.01 (99% Confidence Interval)</option>
+                  <option value="0.10">0.10 (90% Confidence Interval)</option>
                 </select>
               </div>
               <div class="form-group">
@@ -451,19 +460,39 @@
             <h2 class="page-title">Hasil Analisis</h2>
             <span class="proyek-nama-aktif" id="proyekNamaHasil" title="Klik untuk membuat proyek baru atau mengubah nama proyek">Belum ada proyek dipilih</span>
           </div>
-          <div class="toolbar-right">
-            <button class="btn btn-sm btn-ghost" id="btnEksporHasil">
-              <span class="material-icons-round">download</span> Ekspor
+          <div class="toolbar-right" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-sm btn-outline" id="btnSalinLaporanBab4" title="Salin Draf Bab 4 Lengkap dalam Bahasa Indonesia">
+              <span class="material-icons-round" style="color: #6366f1;">content_copy</span> Salin Draf Bab 4
+            </button>
+            <button class="btn btn-sm btn-outline" id="btnDownloadLaporanBab4" title="Unduh Dokumen Laporan Lengkap (.html / Word)">
+              <span class="material-icons-round" style="color: #10b981;">description</span> Unduh Laporan
+            </button>
+            <button class="btn btn-sm btn-primary" id="btnEksporHasil" title="Ekspor Seluruh Tabel Hasil ke Excel">
+              <span class="material-icons-round">download</span> Ekspor Excel
             </button>
           </div>
         </div>
         
         <div class="hasil-container">
           <div class="hasil-tabs">
-            <button class="hasil-tab active" data-tab="ringkasan">Ringkasan</button>
-            <button class="hasil-tab" data-tab="outer-model">Model Pengukuran</button>
-            <button class="hasil-tab" data-tab="inner-model">Model Struktural</button>
-            <button class="hasil-tab" data-tab="bootstrap">Bootstrapping</button>
+            <button class="hasil-tab active" data-tab="ringkasan">
+              <span class="material-icons-round" style="font-size: 16px;">insights</span> Ringkasan & Fit Model
+            </button>
+            <button class="hasil-tab" data-tab="outer-model">
+              <span class="material-icons-round" style="font-size: 16px;">fact_check</span> Outer Model & HTMT
+            </button>
+            <button class="hasil-tab" data-tab="inner-model">
+              <span class="material-icons-round" style="font-size: 16px;">account_tree</span> Inner Model & VIF
+            </button>
+            <button class="hasil-tab" data-tab="mediasi">
+              <span class="material-icons-round" style="font-size: 16px;">mediation</span> Efek Mediasi
+            </button>
+            <button class="hasil-tab" data-tab="bootstrap">
+              <span class="material-icons-round" style="font-size: 16px;">shuffle</span> Bootstrapping
+            </button>
+            <button class="hasil-tab" data-tab="laporan-bab4">
+              <span class="material-icons-round" style="font-size: 16px;">auto_stories</span> Draf Bab 4 & APA 7th
+            </button>
           </div>
           
           <div class="hasil-content" id="hasilContent">
@@ -490,6 +519,14 @@
                 <p>Belum ada hasil model struktural.</p>
               </div>
             </div>
+
+            <!-- Tab Mediasi -->
+            <div class="hasil-panel" id="tab-mediasi">
+              <div class="empty-state">
+                <span class="material-icons-round">mediation</span>
+                <p>Belum ada analisis efek mediasi. Jalankan bootstrapping untuk melihat signifikansi efek tidak langsung.</p>
+              </div>
+            </div>
             
             <!-- Tab Bootstrap -->
             <div class="hasil-panel" id="tab-bootstrap">
@@ -498,6 +535,17 @@
                 <p>Belum ada hasil bootstrapping.</p>
               </div>
             </div>
+
+            <!-- Tab Laporan Bab 4 -->
+            <div class="hasil-panel" id="tab-laporan-bab4">
+              <div class="empty-state">
+                <span class="material-icons-round">auto_stories</span>
+                <p>Jalankan PLS atau Bootstrapping untuk menghasilkan narasi akademik otomatis Bab 4 dan format tabel APA 7th.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
           </div>
         </div>
       </section>
@@ -1396,6 +1444,132 @@
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 11px; color: var(--text-muted);">© 2026 FreePLS Indonesia Contributors • Lisensi CC BY-NC 4.0</span>
         <button class="btn btn-primary modal-close">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL IMPUTASI DATA ============ -->
+  <div class="modal-overlay tersembunyi" id="modalImputasiData">
+    <div class="modal modal-md">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: #f59e0b;">healing</span>
+          <h3>Imputasi Data Hilang (Missing Values)</h3>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 14px;">
+          Mengganti data yang kosong (blank/NaN) pada dataset aktif dengan nilai estimasi statistik kolom.
+        </p>
+        <div class="form-group">
+          <label>Metode Imputasi</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <label class="tipe-card active" id="cardImputasiMean" style="cursor: pointer; padding: 12px; border: 1.5px solid var(--color-primary); background: var(--color-primary-light); border-radius: var(--radius-md); display: flex; align-items: center; gap: 8px;">
+              <input type="radio" name="metodeImputasi" value="mean" checked style="accent-color: var(--color-primary);">
+              <div>
+                <strong style="font-size: 13px; display: block;">Mean (Rata-Rata)</strong>
+                <small style="font-size: 11px; color: var(--text-secondary);">Cocok untuk data berdistribusi normal</small>
+              </div>
+            </label>
+            <label class="tipe-card" id="cardImputasiMedian" style="cursor: pointer; padding: 12px; border: 1.5px solid var(--border-color); background: var(--bg-hover); border-radius: var(--radius-md); display: flex; align-items: center; gap: 8px;">
+              <input type="radio" name="metodeImputasi" value="median" style="accent-color: var(--color-primary);">
+              <div>
+                <strong style="font-size: 13px; display: block;">Median (Nilai Tengah)</strong>
+                <small style="font-size: 11px; color: var(--text-secondary);">Tahan terhadap outlier ekstrem</small>
+              </div>
+            </label>
+          </div>
+        </div>
+        <div id="statusImputasiPreview" style="font-size: 12px; color: var(--text-muted); background: var(--bg-card); padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+          Dataset aktif akan diproses dan diperbarui secara otomatis.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-close">Batal</button>
+        <button class="btn btn-primary" id="btnJalankanImputasi">
+          <span class="material-icons-round">check</span> Terapkan Imputasi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL REVERSE SCORE ============ -->
+  <div class="modal-overlay tersembunyi" id="modalReverseScore">
+    <div class="modal modal-md">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: #8b5cf6;">swap_horiz</span>
+          <h3>Reverse Coding Skala Indikator Negatif</h3>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 14px;">
+          Membalik skala skor kuesioner pertanyaan negatif (misal skala 1-5 diubah menjadi: 1→5, 2→4, 3→3, 4→2, 5→1).
+        </p>
+        <div class="form-group">
+          <label for="selectKolomReverse">Pilih Kolom Indikator</label>
+          <select class="form-input" id="selectKolomReverse">
+            <option value="">-- Pilih Kolom --</option>
+          </select>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label for="inputMinScale">Skala Minimum (Min)</label>
+            <input type="number" class="form-input" id="inputMinScale" value="1">
+          </div>
+          <div class="form-group">
+            <label for="inputMaxScale">Skala Maksimum (Max)</label>
+            <input type="number" class="form-input" id="inputMaxScale" value="5">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-close">Batal</button>
+        <button class="btn btn-primary" id="btnJalankanReverseScore">
+          <span class="material-icons-round">swap_horiz</span> Balik Nilai Kolom
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL DETEKSI OUTLIER ============ -->
+  <div class="modal-overlay tersembunyi" id="modalDeteksiOutlier">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: #ec4899;">rule</span>
+          <h3>Deteksi Pencilan Data (Outlier Detection)</h3>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0;">
+            Deteksi multivariate outlier berdasarkan ambang batas Z-Score (|Z| &ge; 3.0 standar Hair et al.).
+          </p>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 12px; margin: 0;">Ambang Batas |Z|:</label>
+            <select class="form-input" id="selectThresholdOutlier" style="padding: 3px 8px; width: auto; font-size: 12px;">
+              <option value="2.5">2.5 (Sensitif)</option>
+              <option value="3.0" selected>3.0 (Standar Akademik)</option>
+              <option value="3.5">3.5 (Konservatif)</option>
+            </select>
+          </div>
+        </div>
+        <div id="containerHasilOutlier" style="max-height: 360px; overflow-y: auto;">
+          <!-- Diisi tabel outlier -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-close">Tutup</button>
       </div>
     </div>
   </div>

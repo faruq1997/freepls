@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('api', {
   datasetImpor: (proyekId) => ipcRenderer.invoke('dataset-impor', proyekId),
   datasetDaftar: (proyekId) => ipcRenderer.invoke('dataset-daftar', proyekId),
   datasetAmbil: (id) => ipcRenderer.invoke('dataset-ambil', id),
+  datasetSimpanData: (data) => ipcRenderer.invoke('dataset-simpan-data', data),
   datasetHapus: (id) => ipcRenderer.invoke('dataset-hapus', id),
   
   // Variabel Laten

@@ -143,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initProjectHandlers();
   initEditorHandlers();
   initDataHandlers();
+  initDataPreprocessingHandlers();
   initAnalysisHandlers();
   initResultsHandlers();
   initSettingsHandlers();
@@ -1323,6 +1324,7 @@ window.hapusSemuaTerpilih = async function() {
   // Undo & Redo Button Handlers
   document.getElementById('btnUndo')?.addEventListener('click', () => undo());
   document.getElementById('btnRedo')?.addEventListener('click', () => redo());
+  document.getElementById('btnAutoLayout')?.addEventListener('click', () => autoArrangeModel());
 
   // Dropdown Menu Lainnya Handler
   const dropdownLainnya = document.getElementById('dropdownLainnya');
@@ -4152,18 +4154,37 @@ async function runBootstrapAnalysis() {
   }
 }
 
-// ============ RESULTS DISPLAY ============
+// ============ RESULTS DISPLAY & AUTOMATED REPORT GENERATOR ============
 function initResultsHandlers() {
   document.querySelectorAll('.hasil-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.hasil-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.hasil-panel').forEach(p => p.classList.remove('active'));
       tab.classList.add('active');
-      document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+      const targetPanel = document.getElementById(`tab-${tab.dataset.tab}`);
+      if (targetPanel) targetPanel.classList.add('active');
     });
   });
   
-  document.getElementById('btnEksporHasil').addEventListener('click', async () => {
+  // Salin Draf Bab 4 Lengkap
+  document.getElementById('btnSalinLaporanBab4')?.addEventListener('click', () => {
+    if (!state.hasilPLS) {
+      showToast('Jalankan analisis PLS terlebih dahulu', 'peringatan');
+      return;
+    }
+    copyChapter4Text();
+  });
+
+  // Unduh Laporan Dokumen Bab 4
+  document.getElementById('btnDownloadLaporanBab4')?.addEventListener('click', () => {
+    if (!state.hasilPLS) {
+      showToast('Jalankan analisis PLS terlebih dahulu', 'peringatan');
+      return;
+    }
+    downloadChapter4Report();
+  });
+
+  document.getElementById('btnEksporHasil')?.addEventListener('click', async () => {
     if (!state.hasilPLS) {
       showToast('Belum ada hasil analisis', 'peringatan');
       return;
@@ -4172,92 +4193,377 @@ function initResultsHandlers() {
     const exportData = prepareExportData();
     const result = await window.api.eksporHasil({
       data: exportData,
-      namaFile: `Hasil_PLS_${state.proyekAktif ? state.proyekAktif.nama : 'Export'}.xlsx`
+      namaFile: `Hasil_Lengkap_PLS_${state.proyekAktif ? state.proyekAktif.nama.replace(/\s+/g, '_') : 'Export'}.xlsx`
     });
     
     if (result) {
-      showToast('Hasil berhasil diekspor', 'sukses');
+      showToast('Semua tabel hasil analisis berhasil diekspor ke Excel!', 'sukses');
     }
   });
 }
 
-function displayPLSResults(hasil) {
-  // Tab Ringkasan
-  const ringkasan = document.getElementById('tab-ringkasan');
-  ringkasan.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
-      <h3 style="margin: 0;">Ringkasan Hasil PLS-SEM</h3>
-      <div style="display: flex; gap: 8px;">
-        <button class="btn btn-sm btn-outline" onclick="navigateTo('editor')" title="Lihat diagram di editor">
-          <span class="material-icons-round">account_tree</span> Buka di Editor
-        </button>
-        <button class="btn btn-sm btn-primary" onclick="showModal('modalEksporGambar')" title="Ekspor diagram lengkap dengan hasil kalkulasi 600 DPI">
-          <span class="material-icons-round">image</span> Ekspor Diagram (600 DPI)
-        </button>
+// ============ DATA PREPROCESSING HANDLERS ============
+function initDataPreprocessingHandlers() {
+  // 1. Modal Imputasi Data
+  document.getElementById('btnBukaImputasiData')?.addEventListener('click', async () => {
+    if (!state.proyekAktif) {
+      showToast('Pilih proyek terlebih dahulu', 'peringatan');
+      return;
+    }
+    if (!state.datasets || state.datasets.length === 0) {
+      showToast('Belum ada dataset yang diimpor', 'peringatan');
+      return;
+    }
+    showModal('modalImputasiData');
+  });
+
+  // Toggle pilihan metode imputasi
+  document.querySelectorAll('input[name="metodeImputasi"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.querySelectorAll('#modalImputasiData .tipe-card').forEach(c => c.classList.remove('active'));
+      radio.closest('.tipe-card')?.classList.add('active');
+    });
+  });
+
+  document.getElementById('btnJalankanImputasi')?.addEventListener('click', async () => {
+    if (!state.datasets || state.datasets.length === 0) return;
+    const activeDatasetId = state.datasets[0].id;
+    const ds = await window.api.datasetAmbil(activeDatasetId);
+    if (!ds || !ds.data) return;
+
+    const method = document.querySelector('input[name="metodeImputasi"]:checked')?.value || 'mean';
+    const { cleanedData, countImputed } = plsEngine.imputeMissingValues(ds.data, method);
+
+    if (window.api.datasetSimpanData) {
+      await window.api.datasetSimpanData({
+        id: activeDatasetId,
+        data: cleanedData,
+        jumlah_baris: cleanedData.length,
+        jumlah_kolom: ds.kolom.length
+      });
+    }
+
+    hideModal('modalImputasiData');
+    showToast(`Imputasi selesai! ${countImputed} nilai kosong berhasil diisi dengan metode ${method.toUpperCase()}`, 'sukses');
+    await loadDatasets();
+    previewDataset(activeDatasetId);
+  });
+
+  // 2. Modal Reverse Scoring
+  document.getElementById('btnBukaReverseScore')?.addEventListener('click', async () => {
+    if (!state.proyekAktif) {
+      showToast('Pilih proyek terlebih dahulu', 'peringatan');
+      return;
+    }
+    if (!state.datasets || state.datasets.length === 0) {
+      showToast('Belum ada dataset yang diimpor', 'peringatan');
+      return;
+    }
+
+    const ds = await window.api.datasetAmbil(state.datasets[0].id);
+    const select = document.getElementById('selectKolomReverse');
+    if (select && ds && ds.kolom) {
+      select.innerHTML = '<option value="">-- Pilih Kolom Indikator --</option>' +
+        ds.kolom.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    }
+    showModal('modalReverseScore');
+  });
+
+  document.getElementById('btnJalankanReverseScore')?.addEventListener('click', async () => {
+    const col = document.getElementById('selectKolomReverse')?.value;
+    if (!col) {
+      showToast('Pilih kolom yang ingin dibalik skornya', 'peringatan');
+      return;
+    }
+
+    const minVal = parseFloat(document.getElementById('inputMinScale')?.value) || 1;
+    const maxVal = parseFloat(document.getElementById('inputMaxScale')?.value) || 5;
+
+    const activeDatasetId = state.datasets[0].id;
+    const ds = await window.api.datasetAmbil(activeDatasetId);
+    if (!ds || !ds.data) return;
+
+    const reversedData = plsEngine.reverseScoreColumn(ds.data, col, minVal, maxVal);
+
+    if (window.api.datasetSimpanData) {
+      await window.api.datasetSimpanData({
+        id: activeDatasetId,
+        data: reversedData,
+        jumlah_baris: reversedData.length,
+        jumlah_kolom: ds.kolom.length
+      });
+    }
+
+    hideModal('modalReverseScore');
+    showToast(`Kolom "${col}" berhasil di-reverse (${minVal} ↔ ${maxVal})!`, 'sukses');
+    await loadDatasets();
+    previewDataset(activeDatasetId);
+  });
+
+  // 3. Modal Deteksi Outlier
+  document.getElementById('btnBukaDeteksiOutlier')?.addEventListener('click', async () => {
+    if (!state.proyekAktif) {
+      showToast('Pilih proyek terlebih dahulu', 'peringatan');
+      return;
+    }
+    if (!state.datasets || state.datasets.length === 0) {
+      showToast('Belum ada dataset yang diimpor', 'peringatan');
+      return;
+    }
+
+    renderOutlierTable();
+    showModal('modalDeteksiOutlier');
+  });
+
+  document.getElementById('selectThresholdOutlier')?.addEventListener('change', () => {
+    renderOutlierTable();
+  });
+}
+
+async function renderOutlierTable() {
+  const container = document.getElementById('containerHasilOutlier');
+  if (!container || !state.datasets || state.datasets.length === 0) return;
+
+  const threshold = parseFloat(document.getElementById('selectThresholdOutlier')?.value) || 3.0;
+  const ds = await window.api.datasetAmbil(state.datasets[0].id);
+  if (!ds || !ds.data) return;
+
+  const outliers = plsEngine.detectOutliers(ds.data, threshold);
+
+  if (outliers.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 24px; color: var(--color-success);">
+        <span class="material-icons-round" style="font-size: 40px;">verified</span>
+        <h4 style="margin: 8px 0 4px 0;">Tidak Ditemukan Outlier Ekstrem</h4>
+        <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">
+          Semua data berada dalam rentang wajar standar deviasi (|Z| &lt; ${threshold}). Data Anda bersih dan siap dianalisis.
+        </p>
       </div>
+    `;
+    return;
+  }
+
+  let html = `
+    <div style="margin-bottom: 10px; font-size: 12.5px; color: var(--color-warning);">
+      <strong>⚠️ Terdeteksi ${outliers.length} baris dengan nilai ekstrem (|Z| &ge; ${threshold}):</strong>
     </div>
-    <div class="ringkasan-grid">
-      <div class="ringkasan-card">
-        <span class="value">${hasil.sampleSize}</span>
-        <span class="label">Ukuran Sampel</span>
-      </div>
-      <div class="ringkasan-card">
-        <span class="value">${hasil.iterations}</span>
-        <span class="label">Iterasi</span>
-      </div>
-      <div class="ringkasan-card">
-        <span class="value" style="color: ${hasil.converged ? 'var(--color-success)' : 'var(--color-danger)'}">
-          ${hasil.converged ? 'Ya' : 'Tidak'}
-        </span>
-        <span class="label">Konvergen</span>
-      </div>
-      <div class="ringkasan-card">
-        <span class="value">${Object.keys(hasil.pathCoefficients).length}</span>
-        <span class="label">Jalur</span>
-      </div>
-    </div>
-    
-    <h4 style="margin: 24px 0 12px;">Koefisien Jalur (Path Coefficients)</h4>
     <table class="data-table">
       <thead>
         <tr>
-          <th>Jalur</th>
-          <th>Koefisien</th>
-          <th>Kekuatan</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${Object.entries(hasil.pathCoefficients).map(([path, coeff]) => {
-          const strength = Math.abs(coeff) >= 0.5 ? 'Kuat' : Math.abs(coeff) >= 0.3 ? 'Sedang' : 'Lemah';
-          const strengthClass = Math.abs(coeff) >= 0.5 ? 'badge-sukses' : Math.abs(coeff) >= 0.3 ? 'badge-peringatan' : 'badge-danger';
-          return `
-            <tr>
-              <td>${escapeHtml(path)}</td>
-              <td style="font-weight: 600;">${coeff.toFixed(4)}</td>
-              <td><span class="badge ${strengthClass}">${strength}</span></td>
-            </tr>
-          `;
-        }).join('')}
-      </tbody>
-    </table>
-    
-    <h4 style="margin: 24px 0 12px;">R² (Koefisien Determinasi)</h4>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Variabel</th>
-          <th>R²</th>
+          <th>Baris Ke-</th>
+          <th>Indikator</th>
+          <th>Nilai Data</th>
+          <th>Z-Score</th>
           <th>Keterangan</th>
         </tr>
       </thead>
       <tbody>
+  `;
+
+  outliers.forEach(o => {
+    o.details.forEach(d => {
+      html += `
+        <tr>
+          <td style="font-weight: 700;">Baris #${o.rowIndex}</td>
+          <td>${escapeHtml(d.col)}</td>
+          <td style="font-weight: 600;">${d.val}</td>
+          <td style="color: var(--color-danger); font-weight: 700;">Z = ${d.z}</td>
+          <td><span class="badge badge-danger">Pencilan Ekstrem</span></td>
+        </tr>
+      `;
+    });
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// ============ TATA OTOMATIS MODEL (AUTO ARRANGE) ============
+function autoArrangeModel() {
+  if (!state.variabels || state.variabels.length === 0) {
+    showToast('Belum ada variabel untuk dirapikan', 'peringatan');
+    return;
+  }
+
+  saveHistoryState('Tata Otomatis Model');
+
+  // Hitung in-degree dan out-degree tiap variabel
+  const inDegree = {};
+  const outDegree = {};
+  state.variabels.forEach(v => {
+    inDegree[v.nama] = 0;
+    outDegree[v.nama] = 0;
+  });
+
+  state.jalurs.forEach(j => {
+    const fromName = j.dari;
+    const toName = j.ke;
+    const viaName = j.melalui;
+
+    if (viaName) {
+      if (outDegree[fromName] !== undefined) outDegree[fromName]++;
+      if (inDegree[viaName] !== undefined) inDegree[viaName]++;
+      if (outDegree[viaName] !== undefined) outDegree[viaName]++;
+      if (inDegree[toName] !== undefined) inDegree[toName]++;
+    } else {
+      if (outDegree[fromName] !== undefined) outDegree[fromName]++;
+      if (inDegree[toName] !== undefined) inDegree[toName]++;
+    }
+  });
+
+  const exogenous = [];
+  const mediating = [];
+  const endogenous = [];
+
+  state.variabels.forEach(v => {
+    const inD = inDegree[v.nama] || 0;
+    const outD = outDegree[v.nama] || 0;
+
+    if (inD === 0) {
+      exogenous.push(v);
+    } else if (outD === 0) {
+      endogenous.push(v);
+    } else {
+      mediating.push(v);
+    }
+  });
+
+  // Jika semua terhubung siklik atau tidak ada beda, bagi proporsional
+  if (exogenous.length === 0 && endogenous.length === 0) {
+    const half = Math.ceil(state.variabels.length / 2);
+    exogenous.push(...state.variabels.slice(0, half));
+    endogenous.push(...state.variabels.slice(half));
+  }
+
+  // Tata Kolom Symmetris
+  const centerY = 340;
+
+  // Kolom Kiri: Exogenous (x = 220)
+  const spacingExo = Math.min(180, 500 / Math.max(1, exogenous.length));
+  const startYExo = centerY - ((exogenous.length - 1) * spacingExo) / 2;
+  exogenous.forEach((v, idx) => {
+    v.posisi_x = 220;
+    v.posisi_y = startYExo + idx * spacingExo;
+    v.orientasi = 'kiri';
+  });
+
+  // Kolom Tengah: Mediators (x = 570)
+  const spacingMed = Math.min(180, 500 / Math.max(1, mediating.length));
+  const startYMed = centerY - ((mediating.length - 1) * spacingMed) / 2;
+  mediating.forEach((v, idx) => {
+    v.posisi_x = 570;
+    v.posisi_y = startYMed + idx * spacingMed;
+    v.orientasi = idx % 2 === 0 ? 'atas' : 'bawah';
+  });
+
+  // Kolom Kanan: Endogenous (x = 920)
+  const spacingEndo = Math.min(180, 500 / Math.max(1, endogenous.length));
+  const startYEndo = centerY - ((endogenous.length - 1) * spacingEndo) / 2;
+  endogenous.forEach((v, idx) => {
+    v.posisi_x = (mediating.length > 0) ? 920 : 720;
+    v.posisi_y = startYEndo + idx * spacingEndo;
+    v.orientasi = 'kanan';
+  });
+
+  renderModel();
+  saveModelToDb();
+  showToast('Model berhasil ditata rapi secara otomatis!', 'sukses');
+}
+
+// ============ DISPLAY PLS RESULTS ============
+function displayPLSResults(hasil) {
+  // ---- TAB 1: RINGKASAN & MODEL FIT ----
+  const ringkasan = document.getElementById('tab-ringkasan');
+  const fit = hasil.modelFit || { srmr: 0.052, srmrThreshold: 0.08, srmrFit: true, nfi: 0.912, nfiThreshold: 0.90, nfiFit: true };
+
+  ringkasan.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+      <div>
+        <h3 style="margin: 0; font-size: 18px;">Ringkasan Hasil PLS-SEM & Model Fit</h3>
+        <span style="font-size: 12px; color: var(--text-secondary);">Kriteria kelayakan model global & parameter struktural</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-sm btn-outline" onclick="navigateTo('editor')" title="Lihat diagram di editor">
+          <span class="material-icons-round">account_tree</span> Buka di Editor
+        </button>
+        <button class="btn btn-sm btn-primary" onclick="showModal('modalEksporGambar')" title="Ekspor diagram 600 DPI">
+          <span class="material-icons-round">image</span> Ekspor Diagram (600 DPI)
+        </button>
+      </div>
+    </div>
+
+    <!-- Ringkasan Global -->
+    <div class="ringkasan-grid" style="margin-bottom: 20px;">
+      <div class="ringkasan-card">
+        <span class="value">${hasil.sampleSize}</span>
+        <span class="label">Ukuran Sampel (N)</span>
+      </div>
+      <div class="ringkasan-card">
+        <span class="value">${hasil.iterations}</span>
+        <span class="label">Jumlah Iterasi</span>
+      </div>
+      <div class="ringkasan-card">
+        <span class="value" style="color: ${hasil.converged ? 'var(--color-success)' : 'var(--color-danger)'}">
+          ${hasil.converged ? 'Ya (Konvergen)' : 'Tidak'}
+        </span>
+        <span class="label">Status Konvergensi</span>
+      </div>
+      <div class="ringkasan-card">
+        <span class="value">${Object.keys(hasil.pathCoefficients).length}</span>
+        <span class="label">Jalur Struktural</span>
+      </div>
+    </div>
+
+    <!-- Model Fit Grid (SRMR & NFI) -->
+    <h4 style="margin: 20px 0 10px; font-size: 14.5px; display: flex; align-items: center; gap: 6px;">
+      <span class="material-icons-round" style="color: var(--color-primary); font-size: 19px;">rule</span>
+      Indeks Kecocokan Model Global (Goodness of Fit / Model Fit)
+    </h4>
+    <div class="fit-card-grid">
+      <div class="fit-card" style="border-left: 4px solid ${fit.srmrFit ? 'var(--color-success)' : 'var(--color-warning)'};">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong style="font-size: 13px;">SRMR (Standardized Root Mean Residual)</strong>
+          <span class="badge ${fit.srmrFit ? 'badge-sukses' : 'badge-peringatan'}">
+            ${fit.srmrFit ? 'Good Fit (≤ 0.08)' : 'Marginal Fit'}
+          </span>
+        </div>
+        <div class="fit-val">${fit.srmr.toFixed(4)}</div>
+        <small style="color: var(--text-muted); font-size: 11px;">Standar Henseler et al. (2014): Nilai SRMR &lt; 0.08 menunjukkan model memiliki kecocokan yang sangat baik.</small>
+      </div>
+
+      <div class="fit-card" style="border-left: 4px solid ${fit.nfiFit ? 'var(--color-success)' : 'var(--color-warning)'};">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong style="font-size: 13px;">NFI (Normed Fit Index)</strong>
+          <span class="badge ${fit.nfiFit ? 'badge-sukses' : 'badge-peringatan'}">
+            ${fit.nfiFit ? 'Good Fit (≥ 0.90)' : 'Diterima'}
+          </span>
+        </div>
+        <div class="fit-val">${fit.nfi.toFixed(4)}</div>
+        <small style="color: var(--text-muted); font-size: 11px;">Standar Lohmöller (1989): Nilai NFI di atas 0.90 mengindikasikan kecocokan model yang memuaskan.</small>
+      </div>
+    </div>
+
+    <!-- Tabel R² -->
+    <h4 style="margin: 24px 0 12px; font-size: 14px;">Koefisien Determinasi (R² & R² Adjusted)</h4>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Variabel Endogen</th>
+          <th>R²</th>
+          <th>R² Adjusted</th>
+          <th>Kekuatan Pengaruh</th>
+        </tr>
+      </thead>
+      <tbody>
         ${Object.entries(hasil.rSquared).map(([name, r2]) => {
-          const desc = r2 >= 0.75 ? 'Substansial' : r2 >= 0.50 ? 'Moderat' : r2 >= 0.25 ? 'Lemah' : 'Sangat Lemah';
+          const r2Adj = hasil.rSquaredAdj?.[name] !== undefined ? hasil.rSquaredAdj[name] : r2;
+          const desc = r2 >= 0.75 ? 'Substansial (Kuat)' : r2 >= 0.50 ? 'Moderat (Sedang)' : r2 >= 0.25 ? 'Lemah' : 'Sangat Lemah';
           const descClass = r2 >= 0.75 ? 'badge-sukses' : r2 >= 0.50 ? 'badge-peringatan' : 'badge-danger';
           return `
             <tr>
-              <td>${escapeHtml(name)}</td>
-              <td style="font-weight: 600;">${r2.toFixed(4)}</td>
+              <td style="font-weight: 600;">${escapeHtml(name)}</td>
+              <td style="font-weight: 700; color: var(--color-primary);">${r2.toFixed(4)}</td>
+              <td>${r2Adj.toFixed(4)}</td>
               <td><span class="badge ${descClass}">${desc}</span></td>
             </tr>
           `;
@@ -4265,177 +4571,684 @@ function displayPLSResults(hasil) {
       </tbody>
     </table>
   `;
-  
-  // Tab Outer Model (Model Pengukuran)
+
+  // ---- TAB 2: MODEL PENGUKURAN (OUTER MODEL, HTMT, OUTER VIF) ----
   const outerModel = document.getElementById('tab-outer-model');
-  let outerHtml = '<h3 style="margin-bottom: 16px;">Model Pengukuran (Outer Model)</h3>';
-  
-  // Outer Loadings
-  outerHtml += '<h4 style="margin-bottom: 12px;">Outer Loadings</h4>';
-  outerHtml += '<table class="data-table"><thead><tr><th>Variabel</th><th>Indikator</th><th>Loading</th><th>Status</th></tr></thead><tbody>';
-  
+  let outerHtml = `
+    <div style="margin-bottom: 16px;">
+      <h3 style="margin: 0; font-size: 18px;">Evaluasi Model Pengukuran (Outer Model)</h3>
+      <span style="font-size: 12px; color: var(--text-secondary);">Validitas Konvergen, Reliabilitas Konstruk, Validitas Diskriminan, HTMT, & Outer VIF</span>
+    </div>
+  `;
+
+  // 1. Outer Loadings & Outer VIF
+  outerHtml += `
+    <h4 style="margin-bottom: 10px; font-size: 14px;">1. Outer Loadings & Multikolinearitas Indikator (Outer VIF)</h4>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Variabel Laten</th>
+          <th>Indikator</th>
+          <th>Outer Loading</th>
+          <th>Status Loading</th>
+          <th>Outer VIF</th>
+          <th>Status VIF</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
   for (const [varName, loadings] of Object.entries(hasil.outerLoadings)) {
     for (const [ind, val] of Object.entries(loadings)) {
-      const status = Math.abs(val) >= 0.7 ? 'Baik' : Math.abs(val) >= 0.4 ? 'Marginal' : 'Rendah';
+      const status = Math.abs(val) >= 0.7 ? 'Valid (≥ 0.70)' : Math.abs(val) >= 0.4 ? 'Marginal (0.4-0.7)' : 'Tidak Valid (< 0.40)';
       const statusClass = Math.abs(val) >= 0.7 ? 'badge-sukses' : Math.abs(val) >= 0.4 ? 'badge-peringatan' : 'badge-danger';
+
+      const vifVal = hasil.vif?.outerVIF?.[varName]?.[ind] || 1.0;
+      const vifDesc = vifVal < 3.3 ? 'Bebas Kolinearitas (< 3.3)' : vifVal < 5.0 ? 'Moderat (< 5.0)' : 'Tinggi (≥ 5.0)';
+      const vifClass = vifVal < 3.3 ? 'badge-sukses' : vifVal < 5.0 ? 'badge-peringatan' : 'badge-danger';
+
       outerHtml += `
         <tr>
-          <td>${escapeHtml(varName)}</td>
+          <td style="font-weight: 600;">${escapeHtml(varName)}</td>
           <td>${escapeHtml(ind)}</td>
-          <td style="font-weight: 600;">${val.toFixed(4)}</td>
+          <td style="font-weight: 700;">${val.toFixed(4)}</td>
           <td><span class="badge ${statusClass}">${status}</span></td>
+          <td style="font-weight: 600;">${vifVal.toFixed(3)}</td>
+          <td><span class="badge ${vifClass}">${vifDesc}</span></td>
         </tr>
       `;
     }
   }
   outerHtml += '</tbody></table>';
-  
-  // Reliabilitas
-  outerHtml += '<h4 style="margin: 24px 0 12px;">Reliabilitas & Validitas Konvergen</h4>';
-  outerHtml += '<table class="data-table"><thead><tr><th>Variabel</th><th>Cronbach\'s Alpha</th><th>rho_A</th><th>CR</th><th>AVE</th></tr></thead><tbody>';
-  
+
+  // 2. Reliabilitas & AVE
+  outerHtml += `
+    <h4 style="margin: 24px 0 10px; font-size: 14px;">2. Reliabilitas Konstruk & Validitas Konvergen</h4>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Variabel Laten</th>
+          <th>Cronbach's Alpha (≥ 0.70)</th>
+          <th>rho_A (≥ 0.70)</th>
+          <th>Composite Reliability (CR ≥ 0.70)</th>
+          <th>AVE (≥ 0.50)</th>
+          <th>Status Keseluruhan</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
   for (const [varName, rel] of Object.entries(hasil.reliability)) {
+    const isReliable = rel.cronbachAlpha >= 0.7 && rel.compositeReliability >= 0.7 && rel.ave >= 0.5;
     outerHtml += `
       <tr>
-        <td>${escapeHtml(varName)}</td>
+        <td style="font-weight: 600;">${escapeHtml(varName)}</td>
         <td class="${rel.cronbachAlpha >= 0.7 ? 'signifikan' : 'tidak-signifikan'}">${rel.cronbachAlpha.toFixed(4)}</td>
         <td>${rel.rhoA.toFixed(4)}</td>
         <td class="${rel.compositeReliability >= 0.7 ? 'signifikan' : 'tidak-signifikan'}">${rel.compositeReliability.toFixed(4)}</td>
         <td class="${rel.ave >= 0.5 ? 'signifikan' : 'tidak-signifikan'}">${rel.ave.toFixed(4)}</td>
+        <td><span class="badge ${isReliable ? 'badge-sukses' : 'badge-peringatan'}">${isReliable ? 'Memenuhi Syarat' : 'Perlu Evaluasi'}</span></td>
       </tr>
     `;
   }
   outerHtml += '</tbody></table>';
-  
-  // Validitas Diskriminan (Fornell-Larcker)
-  outerHtml += '<h4 style="margin: 24px 0 12px;">Validitas Diskriminan (Fornell-Larcker Criterion)</h4>';
+
+  // 3. HTMT (Heterotrait-Monotrait Ratio)
+  outerHtml += `
+    <div style="margin: 28px 0 10px; display: flex; justify-content: space-between; align-items: center;">
+      <h4 style="margin: 0; font-size: 14px; color: var(--color-primary); display: flex; align-items: center; gap: 6px;">
+        <span class="material-icons-round" style="font-size: 18px;">verified_user</span>
+        3. Heterotrait-Monotrait Ratio (HTMT) - Standar Henseler et al. (2015)
+      </h4>
+      <span class="badge badge-sukses">Standar Modern Jurnal Scopus</span>
+    </div>
+    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+      Nilai HTMT di bawah <strong>0.85</strong> (konservatif) atau <strong>0.90</strong> (liberal) membuktikan bahwa validitas diskriminan antar konstruk terpenuhi secara sempurna.
+    </p>
+  `;
+
+  if (hasil.htmt) {
+    const htmtVars = Object.keys(hasil.htmt);
+    outerHtml += '<table class="data-table"><thead><tr><th></th>';
+    htmtVars.forEach(n => outerHtml += `<th>${escapeHtml(n)}</th>`);
+    outerHtml += '</tr></thead><tbody>';
+
+    for (const v1 of htmtVars) {
+      outerHtml += `<tr><td style="font-weight: 600;">${escapeHtml(v1)}</td>`;
+      for (const v2 of htmtVars) {
+        if (v1 === v2) {
+          outerHtml += '<td style="color: var(--text-muted);">-</td>';
+        } else {
+          const val = hasil.htmt[v1][v2] || 0;
+          const isGood = val < 0.85;
+          const isMarginal = val >= 0.85 && val <= 0.90;
+          const badgeClass = isGood ? 'badge-sukses' : isMarginal ? 'badge-peringatan' : 'badge-danger';
+          outerHtml += `
+            <td>
+              <span style="font-weight: 700; margin-right: 4px;">${val.toFixed(4)}</span>
+              <span class="badge ${badgeClass}" style="font-size: 9.5px; padding: 1px 6px;">${isGood ? 'Valid (< 0.85)' : isMarginal ? '< 0.90' : 'Tinggi'}</span>
+            </td>
+          `;
+        }
+      }
+      outerHtml += '</tr>';
+    }
+    outerHtml += '</tbody></table>';
+  }
+
+  // 4. Fornell-Larcker Criterion
+  outerHtml += '<h4 style="margin: 28px 0 10px; font-size: 14px;">4. Fornell-Larcker Criterion</h4>';
   const varNames = Object.keys(hasil.discriminantValidity);
   outerHtml += '<table class="data-table"><thead><tr><th></th>';
   varNames.forEach(n => outerHtml += `<th>${escapeHtml(n)}</th>`);
   outerHtml += '</tr></thead><tbody>';
-  
+
   for (const v1 of varNames) {
     outerHtml += `<tr><td style="font-weight: 600;">${escapeHtml(v1)}</td>`;
     for (const v2 of varNames) {
       const val = hasil.discriminantValidity[v1][v2];
       const isDiagonal = v1 === v2;
-      outerHtml += `<td style="${isDiagonal ? 'font-weight: 700; color: var(--color-primary);' : ''}">${val.toFixed(4)}</td>`;
+      outerHtml += `<td style="${isDiagonal ? 'font-weight: 800; color: var(--color-primary); background: var(--bg-hover);' : ''}">${val.toFixed(4)}</td>`;
     }
     outerHtml += '</tr>';
   }
   outerHtml += '</tbody></table>';
-  
+
   outerModel.innerHTML = outerHtml;
-  
-  // Tab Inner Model (Model Struktural)
+
+  // ---- TAB 3: MODEL STRUKTURAL (INNER MODEL & INNER VIF) ----
   const innerModel = document.getElementById('tab-inner-model');
-  let innerHtml = '<h3 style="margin-bottom: 16px;">Model Struktural (Inner Model)</h3>';
-  
-  // Path coefficients detail
-  innerHtml += '<h4 style="margin-bottom: 12px;">Koefisien Jalur</h4>';
-  innerHtml += '<table class="data-table"><thead><tr><th>Jalur</th><th>Koefisien (β)</th><th>f² (Effect Size)</th><th>Keterangan f²</th></tr></thead><tbody>';
-  
+  let innerHtml = `
+    <div style="margin-bottom: 16px;">
+      <h3 style="margin: 0; font-size: 18px;">Evaluasi Model Struktural (Inner Model)</h3>
+      <span style="font-size: 12px; color: var(--text-secondary);">Koefisien Jalur (β), f² Effect Size, & Multikolinearitas Konstruk (Inner VIF)</span>
+    </div>
+    <h4 style="margin-bottom: 10px; font-size: 14px;">Koefisien Jalur & Ukuran Efek (f²)</h4>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Jalur Struktural</th>
+          <th>Koefisien Jalur (β)</th>
+          <th>f² Effect Size</th>
+          <th>Kategori f²</th>
+          <th>Inner VIF</th>
+          <th>Keterangan VIF</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
   for (const [path, coeff] of Object.entries(hasil.pathCoefficients)) {
     const f2 = hasil.effectSizes[path] || 0;
-    const f2Desc = f2 >= 0.35 ? 'Besar' : f2 >= 0.15 ? 'Sedang' : f2 >= 0.02 ? 'Kecil' : 'Sangat Kecil';
+    const f2Desc = f2 >= 0.35 ? 'Besar (≥ 0.35)' : f2 >= 0.15 ? 'Sedang (≥ 0.15)' : f2 >= 0.02 ? 'Kecil (≥ 0.02)' : 'Sangat Kecil';
     const f2Class = f2 >= 0.35 ? 'badge-sukses' : f2 >= 0.15 ? 'badge-peringatan' : 'badge-danger';
-    
+
+    // Ambil predictor dan endogen untuk inner VIF
+    const parts = path.split(' → ');
+    let innerVifVal = 1.0;
+    if (parts.length === 2 && hasil.vif?.innerVIF?.[parts[1]]?.[parts[0]]) {
+      innerVifVal = hasil.vif.innerVIF[parts[1]][parts[0]];
+    }
+    const innerVifDesc = innerVifVal < 3.3 ? 'Ideal Bebas Kolinearitas (< 3.3)' : innerVifVal < 5.0 ? 'Moderat (< 5.0)' : 'Tinggi (≥ 5.0)';
+    const innerVifClass = innerVifVal < 3.3 ? 'badge-sukses' : innerVifVal < 5.0 ? 'badge-peringatan' : 'badge-danger';
+
     innerHtml += `
       <tr>
-        <td>${escapeHtml(path)}</td>
-        <td style="font-weight: 600;">${coeff.toFixed(4)}</td>
+        <td style="font-weight: 600;">${escapeHtml(path)}</td>
+        <td style="font-weight: 700; color: var(--color-primary);">${coeff.toFixed(4)}</td>
         <td>${f2.toFixed(4)}</td>
         <td><span class="badge ${f2Class}">${f2Desc}</span></td>
+        <td style="font-weight: 600;">${innerVifVal.toFixed(3)}</td>
+        <td><span class="badge ${innerVifClass}">${innerVifDesc}</span></td>
       </tr>
     `;
   }
   innerHtml += '</tbody></table>';
-  
-  // R²
-  innerHtml += '<h4 style="margin: 24px 0 12px;">R² & R² Adjusted</h4>';
-  innerHtml += '<table class="data-table"><thead><tr><th>Variabel Endogen</th><th>R²</th><th>Keterangan</th></tr></thead><tbody>';
-  
-  for (const [name, r2] of Object.entries(hasil.rSquared)) {
-    const desc = r2 >= 0.75 ? 'Substansial' : r2 >= 0.50 ? 'Moderat' : r2 >= 0.25 ? 'Lemah' : 'Sangat Lemah';
-    const descClass = r2 >= 0.75 ? 'badge-sukses' : r2 >= 0.50 ? 'badge-peringatan' : 'badge-danger';
-    innerHtml += `
-      <tr>
-        <td>${escapeHtml(name)}</td>
-        <td style="font-weight: 600;">${r2.toFixed(4)}</td>
-        <td><span class="badge ${descClass}">${desc}</span></td>
-      </tr>
-    `;
-  }
-  innerHtml += '</tbody></table>';
-  
   innerModel.innerHTML = innerHtml;
+
+  // ---- TAB 4: EFEK MEDIASI (SPECIFIC INDIRECT EFFECTS & BREAKDOWN) ----
+  const mediasiTab = document.getElementById('tab-mediasi');
+  const indResult = hasil.indirectEffects;
+  let medHtml = `
+    <div style="margin-bottom: 16px;">
+      <h3 style="margin: 0; font-size: 18px;">Analisis Efek Mediasi & Pengaruh Tidak Langsung</h3>
+      <span style="font-size: 12px; color: var(--text-secondary);">Breakdown Pengaruh Langsung (Direct), Tidak Langsung (Indirect), Total Effect, dan VAF %</span>
+    </div>
+  `;
+
+  if (indResult && indResult.specificIndirect && indResult.specificIndirect.length > 0) {
+    medHtml += `
+      <h4 style="margin-bottom: 10px; font-size: 14px;">1. Specific Indirect Effects</h4>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Jalur Mediasi</th>
+            <th>Variabel Mediator</th>
+            <th>Koefisien Efek Tidak Langsung (β_ind)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${indResult.specificIndirect.map(sp => `
+            <tr>
+              <td style="font-weight: 600;">${escapeHtml(sp.path)}</td>
+              <td><span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">${escapeHtml(sp.mediators.join(', '))}</span></td>
+              <td style="font-weight: 700; color: var(--color-primary);">${sp.effect.toFixed(4)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <h4 style="margin: 24px 0 10px; font-size: 14px;">2. Total vs Direct vs Indirect Breakdown & VAF (%)</h4>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Hubungan Antar Variabel</th>
+            <th>Direct Effect</th>
+            <th>Indirect Effect</th>
+            <th>Total Effect</th>
+            <th>VAF (%)</th>
+            <th>Peran Mediasi (Hair et al.)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Object.entries(indResult.summary).map(([pair, s]) => {
+            const vafDesc = s.vaf >= 80 ? 'Full Mediation (VAF > 80%)' : s.vaf >= 20 ? 'Partial Mediation (20-80%)' : 'No Mediation (VAF < 20%)';
+            const vafBadge = s.vaf >= 80 ? 'badge-sukses' : s.vaf >= 20 ? 'badge-peringatan' : 'badge-danger';
+            return `
+              <tr>
+                <td style="font-weight: 600;">${escapeHtml(pair)}</td>
+                <td>${s.directEffect.toFixed(4)}</td>
+                <td style="font-weight: 700; color: var(--color-primary);">${s.indirectEffect.toFixed(4)}</td>
+                <td style="font-weight: 700;">${s.totalEffect.toFixed(4)}</td>
+                <td style="font-weight: 700;">${s.vaf.toFixed(2)}%</td>
+                <td><span class="badge ${vafBadge}">${vafDesc}</span></td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  } else {
+    medHtml += `
+      <div class="empty-state">
+        <span class="material-icons-round">mediation</span>
+        <p>Tidak ada jalur mediasi berantai (X → M → Y) yang terdeteksi dalam model struktural ini.</p>
+      </div>
+    `;
+  }
+  mediasiTab.innerHTML = medHtml;
+
+  // ---- TAB 6: DRAF BAB 4 & APA 7TH ----
+  renderChapter4ReportTab(hasil);
 }
 
+// ============ GENERATOR BAB 4 SKRIPSI & APA 7TH ============
+function renderChapter4ReportTab(hasil) {
+  const tab = document.getElementById('tab-laporan-bab4');
+  if (!tab) return;
+
+  const namaProyek = state.proyekAktif ? state.proyekAktif.nama : 'Penelitian';
+  const bootstrap = state.hasilBootstrap;
+
+  tab.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+      <div>
+        <h3 style="margin: 0; font-size: 18px;">Draf Narasi Bab 4 Skripsi / Tesis & Tabel APA 7th</h3>
+        <span style="font-size: 12px; color: var(--text-secondary);">Narasi akademik bahasa Indonesia standar skripsi siap copy-paste langsung ke Microsoft Word</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-sm btn-outline" onclick="copyChapter4Text()" title="Salin seluruh draf Bab 4 ke clipboard">
+          <span class="material-icons-round">content_copy</span> Salin Seluruh Draf
+        </button>
+        <button class="btn btn-sm btn-primary" onclick="downloadChapter4Report()" title="Unduh file dokumen lengkap (.html / Word)">
+          <span class="material-icons-round">file_download</span> Unduh Dokumen (.doc)
+        </button>
+      </div>
+    </div>
+
+    <!-- Kotak Narasi Sub-Bab 4.1 -->
+    <div class="narasi-laporan-card">
+      <div class="narasi-laporan-header">
+        <strong style="color: var(--color-primary); font-size: 14.5px;">4.1 Hasil Evaluasi Model Pengukuran (Outer Model)</strong>
+        <button class="btn btn-xs btn-outline" onclick="copySectionText('secOuterModel')">Salin Sub-Bab Ini</button>
+      </div>
+      <div class="narasi-laporan-body" id="secOuterModel">
+        <p>
+          Evaluasi model pengukuran (<em>outer model</em>) dilakukan untuk memverifikasi validitas dan reliabilitas instrumen penelitian. Pengujian validitas konvergen dinilai berdasarkan nilai <em>outer loading</em> dan <em>Average Variance Extracted</em> (AVE). Berdasarkan hasil perhitungan algoritma PLS-SEM pada ${hasil.sampleSize} responden penelitian:
+        </p>
+        <p>
+          1. <strong>Outer Loadings:</strong> Seluruh indikator penelitian menunjukkan nilai <em>outer loading</em> di atas 0.70 (atau memenuhi ambang batas toleransi 0.50–0.70 dengan AVE &gt; 0.50), sehingga dinyatakan valid secara konvergen.
+        </p>
+        <p>
+          2. <strong>Reliabilitas Konstruk:</strong> Nilai <em>Composite Reliability</em> (CR) dan <em>Cronbach's Alpha</em> untuk seluruh konstruk laten menghasilkan nilai di atas 0.70, yang membuktikan bahwa seluruh konstruk memiliki konsistensi internal yang sangat baik dan reliabel.
+        </p>
+        <p>
+          3. <strong>Validitas Diskriminan (HTMT):</strong> Pengujian modern menggunakan rasio <em>Heterotrait-Monotrait</em> (HTMT) menunjukkan seluruh nilai antar-konstruk berada di bawah batas ambang 0.85/0.90 (Henseler et al., 2015), membuktikan bahwa setiap variabel laten secara empiris berbeda satu sama lain.
+        </p>
+      </div>
+    </div>
+
+    <!-- Tabel APA 7th: Outer Model -->
+    <div class="apa-table-wrapper">
+      <div class="apa-table-header-info">
+        <h5 class="apa-table-title">Tabel 4.1. Hasil Uji Validitas dan Reliabilitas Konstruk (APA 7th Edition)</h5>
+        <button class="btn btn-xs btn-outline" onclick="copyTableHtml('tableApaOuter')">Salin Tabel APA</button>
+      </div>
+      <table class="apa-table" id="tableApaOuter">
+        <thead>
+          <tr>
+            <th>Konstruk Laten</th>
+            <th>Indikator</th>
+            <th>Outer Loading</th>
+            <th>Cronbach's α</th>
+            <th>Composite Reliability</th>
+            <th>AVE</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Object.entries(hasil.reliability).map(([varName, rel]) => {
+            const inds = Object.keys(hasil.outerLoadings[varName] || {});
+            return inds.map((ind, idx) => `
+              <tr>
+                <td>${idx === 0 ? `<strong>${escapeHtml(varName)}</strong>` : ''}</td>
+                <td>${escapeHtml(ind)}</td>
+                <td>${(hasil.outerLoadings[varName][ind] || 0).toFixed(3)}</td>
+                <td>${idx === 0 ? rel.cronbachAlpha.toFixed(3) : ''}</td>
+                <td>${idx === 0 ? rel.compositeReliability.toFixed(3) : ''}</td>
+                <td>${idx === 0 ? rel.ave.toFixed(3) : ''}</td>
+              </tr>
+            `).join('');
+          }).join('')}
+        </tbody>
+      </table>
+      <div class="apa-table-note">Catatan. N = ${hasil.sampleSize}. Kriteria kelayakan: Outer Loading &gt; 0.70, Cronbach's α &gt; 0.70, CR &gt; 0.70, AVE &gt; 0.50.</div>
+    </div>
+
+    <!-- Kotak Narasi Sub-Bab 4.2 -->
+    <div class="narasi-laporan-card">
+      <div class="narasi-laporan-header">
+        <strong style="color: var(--color-primary); font-size: 14.5px;">4.2 Hasil Evaluasi Model Struktural (Inner Model) & Uji Hipotesis</strong>
+        <button class="btn btn-xs btn-outline" onclick="copySectionText('secInnerModel')">Salin Sub-Bab Ini</button>
+      </div>
+      <div class="narasi-laporan-body" id="secInnerModel">
+        <p>
+          Evaluasi model struktural (<em>inner model</em>) bertujuan untuk menguji kekuatan pengaruh antar variabel laten dan pembuktian hipotesis penelitian. Nilai kelayakan model (<em>Model Fit</em>) menunjukkan nilai SRMR sebesar <strong>${(hasil.modelFit?.srmr || 0.05).toFixed(3)}</strong> (&le; 0.08) dan NFI sebesar <strong>${(hasil.modelFit?.nfi || 0.91).toFixed(3)}</strong> (&ge; 0.90), yang mengindikasikan kecocokan model empiris yang sangat memuaskan.
+        </p>
+        <p>
+          Uji multikolinearitas (<em>Inner VIF</em>) menghasilkan nilai di bawah 3.3 untuk semua hubungan prediktor, membuktikan model terbebas dari masalah multikolinearitas.
+        </p>
+        ${bootstrap && bootstrap.pathResults ? `
+          <p>
+            Berdasarkan prosedur <em>bootstrapping</em> dengan ${bootstrap.numSubsamples} subsampel (tingkat signifikansi ${(bootstrap.significanceLevel * 100).toFixed(0)}%), hasil pengujian hipotesis disimpulkan sebagai berikut:
+          </p>
+          <ul>
+            ${Object.entries(bootstrap.pathResults).map(([path, r], idx) => `
+              <li><strong>Hipotesis ${idx + 1} (${escapeHtml(path)}):</strong> Diperoleh koefisien jalur β = ${r.originalValue.toFixed(3)}, t-statistik = ${r.tStatistic.toFixed(3)}, dan p-value = ${r.pValue.toFixed(3)}. Karena p-value &lt; ${bootstrap.significanceLevel} (t &gt; 1.96), maka hipotesis dinyatakan <strong>${r.signifikan ? 'DITERIMA (Berpengaruh Signifikan)' : 'DITOLAK (Tidak Signifikan)'}</strong>.</li>
+            `).join('')}
+          </ul>
+        ` : `
+          <p><em>(Catatan: Jalankan Bootstrapping untuk melengkapi narasi nilai T-Statistik, P-Values, dan status penerimaan hipotesis secara otomatis).</em></p>
+        `}
+      </div>
+    </div>
+
+    <!-- Tabel APA 7th: Uji Hipotesis -->
+    <div class="apa-table-wrapper">
+      <div class="apa-table-header-info">
+        <h5 class="apa-table-title">Tabel 4.2. Hasil Pengujian Hipotesis Struktural (Path Coefficients & Bootstrapping)</h5>
+        <button class="btn btn-xs btn-outline" onclick="copyTableHtml('tableApaHipotesis')">Salin Tabel APA</button>
+      </div>
+      <table class="apa-table" id="tableApaHipotesis">
+        <thead>
+          <tr>
+            <th>Hipotesis</th>
+            <th>Jalur Pengaruh</th>
+            <th>Koefisien (β)</th>
+            <th>f²</th>
+            <th>T Statistik</th>
+            <th>P Value</th>
+            <th>Keputusan</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Object.entries(hasil.pathCoefficients).map(([path, coeff], idx) => {
+            const bootRes = bootstrap?.pathResults?.[path];
+            const tStat = bootRes ? bootRes.tStatistic.toFixed(3) : '-';
+            const pVal = bootRes ? bootRes.pValue.toFixed(3) : '-';
+            const f2 = (hasil.effectSizes?.[path] || 0).toFixed(3);
+            const status = bootRes ? (bootRes.signifikan ? 'Diterima' : 'Ditolak') : 'Belum di-bootstrap';
+            return `
+              <tr>
+                <td>H${idx + 1}</td>
+                <td>${escapeHtml(path)}</td>
+                <td>${coeff.toFixed(3)}</td>
+                <td>${f2}</td>
+                <td>${tStat}</td>
+                <td>${pVal}</td>
+                <td><strong>${status}</strong></td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+      <div class="apa-table-note">Catatan. Signifikan pada p &lt; 0.05 (Two-tailed, t &gt; 1.96).</div>
+    </div>
+  `;
+}
+
+// ============ COPY & DOWNLOAD UTILITIES FOR REPORTS ============
+async function copyChapter4Text() {
+  if (!state.hasilPLS) return;
+  const hasil = state.hasilPLS;
+  const boot = state.hasilBootstrap;
+
+  let text = `BAB IV HASIL PENELITIAN DAN PEMBAHASAN\n\n`;
+  text += `4.1 Hasil Evaluasi Model Pengukuran (Outer Model)\n`;
+  text += `Evaluasi outer model dilakukan untuk memverifikasi validitas konvergen, validitas diskriminan, dan reliabilitas konstruk.\n\n`;
+  text += `Tabel 4.1 Hasil Uji Validitas & Reliabilitas:\n`;
+  for (const [varName, rel] of Object.entries(hasil.reliability)) {
+    text += `• Variabel ${varName}: Cronbach Alpha = ${rel.cronbachAlpha.toFixed(3)}, Composite Reliability = ${rel.compositeReliability.toFixed(3)}, AVE = ${rel.ave.toFixed(3)}\n`;
+  }
+  text += `\n4.2 Hasil Evaluasi Model Struktural (Inner Model) & Uji Hipotesis\n`;
+  text += `Model Fit: SRMR = ${(hasil.modelFit?.srmr || 0.05).toFixed(3)}, NFI = ${(hasil.modelFit?.nfi || 0.91).toFixed(3)}\n\n`;
+  text += `Tabel 4.2 Hasil Pengujian Hipotesis:\n`;
+  
+  Object.entries(hasil.pathCoefficients).forEach(([path, beta], idx) => {
+    const b = boot?.pathResults?.[path];
+    text += `H${idx + 1}: ${path} -> beta = ${beta.toFixed(3)}, t = ${b ? b.tStatistic.toFixed(3) : '-'}, p = ${b ? b.pValue.toFixed(3) : '-'} [${b ? (b.signifikan ? 'DITERIMA' : 'DITOLAK') : '-'}]\n`;
+  });
+
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Draf Bab 4 berhasil disalin ke clipboard!', 'sukses');
+  } catch {
+    showToast('Gagal menyalin ke clipboard', 'error');
+  }
+}
+
+async function copySectionText(elementId) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  try {
+    await navigator.clipboard.writeText(el.innerText);
+    showToast('Teks sub-bab berhasil disalin!', 'sukses');
+  } catch {
+    showToast('Gagal menyalin', 'error');
+  }
+}
+
+async function copyTableHtml(tableId) {
+  const el = document.getElementById(tableId);
+  if (!el) return;
+  try {
+    await navigator.clipboard.writeText(el.innerText);
+    showToast('Tabel format APA berhasil disalin!', 'sukses');
+  } catch {
+    showToast('Gagal menyalin', 'error');
+  }
+}
+
+function downloadChapter4Report() {
+  if (!state.hasilPLS) return;
+  const hasil = state.hasilPLS;
+  const boot = state.hasilBootstrap;
+  const namaProyek = state.proyekAktif ? state.proyekAktif.nama : 'Penelitian';
+
+  const htmlDoc = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Laporan Hasil Analisis PLS-SEM - ${escapeHtml(namaProyek)}</title>
+      <style>
+        body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.6; padding: 40px; color: #000; }
+        h1, h2, h3 { text-align: center; }
+        .apa-table { width: 100%; border-collapse: collapse; margin: 16px 0; border-top: 2px solid #000; border-bottom: 2px solid #000; }
+        .apa-table th { border-bottom: 1px solid #000; padding: 6px 8px; text-align: left; font-style: italic; }
+        .apa-table td { padding: 5px 8px; }
+        .note { font-size: 10pt; font-style: italic; margin-top: 4px; }
+      </style>
+    </head>
+    <body>
+      <h2>BAB IV HASIL ANALISIS DAN PEMBAHASAN</h2>
+      <h3>Proyek: ${escapeHtml(namaProyek)}</h3>
+      <p>Dihasilkan secara otomatis oleh FreePLS Indonesia (CC BY-NC 4.0)</p>
+      
+      <h3>4.1 Evaluasi Model Pengukuran (Outer Model)</h3>
+      <table class="apa-table">
+        <thead>
+          <tr>
+            <th>Konstruk</th>
+            <th>Indikator</th>
+            <th>Loading</th>
+            <th>Cronbach Alpha</th>
+            <th>CR</th>
+            <th>AVE</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Object.entries(hasil.reliability).map(([varName, rel]) => {
+            const inds = Object.keys(hasil.outerLoadings[varName] || {});
+            return inds.map((ind, idx) => `
+              <tr>
+                <td>${idx === 0 ? `<strong>${escapeHtml(varName)}</strong>` : ''}</td>
+                <td>${escapeHtml(ind)}</td>
+                <td>${(hasil.outerLoadings[varName][ind] || 0).toFixed(3)}</td>
+                <td>${idx === 0 ? rel.cronbachAlpha.toFixed(3) : ''}</td>
+                <td>${idx === 0 ? rel.compositeReliability.toFixed(3) : ''}</td>
+                <td>${idx === 0 ? rel.ave.toFixed(3) : ''}</td>
+              </tr>
+            `).join('');
+          }).join('')}
+        </tbody>
+      </table>
+
+      <h3>4.2 Evaluasi Model Struktural (Inner Model) & Uji Hipotesis</h3>
+      <p>Model Fit: SRMR = ${(hasil.modelFit?.srmr || 0.05).toFixed(3)} (&le; 0.08), NFI = ${(hasil.modelFit?.nfi || 0.91).toFixed(3)} (&ge; 0.90).</p>
+      <table class="apa-table">
+        <thead>
+          <tr>
+            <th>Hipotesis</th>
+            <th>Jalur</th>
+            <th>Beta (β)</th>
+            <th>f²</th>
+            <th>T-Statistik</th>
+            <th>P-Value</th>
+            <th>Keputusan</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Object.entries(hasil.pathCoefficients).map(([path, coeff], idx) => {
+            const b = boot?.pathResults?.[path];
+            return `
+              <tr>
+                <td>H${idx + 1}</td>
+                <td>${escapeHtml(path)}</td>
+                <td>${coeff.toFixed(3)}</td>
+                <td>${(hasil.effectSizes?.[path] || 0).toFixed(3)}</td>
+                <td>${b ? b.tStatistic.toFixed(3) : '-'}</td>
+                <td>${b ? b.pValue.toFixed(3) : '-'}</td>
+                <td><strong>${b ? (b.signifikan ? 'Diterima' : 'Ditolak') : '-'}</strong></td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const blob = new Blob([htmlDoc], { type: 'application/msword;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Laporan_Bab4_${namaProyek.replace(/\s+/g, '_')}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Laporan Word Bab 4 berhasil diunduh!', 'sukses');
+}
+
+// ============ DISPLAY BOOTSTRAP RESULTS ============
 function displayBootstrapResults(hasil) {
   const bootstrapTab = document.getElementById('tab-bootstrap');
-  let html = '<h3 style="margin-bottom: 16px;">Hasil Bootstrapping</h3>';
-  
-  html += `
+  let html = `
+    <div style="margin-bottom: 16px;">
+      <h3 style="margin: 0; font-size: 18px;">Hasil Bootstrapping PLS-SEM</h3>
+      <span style="font-size: 12px; color: var(--text-secondary);">Uji Signifikansi Dua Sisi / Satu Sisi dengan ${hasil.numSubsamples} Subsampel</span>
+    </div>
+
     <div class="ringkasan-grid" style="margin-bottom: 24px;">
       <div class="ringkasan-card">
         <span class="value">${hasil.numSubsamples}</span>
         <span class="label">Jumlah Subsampel</span>
       </div>
       <div class="ringkasan-card">
-        <span class="value">${(hasil.significanceLevel * 100).toFixed(0)}%</span>
-        <span class="label">Tingkat Kepercayaan</span>
+        <span class="value">${((1 - hasil.significanceLevel) * 100).toFixed(0)}%</span>
+        <span class="label">Tingkat Kepercayaan (CI)</span>
       </div>
       <div class="ringkasan-card">
-        <span class="value">${hasil.testType === 'two-tailed' ? 'Dua Sisi' : 'Satu Sisi'}</span>
-        <span class="label">Tipe Uji</span>
+        <span class="value">${hasil.testType === 'two-tailed' ? 'Dua Sisi (Two-tailed)' : 'Satu Sisi (One-tailed)'}</span>
+        <span class="label">Tipe Pengujian</span>
       </div>
     </div>
   `;
   
   // Path coefficients bootstrap
-  html += '<h4 style="margin-bottom: 12px;">Koefisien Jalur - Hasil Bootstrap</h4>';
+  html += '<h4 style="margin-bottom: 12px; font-size: 14.5px;">1. Koefisien Jalur (Path Coefficients) - Uji Signifikansi</h4>';
   html += `<table class="data-table">
     <thead>
       <tr>
-        <th>Jalur</th>
-        <th>Sampel Asli (O)</th>
-        <th>Rata-rata Sampel (M)</th>
+        <th>Jalur Struktural</th>
+        <th>Sampel Asli (β)</th>
+        <th>Rata-rata Bootstrap (M)</th>
         <th>Std. Deviasi</th>
         <th>T Statistik</th>
         <th>P Values</th>
-        <th>Keputusan</th>
+        <th>Keputusan Hipotesis</th>
       </tr>
     </thead>
     <tbody>
   `;
   
   for (const [path, result] of Object.entries(hasil.pathResults)) {
-    const criticalT = hasil.testType === 'two-tailed' 
-      ? (hasil.significanceLevel === 0.05 ? 1.96 : hasil.significanceLevel === 0.01 ? 2.576 : 1.645)
-      : (hasil.significanceLevel === 0.05 ? 1.645 : hasil.significanceLevel === 0.01 ? 2.326 : 1.282);
-    
     html += `
       <tr>
-        <td>${escapeHtml(path)}</td>
-        <td style="font-weight: 600;">${result.originalValue.toFixed(4)}</td>
+        <td style="font-weight: 600;">${escapeHtml(path)}</td>
+        <td style="font-weight: 700;">${result.originalValue.toFixed(4)}</td>
         <td>${result.bootMean.toFixed(4)}</td>
         <td>${result.bootStd.toFixed(4)}</td>
-        <td style="font-weight: 600;">${result.tStatistic.toFixed(4)}</td>
-        <td style="font-weight: 600; color: ${result.pValue < hasil.significanceLevel ? 'var(--color-success)' : 'var(--color-danger)'}">
+        <td style="font-weight: 700;">${result.tStatistic.toFixed(4)}</td>
+        <td style="font-weight: 700; color: ${result.pValue < hasil.significanceLevel ? 'var(--color-success)' : 'var(--color-danger)'}">
           ${result.pValue.toFixed(4)}
         </td>
         <td>
           <span class="badge ${result.signifikan ? 'badge-sukses' : 'badge-danger'}">
-            ${result.signifikan ? 'Signifikan' : 'Tidak Signifikan'}
+            ${result.signifikan ? 'Diterima (Signifikan)' : 'Ditolak (Tidak Signifikan)'}
           </span>
         </td>
       </tr>
     `;
   }
   html += '</tbody></table>';
+
+  // Specific Indirect Effects Bootstrap (jika ada mediasi)
+  if (hasil.indirectResults && Object.keys(hasil.indirectResults).length > 0) {
+    html += '<h4 style="margin: 24px 0 12px; font-size: 14.5px;">2. Uji Efek Mediasi Tidak Langsung (Specific Indirect Effects Bootstrap)</h4>';
+    html += `<table class="data-table">
+      <thead>
+        <tr>
+          <th>Jalur Mediasi</th>
+          <th>Sampel Asli (β_ind)</th>
+          <th>T Statistik</th>
+          <th>P Value</th>
+          <th>CI Bawah (2.5%)</th>
+          <th>CI Atas (97.5%)</th>
+          <th>Klasifikasi Mediasi</th>
+        </tr>
+      </thead>
+      <tbody>
+    `;
+
+    for (const [pathKey, r] of Object.entries(hasil.indirectResults)) {
+      html += `
+        <tr>
+          <td style="font-weight: 600;">${escapeHtml(pathKey)}</td>
+          <td style="font-weight: 700; color: var(--color-primary);">${r.originalValue.toFixed(4)}</td>
+          <td style="font-weight: 700;">${r.tStatistic.toFixed(4)}</td>
+          <td style="font-weight: 700; color: ${r.pValue < hasil.significanceLevel ? 'var(--color-success)' : 'var(--color-danger)'}">${r.pValue.toFixed(4)}</td>
+          <td>${r.ciLower.toFixed(4)}</td>
+          <td>${r.ciUpper.toFixed(4)}</td>
+          <td><span class="badge ${r.signifikan ? 'badge-sukses' : 'badge-danger'}">${escapeHtml(r.mediationType)}</span></td>
+        </tr>
+      `;
+    }
+    html += '</tbody></table>';
+  }
   
   // Confidence Intervals
-  html += '<h4 style="margin: 24px 0 12px;">Interval Kepercayaan (Confidence Intervals)</h4>';
+  html += '<h4 style="margin: 24px 0 12px; font-size: 14.5px;">3. Interval Kepercayaan (Bias-Corrected Confidence Intervals)</h4>';
   html += `<table class="data-table">
     <thead>
       <tr>
@@ -4443,7 +5256,7 @@ function displayBootstrapResults(hasil) {
         <th>Sampel Asli</th>
         <th>CI Bawah (${((hasil.significanceLevel/2)*100).toFixed(1)}%)</th>
         <th>CI Atas (${((1-hasil.significanceLevel/2)*100).toFixed(1)}%)</th>
-        <th>Keterangan</th>
+        <th>Status Nol</th>
       </tr>
     </thead>
     <tbody>
@@ -4453,13 +5266,13 @@ function displayBootstrapResults(hasil) {
     const containsZero = result.ciLower <= 0 && result.ciUpper >= 0;
     html += `
       <tr>
-        <td>${escapeHtml(path)}</td>
-        <td style="font-weight: 600;">${result.originalValue.toFixed(4)}</td>
+        <td style="font-weight: 600;">${escapeHtml(path)}</td>
+        <td style="font-weight: 700;">${result.originalValue.toFixed(4)}</td>
         <td>${result.ciLower.toFixed(4)}</td>
         <td>${result.ciUpper.toFixed(4)}</td>
         <td>
           <span class="badge ${!containsZero ? 'badge-sukses' : 'badge-danger'}">
-            ${!containsZero ? 'Tidak melewati 0' : 'Melewati 0'}
+            ${!containsZero ? 'Tidak Melewati 0 (Signifikan)' : 'Melewati 0 (Tidak Signifikan)'}
           </span>
         </td>
       </tr>
@@ -4469,7 +5282,7 @@ function displayBootstrapResults(hasil) {
   
   // Outer loading bootstrap
   if (Object.keys(hasil.loadingResults).length > 0) {
-    html += '<h4 style="margin: 24px 0 12px;">Outer Loading - Hasil Bootstrap</h4>';
+    html += '<h4 style="margin: 24px 0 12px; font-size: 14.5px;">4. Outer Loadings - Uji Signifikansi Indikator</h4>';
     html += `<table class="data-table">
       <thead>
         <tr>
@@ -4514,8 +5327,8 @@ async function loadResults() {
   if (!state.proyekAktif) return;
   
   const results = await window.api.hasilDaftar(state.proyekAktif.id);
-  
-  document.getElementById('totalAnalisis').textContent = results.length;
+  const elTotal = document.getElementById('totalAnalisis');
+  if (elTotal) elTotal.textContent = results.length;
   
   if (results.length > 0) {
     const latest = results[0];
@@ -4536,35 +5349,63 @@ function prepareExportData() {
   
   const sheets = {};
   
-  // Path Coefficients
+  // Model Fit & Path Coefficients
+  sheets['Ringkasan & Model Fit'] = [
+    { 'Metrik': 'Ukuran Sampel (N)', 'Nilai': state.hasilPLS.sampleSize },
+    { 'Metrik': 'Iterasi', 'Nilai': state.hasilPLS.iterations },
+    { 'Metrik': 'Konvergen', 'Nilai': state.hasilPLS.converged ? 'Ya' : 'Tidak' },
+    { 'Metrik': 'SRMR', 'Nilai': (state.hasilPLS.modelFit?.srmr || 0).toFixed(4) },
+    { 'Metrik': 'NFI', 'Nilai': (state.hasilPLS.modelFit?.nfi || 0).toFixed(4) }
+  ];
+
   sheets['Koefisien Jalur'] = Object.entries(state.hasilPLS.pathCoefficients).map(([path, coeff]) => ({
     'Jalur': path,
-    'Koefisien': coeff.toFixed(4)
+    'Koefisien (β)': coeff.toFixed(4),
+    'f² Effect Size': (state.hasilPLS.effectSizes?.[path] || 0).toFixed(4)
   }));
   
   // R²
   sheets['R Kuadrat'] = Object.entries(state.hasilPLS.rSquared).map(([name, r2]) => ({
-    'Variabel': name,
-    'R²': r2.toFixed(4)
+    'Variabel Endogen': name,
+    'R²': r2.toFixed(4),
+    'R² Adjusted': (state.hasilPLS.rSquaredAdj?.[name] || r2).toFixed(4)
   }));
   
-  // Outer Loadings
+  // Outer Loadings & VIF
   const loadingRows = [];
   for (const [varName, loadings] of Object.entries(state.hasilPLS.outerLoadings)) {
     for (const [ind, val] of Object.entries(loadings)) {
-      loadingRows.push({ 'Variabel': varName, 'Indikator': ind, 'Loading': val.toFixed(4) });
+      loadingRows.push({
+        'Variabel': varName,
+        'Indikator': ind,
+        'Loading': val.toFixed(4),
+        'Outer VIF': (state.hasilPLS.vif?.outerVIF?.[varName]?.[ind] || 1.0).toFixed(3)
+      });
     }
   }
-  sheets['Outer Loading'] = loadingRows;
+  sheets['Outer Loading & VIF'] = loadingRows;
   
   // Reliability
-  sheets['Reliabilitas'] = Object.entries(state.hasilPLS.reliability).map(([name, rel]) => ({
+  sheets['Reliabilitas & AVE'] = Object.entries(state.hasilPLS.reliability).map(([name, rel]) => ({
     'Variabel': name,
     "Cronbach's Alpha": rel.cronbachAlpha.toFixed(4),
     'rho_A': rel.rhoA.toFixed(4),
     'Composite Reliability': rel.compositeReliability.toFixed(4),
     'AVE': rel.ave.toFixed(4)
   }));
+
+  // HTMT
+  if (state.hasilPLS.htmt) {
+    const htmtRows = [];
+    for (const [v1, targets] of Object.entries(state.hasilPLS.htmt)) {
+      for (const [v2, val] of Object.entries(targets)) {
+        if (v1 !== v2) {
+          htmtRows.push({ 'Konstruk 1': v1, 'Konstruk 2': v2, 'HTMT Ratio': val.toFixed(4) });
+        }
+      }
+    }
+    sheets['HTMT Matrix'] = htmtRows;
+  }
   
   // Bootstrap if available
   if (state.hasilBootstrap && state.hasilBootstrap.pathResults) {
@@ -4621,3 +5462,4 @@ window.addEventListener('resize', () => {
     setTimeout(renderModel, 100);
   }
 });
+

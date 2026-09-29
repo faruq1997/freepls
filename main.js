@@ -438,6 +438,11 @@ ipcMain.handle('dataset-ambil', (_, id) => {
   return dataset;
 });
 
+ipcMain.handle('dataset-simpan-data', (_, { id, data, jumlah_baris, jumlah_kolom }) => {
+  dbRun('UPDATE dataset SET data = ?, jumlah_baris = ?, jumlah_kolom = ? WHERE id = ?', [JSON.stringify(data), jumlah_baris, jumlah_kolom, id]);
+  return true;
+});
+
 ipcMain.handle('dataset-hapus', (_, id) => {
   dbRun('DELETE FROM dataset WHERE id = ?', [id]);
   return true;
