@@ -1,8 +1,8 @@
 Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
 
 ========================================================================
-OpenPLS Indonesia - Open Source PLS-SEM Desktop Software
-Copyright (c) 2026 OpenPLS Indonesia Contributors
+FreePLS Indonesia - Open Source PLS-SEM Desktop Software
+Copyright (c) 2026 FreePLS Indonesia Contributors
 ========================================================================
 
 You are free to:
@@ -20,10 +20,10 @@ Under the following terms:
 ========================================================================
 DISCLAIMER ETIS & HUKUM (ETHICAL & LEGAL DISCLAIMER)
 ========================================================================
-1. OpenPLS Indonesia adalah perangkat lunak open-source independen yang 
+1. FreePLS Indonesia adalah perangkat lunak open-source independen yang 
    dirancang untuk memfasilitasi riset akademik, pembelajaran statistika, 
    dan sains terbuka (Open Science).
-2. OpenPLS Indonesia TIDAK berafiliasi, disponsori, atau didukung oleh 
+2. FreePLS Indonesia TIDAK berafiliasi, disponsori, atau didukung oleh 
    SmartPLS GmbH atau entitas pemilik merek komersial lainnya.
 3. Seluruh algoritma (Partial Least Squares Path Modeling & Bootstrapping) 
    diimplementasikan secara independen berdasarkan literatur ilmiah domain 

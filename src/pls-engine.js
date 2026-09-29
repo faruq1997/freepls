@@ -1,6 +1,6 @@
 /**
  * ============================================
- * OpenPLS Indonesia - PLS-SEM Engine
+ * FreePLS Indonesia - PLS-SEM Engine
  * Mesin perhitungan PLS-SEM
  * ============================================
  */
@@ -714,4 +714,6 @@ class PLSEngine {
 // Export
 if (typeof window !== 'undefined') {
   window.PLSEngine = PLSEngine;
+  window.FreePLS = PLSEngine;
+  window.OpenPLS = PLSEngine;
 }

@@ -1,4 +1,4 @@
-# OpenPLS Indonesia 🇮🇩
+# FreePLS Indonesia 🇮🇩
 
 Aplikasi desktop *open-source* modern untuk analisis **Partial Least Squares - Structural Equation Modeling (PLS-SEM)** dengan antarmuka penuh Bahasa Indonesia, dirancang khusus untuk mendukung kegiatan penelitian, skripsi, tesis, disertasi, dan pembelajaran statistika.
 
@@ -6,7 +6,7 @@ Aplikasi desktop *open-source* modern untuk analisis **Partial Least Squares - S
 
 ## ⚖️ Disclaimer Etis & Hukum (Legal & Ethical Disclaimer)
 
-1. **Independensi Perangkat Lunak**: **OpenPLS Indonesia** adalah proyek independen dan sumber terbuka (*open-source*) yang didedikasikan untuk kemajuan sains terbuka (*Open Science*) dan edukasi.
+1. **Independensi Perangkat Lunak**: **FreePLS Indonesia** adalah proyek independen dan sumber terbuka (*open-source*) yang didedikasikan untuk kemajuan sains terbuka (*Open Science*) dan edukasi.
 2. **Bukan Afiliasi**: Proyek ini **TIDAK berafiliasi, tidak disponsori, dan tidak didukung oleh SmartPLS GmbH** atau pemegang merek komersial lainnya.
 3. **Implementasi Mandiri**: Seluruh perhitungan statistika (Algoritma PLS-SEM, Bootstrapping, Uji Reliabilitas & Validitas) dibangun secara independen (*clean-room implementation*) berdasarkan literatur ilmiah dan publikasi domain publik (Wold, Lohmöller, Hair et al.).
 
@@ -19,7 +19,7 @@ Aplikasi desktop *open-source* modern untuk analisis **Partial Least Squares - S
 - 🎨 **Interactive Canvas Editor** - Buat model visual dengan drag-and-drop, lengkungkan jalur sesuka hati, model mediasi langsung, dan multi-select (*Ctrl + A* / *Delete*).
 - 🖼️ **Ekspor Gambar High-Resolution 600+ DPI** - Ekspor diagram model beresolusi publikasi jurnal (PNG / JPG / SVG) dengan atau tanpa indikator.
 - 💾 **Autosave Real-Time & Versi Snapshot** - Perubahan otomatis tersimpan ke SQLite lokal, dilengkapi fitur pencadangan snapshot versi model.
-- 📁 **Ekspor & Impor File Proyek (.openpls)** - Backup dan bagikan file proyek lengkap antar pengguna.
+- 📁 **Ekspor & Impor File Proyek (.freepls)** - Backup dan bagikan file proyek lengkap antar pengguna.
 - 🌙 **Tema Gelap & Terang Modern** - Desain antarmuka *glassmorphic* premium yang nyaman di mata.
 
 ---

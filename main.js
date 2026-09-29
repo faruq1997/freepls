@@ -30,16 +30,19 @@ async function initDatabase() {
     locateFile: () => wasmPath
   });
   
+  const freePlsDbPath = path.join(app.getPath('userData'), 'freepls.db');
   const openPlsDbPath = path.join(app.getPath('userData'), 'openpls.db');
   const oldSmartPlsDbPath = path.join(app.getPath('userData'), 'smartpls.db');
   
-  if (!fs.existsSync(openPlsDbPath) && fs.existsSync(oldSmartPlsDbPath)) {
-    try {
-      fs.copyFileSync(oldSmartPlsDbPath, openPlsDbPath);
-    } catch (e) {}
+  if (!fs.existsSync(freePlsDbPath)) {
+    if (fs.existsSync(openPlsDbPath)) {
+      try { fs.copyFileSync(openPlsDbPath, freePlsDbPath); } catch (e) {}
+    } else if (fs.existsSync(oldSmartPlsDbPath)) {
+      try { fs.copyFileSync(oldSmartPlsDbPath, freePlsDbPath); } catch (e) {}
+    }
   }
 
-  dbPath = openPlsDbPath;
+  dbPath = freePlsDbPath;
   
   // Load existing DB or create new
   if (fs.existsSync(dbPath)) {
@@ -143,7 +146,7 @@ function createWindow() {
     height: 900,
     minWidth: 1100,
     minHeight: 700,
-    title: 'OpenPLS Indonesia',
+    title: 'FreePLS Indonesia',
     icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -249,7 +252,7 @@ ipcMain.handle('proyek-ekspor-file', async (_, proyekId) => {
   const hasil = dbAll('SELECT * FROM hasil_analisis WHERE proyek_id = ?', [proyekId]);
 
   const bundle = {
-    format: 'OpenPLS_Indonesia_Project',
+    format: 'FreePLS_Indonesia_Project',
     version: '2.0',
     export_time: new Date().toISOString(),
     proyek: {
@@ -280,10 +283,10 @@ ipcMain.handle('proyek-ekspor-file', async (_, proyekId) => {
 
   const safeName = (proyek.nama || 'Proyek').replace(/[^a-zA-Z0-9_-]/g, '_');
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: 'Ekspor Proyek OpenPLS',
-    defaultPath: `${safeName}.openpls`,
+    title: 'Ekspor Proyek FreePLS',
+    defaultPath: `${safeName}.freepls`,
     filters: [
-      { name: 'OpenPLS Project File (*.openpls)', extensions: ['openpls', 'smartpls', 'json'] }
+      { name: 'FreePLS Project File (*.freepls)', extensions: ['freepls', 'openpls', 'smartpls', 'json'] }
     ]
   });
 
@@ -295,9 +298,9 @@ ipcMain.handle('proyek-ekspor-file', async (_, proyekId) => {
 
 ipcMain.handle('proyek-impor-file', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Impor File Proyek OpenPLS',
+    title: 'Impor File Proyek FreePLS',
     filters: [
-      { name: 'OpenPLS Project File (*.openpls, *.smartpls, *.json)', extensions: ['openpls', 'smartpls', 'json'] }
+      { name: 'FreePLS Project File (*.freepls, *.openpls, *.smartpls, *.json)', extensions: ['freepls', 'openpls', 'smartpls', 'json'] }
     ],
     properties: ['openFile']
   });

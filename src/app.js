@@ -1,6 +1,6 @@
 /**
  * ============================================
- * OpenPLS Indonesia - Aplikasi Utama
+ * FreePLS Indonesia - Aplikasi Utama
  * ============================================
  */
 
@@ -298,7 +298,7 @@ function initNavigation() {
 
   // Kirim Email Support
   document.getElementById('btnKirimEmailSupport')?.addEventListener('click', async () => {
-    const mailUrl = 'mailto:test@gmail.com?subject=Bantuan%20OpenPLS%20Indonesia&body=Halo%20Tim%20OpenPLS%20Indonesia,%0A%0ASaya%20membutuhkan%20bantuan%20mengenai:%0A';
+    const mailUrl = 'mailto:test@gmail.com?subject=Bantuan%20FreePLS%20Indonesia&body=Halo%20Tim%20FreePLS%20Indonesia,%0A%0ASaya%20membutuhkan%20bantuan%20mengenai:%0A';
     try {
       if (window.api && window.api.openExternal) {
         await window.api.openExternal(mailUrl);
@@ -827,18 +827,18 @@ async function hapusVersiSnapshot(versiId, namaVersi) {
   }
 }
 
-// ============ EXPORT / IMPORT .OPENPLS FILE ============
+// ============ EXPORT / IMPORT .FREEPLS FILE ============
 async function eksporProyekFile() {
   if (!state.proyekAktif) {
     showToast('Pilih proyek terlebih dahulu', 'peringatan');
     return;
   }
-  showLoading('Mengekspor bundle proyek .openpls...');
+  showLoading('Mengekspor bundle proyek .freepls...');
   try {
     const res = await window.api.proyekEksporFile(state.proyekAktif.id);
     hideLoading();
     if (res && res.sukses) {
-      showToast('Proyek berhasil diekspor ke file .openpls!', 'sukses');
+      showToast('Proyek berhasil diekspor ke file .freepls!', 'sukses');
     }
   } catch (e) {
     hideLoading();
@@ -847,7 +847,7 @@ async function eksporProyekFile() {
 }
 
 async function imporProyekFile() {
-  showLoading('Mengimpor file .openpls...');
+  showLoading('Mengimpor file .freepls...');
   try {
     const res = await window.api.proyekImporFile();
     hideLoading();
@@ -3614,7 +3614,7 @@ async function terapkanTemplateModel(templateKey) {
   // Pastikan ada proyek aktif, jika belum ada buat otomatis
   if (!state.proyekAktif) {
     const proyekBaru = await window.api.proyekBuat({
-      nama: 'Model Penelitian OpenPLS',
+      nama: 'Model Penelitian FreePLS',
       deskripsi: 'Proyek dibuat otomatis dari Template Model'
     });
     setActiveProject(proyekBaru);
