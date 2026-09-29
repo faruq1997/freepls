@@ -887,6 +887,8 @@ select.form-input {
   align-items: center;
   gap: 5px;
   min-width: 0;
+}
+
 .proyek-nama-aktif {
   font-weight: 700;
   font-size: 13.5px;
