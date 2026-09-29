@@ -446,10 +446,41 @@ function hideLoading() {
 }
 
 // ============ PROJECT HANDLERS ============
+function bukaModalProyekBaru() {
+  showModal('modalProyekBaru');
+  setTimeout(() => {
+    const input = document.getElementById('inputNamaProyek');
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }, 100);
+}
+
 function initProjectHandlers() {
-  document.getElementById('btnProyekBaru')?.addEventListener('click', () => showModal('modalProyekBaru'));
+  document.getElementById('btnProyekBaru')?.addEventListener('click', () => bukaModalProyekBaru());
   document.getElementById('btnImporProyek')?.addEventListener('click', () => showProjectPickerModal());
   document.getElementById('btnImporSmartPLSFile')?.addEventListener('click', () => imporProyekFile());
+  
+  // Klik teks "Belum ada proyek" / nama proyek di semua toolbar
+  document.querySelectorAll('.proyek-nama-aktif').forEach(el => {
+    el.addEventListener('click', () => {
+      if (!state.proyekAktif) {
+        bukaModalProyekBaru();
+      } else {
+        bukaModalRenameProyek();
+      }
+    });
+  });
+
+  // Klik badge icon di toolbar editor
+  document.querySelector('.toolbar-project-badge')?.addEventListener('click', () => {
+    if (!state.proyekAktif) {
+      bukaModalProyekBaru();
+    } else {
+      bukaModalRenameProyek();
+    }
+  });
   
   document.getElementById('btnSimpanProyekBaru')?.addEventListener('click', async () => {
     const nama = document.getElementById('inputNamaProyek').value.trim();
@@ -469,6 +500,22 @@ function initProjectHandlers() {
     await setActiveProject(proyek);
     loadDashboard();
   });
+
+  // Tekan Enter untuk submit nama proyek baru
+  document.getElementById('inputNamaProyek')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('btnSimpanProyekBaru')?.click();
+    }
+  });
+
+  // Tekan Enter untuk submit rename proyek
+  document.getElementById('inputRenameNamaProyek')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('btnSimpanRenameProyek')?.click();
+    }
+  });
 }
 
 async function showProjectPickerModal() {
@@ -476,7 +523,16 @@ async function showProjectPickerModal() {
   const list = document.getElementById('proyekListModal');
   
   if (proyeks.length === 0) {
-    list.innerHTML = '<div class="empty-state"><span class="material-icons-round">folder_off</span><p>Belum ada proyek. Buat proyek baru terlebih dahulu.</p></div>';
+    list.innerHTML = `
+      <div class="empty-state" style="cursor: pointer;" id="emptyPickerModal" title="Klik untuk buat proyek baru">
+        <span class="material-icons-round">folder_off</span>
+        <p>Belum ada proyek. <strong style="color: var(--color-primary); text-decoration: underline;">Klik di sini untuk buat proyek baru.</strong></p>
+      </div>
+    `;
+    document.getElementById('emptyPickerModal')?.addEventListener('click', () => {
+      hideModal('modalPilihProyek');
+      bukaModalProyekBaru();
+    });
   } else {
     list.innerHTML = proyeks.map(p => `
       <div class="proyek-list-item" data-id="${p.id}">
@@ -510,6 +566,7 @@ async function setActiveProject(proyek, forceVersiId = null) {
   // Update all project name labels
   document.querySelectorAll('.proyek-nama-aktif').forEach(el => {
     el.textContent = proyek.nama;
+    el.title = `Proyek: ${proyek.nama} (Klik untuk ubah nama)`;
   });
   
   // Ambil riwayat versi proyek
@@ -577,11 +634,12 @@ async function loadDashboard() {
   
   if (proyeks.length === 0) {
     grid.innerHTML = `
-      <div class="proyek-empty">
+      <div class="proyek-empty" id="proyekEmptyCard" style="cursor: pointer;" title="Klik untuk buat proyek baru">
         <span class="material-icons-round" style="font-size: 64px; opacity: 0.3; display: block; margin-bottom: 16px;">folder_open</span>
-        <p style="color: var(--text-muted)">Belum ada proyek. Klik "Proyek Baru" untuk memulai.</p>
+        <p style="color: var(--text-muted)">Belum ada proyek. <strong style="color: var(--color-primary); text-decoration: underline;">Klik di sini atau "Proyek Baru" untuk memulai.</strong></p>
       </div>
     `;
+    document.getElementById('proyekEmptyCard')?.addEventListener('click', () => bukaModalProyekBaru());
     return;
   }
   
@@ -626,6 +684,10 @@ async function hapusProyek(id, nama) {
     await window.api.proyekHapus(id);
     if (state.proyekAktif && state.proyekAktif.id === id) {
       state.proyekAktif = null;
+      document.querySelectorAll('.proyek-nama-aktif').forEach(el => {
+        el.textContent = 'Belum ada proyek dipilih';
+        el.title = 'Belum ada proyek dipilih (Klik untuk buat proyek baru)';
+      });
     }
     showToast(`Proyek "${nama}" telah dihapus`, 'sukses');
     loadDashboard();
@@ -635,12 +697,19 @@ async function hapusProyek(id, nama) {
 // ============ RENAME PROJECT ============
 function bukaModalRenameProyek() {
   if (!state.proyekAktif) {
-    showToast('Pilih proyek terlebih dahulu', 'peringatan');
+    bukaModalProyekBaru();
     return;
   }
   document.getElementById('inputRenameNamaProyek').value = state.proyekAktif.nama;
   document.getElementById('inputRenameDeskripsiProyek').value = state.proyekAktif.deskripsi || '';
   showModal('modalRenameProyek');
+  setTimeout(() => {
+    const input = document.getElementById('inputRenameNamaProyek');
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }, 100);
 }
 
 async function simpanRenameProyek() {

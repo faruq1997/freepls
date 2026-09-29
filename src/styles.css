@@ -887,23 +887,38 @@ select.form-input {
   align-items: center;
   gap: 5px;
   min-width: 0;
-}
-
-.toolbar-title-row .proyek-nama-aktif {
+.proyek-nama-aktif {
   font-weight: 700;
   font-size: 13.5px;
   color: var(--text-primary);
   letter-spacing: -0.2px;
   cursor: pointer;
-  transition: color var(--transition-fast);
+  transition: all var(--transition-fast);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--border-color);
+  text-underline-offset: 3px;
+}
+
+.proyek-nama-aktif:hover {
+  color: var(--color-primary);
+  text-decoration-color: var(--color-primary);
+}
+
+.toolbar-title-row .proyek-nama-aktif {
   max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.toolbar-title-row .proyek-nama-aktif:hover {
-  color: var(--color-primary);
+.toolbar-project-badge {
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.toolbar-project-badge:hover {
+  transform: scale(1.08);
 }
 
 .btn-toolbar-edit {
