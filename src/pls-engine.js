@@ -717,3 +717,7 @@ if (typeof window !== 'undefined') {
   window.FreePLS = PLSEngine;
   window.OpenPLS = PLSEngine;
 }
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { PLSEngine, FreePLS: PLSEngine, OpenPLS: PLSEngine };
+}
+
