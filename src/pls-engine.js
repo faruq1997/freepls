@@ -2243,8 +2243,7 @@ class PLSEngine {
 if (typeof window !== 'undefined') {
   window.PLSEngine = PLSEngine;
   window.FreePLS = PLSEngine;
-  window.OpenPLS = PLSEngine;
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { PLSEngine, FreePLS: PLSEngine, OpenPLS: PLSEngine };
+  module.exports = { PLSEngine, FreePLS: PLSEngine };
 }
