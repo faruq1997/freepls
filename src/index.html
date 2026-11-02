@@ -152,130 +152,236 @@
       <!-- HALAMAN EDITOR MODEL -->
       <section class="halaman tersembunyi" id="halaman-editor">
         <div class="editor-toolbar">
-          <div class="toolbar-left">
-            <div class="toolbar-project-badge" title="Model PLS-SEM Aktif">
-              <span class="material-icons-round">account_tree</span>
-            </div>
-            <div class="toolbar-project-info">
-              <div class="toolbar-title-row">
+          <!-- BARIS 1: INFORMASI PROYEK & STATUS SISTEM (ATAS) -->
+          <div class="toolbar-top-row">
+            <div class="toolbar-top-left">
+              <div class="toolbar-project-badge" id="btnProyekBadgeIcon" title="Model PLS-SEM Aktif (Klik untuk ubah nama)">
+                <span class="material-icons-round">account_tree</span>
+              </div>
+              <div class="toolbar-title-wrap">
                 <span class="proyek-nama-aktif" id="proyekNamaEditor" title="Klik untuk membuat proyek baru atau mengubah nama proyek">Belum ada proyek dipilih</span>
                 <button class="btn btn-icon btn-ghost btn-toolbar-edit" id="btnRenameProyek" title="Buat / Ubah Nama Proyek">
                   <span class="material-icons-round">edit</span>
                 </button>
               </div>
-              <div class="toolbar-meta-row">
-                <!-- Version Chip Button -->
-                <button class="toolbar-pill-chip version-chip" id="btnVersiModel" title="Kelola Versi & Snapshot Model">
-                  <span class="material-icons-round chip-icon" style="color: #8b5cf6;">history</span>
-                  <span id="labelVersiAktif">Versi: Terkini</span>
-                  <span class="chip-counter" id="badgeTotalVersi">0</span>
-                </button>
 
-                <!-- Autosave Live Chip -->
-                <div class="toolbar-pill-chip autosave-chip" id="badgeAutosaveStatus" title="Status Sinkronisasi Otomatis">
-                  <span class="material-icons-round chip-icon" style="color: #10b981;">cloud_done</span>
-                  <span>Autosave Aktif</span>
+              <!-- Version Chip Button -->
+              <button class="toolbar-pill-chip version-chip" id="btnVersiModel" title="Kelola Versi & Snapshot Riwayat Model">
+                <span class="material-icons-round chip-icon" style="color: #8b5cf6;">history</span>
+                <span id="labelVersiAktif">Versi: Terkini</span>
+                <span class="chip-counter" id="badgeTotalVersi">0</span>
+              </button>
+
+              <!-- Autosave Live Chip -->
+              <div class="toolbar-pill-chip autosave-chip" id="badgeAutosaveStatus" title="Status Sinkronisasi Otomatis Basis Data">
+                <span class="material-icons-round chip-icon" style="color: #10b981;">cloud_done</span>
+                <span>Autosave Aktif</span>
+              </div>
+            </div>
+
+            <div class="toolbar-top-right">
+              <!-- Model Validator Live Chip & Diagnostic Flyout -->
+              <div class="dropdown" id="dropdownModelValidator">
+                <button class="toolbar-pill-chip validator-chip" id="badgeModelValidator" title="Diagnostik & Validasi Struktur Model Real-Time">
+                  <span class="material-icons-round chip-icon" id="iconModelValidator" style="color: #10b981;">check_circle</span>
+                  <span id="textModelValidator">Model Siap</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-right" id="menuModelValidator" style="min-width: 320px; padding: 12px; right: 0; left: auto;">
+                  <div class="dropdown-header" style="padding: 0 0 8px 0; font-size: 11.5px; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border-light); margin-bottom: 8px;">
+                    DIAGNOSTIK STRUKTUR MODEL (LINTING)
+                  </div>
+                  <div id="listModelValidatorIssues" style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
+                    <span style="color: #10b981; display: flex; align-items: center; gap: 6px;">
+                      <span class="material-icons-round" style="font-size: 16px;">check</span> Struktur model siap dianalisis
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              <div class="toolbar-divider"></div>
+
+              <!-- Export Gambar (600 DPI) & Simpan Model -->
+              <button class="btn btn-sm btn-outline btn-toolbar-export" id="btnBukaEksporGambar" title="Ekspor Gambar High-Resolution 600 DPI (PNG / JPG / SVG)">
+                <span class="material-icons-round" style="color: #3b82f6;">image</span>
+                <span>Export Gambar</span>
+              </button>
+
+              <button class="btn btn-sm btn-primary btn-toolbar-save" id="btnSimpanModel" title="Simpan Model ke Basis Data (Ctrl+S)">
+                <span class="material-icons-round">save</span>
+                <span>Simpan</span>
+              </button>
             </div>
           </div>
 
-          <div class="toolbar-right">
-            <!-- Undo / Redo Segmented Group -->
-            <div class="toolbar-btn-group" title="Riwayat Perubahan Model">
-              <button class="btn btn-sm btn-ghost btn-group-item" id="btnUndo" title="Undo / Urungkan (Ctrl+Z)" disabled>
-                <span class="material-icons-round">undo</span>
-              </button>
-              <button class="btn btn-sm btn-ghost btn-group-item" id="btnRedo" title="Redo / Ulangi (Ctrl+Y)" disabled>
-                <span class="material-icons-round">redo</span>
-              </button>
-            </div>
-
-            <div class="toolbar-divider"></div>
-
-            <!-- Canvas Modeling Tools Segmented Group -->
-            <div class="toolbar-btn-group">
-              <button class="btn btn-sm btn-ghost btn-group-item" id="btnAutoLayout" title="Tata Letak Otomatis (Rapi)">
-                <span class="material-icons-round" style="color: #a855f7;">auto_awesome</span>
-                <span>Rapikan</span>
-              </button>
-              <button class="btn btn-sm btn-ghost btn-group-item btn-highlight-primary" id="btnTambahVariabel" title="Tambah Variabel Laten Baru">
-                <span class="material-icons-round" style="color: #009bf2;">add_circle</span>
-                <span>+ Variabel</span>
-              </button>
-              <button class="btn btn-sm btn-ghost btn-group-item" id="btnTambahJalur" title="Tambah Hubungan Jalur / Pengaruh">
-                <span class="material-icons-round" style="color: #ec4899;">trending_flat</span>
-                <span>+ Jalur</span>
-              </button>
-            </div>
-
-            <div class="toolbar-divider"></div>
-
-            <!-- Dropdown Menu Lainnya (Catatan, Indikator, Template, Export File Project) -->
-            <div class="dropdown" id="dropdownLainnya">
-              <button class="btn btn-sm btn-ghost btn-dropdown-trigger" id="btnDropdownLainnya" title="Fitur Tambahan (Catatan, Indikator, Template, Backup)">
-                <span class="material-icons-round" style="color: #8b5cf6;">apps</span>
-                <span>Lainnya</span>
-                <span class="material-icons-round dropdown-chevron">expand_more</span>
-              </button>
-              <div class="dropdown-menu">
-                <div class="dropdown-header">FITUR TAMBAHAN</div>
-                <!-- Catatan Canvas -->
-                <button class="dropdown-item" id="btnTambahCatatan">
-                  <div class="dropdown-icon-box note-box">
-                    <span class="material-icons-round">note_add</span>
-                  </div>
-                  <div class="dropdown-text">
-                    <div class="dropdown-title">Catatan Canvas</div>
-                    <span class="dropdown-item-desc">Tambah sticky note keterangan</span>
-                  </div>
+          <!-- BARIS 2: ALAT PEMODELAN KANVAS & AKSI (BAWAH) -->
+          <div class="toolbar-bottom-row">
+            <div class="toolbar-bottom-left">
+              <!-- Undo / Redo Segmented Group -->
+              <div class="toolbar-btn-group" title="Riwayat Perubahan Model">
+                <button class="btn btn-sm btn-ghost btn-group-item" id="btnUndo" title="Undo / Urungkan (Ctrl+Z)" disabled>
+                  <span class="material-icons-round">undo</span>
                 </button>
-                <!-- Toggle Indikator -->
-                <button class="dropdown-item" id="btnToggleIndikator">
-                  <div class="dropdown-icon-box eye-box">
-                    <span class="material-icons-round" id="iconToggleIndikator">visibility</span>
-                  </div>
-                  <div class="dropdown-text">
-                    <div class="dropdown-title" id="labelToggleIndikator">Indikator</div>
-                    <span class="dropdown-item-desc">Show / Hide kotak indikator</span>
-                  </div>
+                <button class="btn btn-sm btn-ghost btn-group-item" id="btnRedo" title="Redo / Ulangi (Ctrl+Y)" disabled>
+                  <span class="material-icons-round">redo</span>
                 </button>
-                <!-- Template Model -->
-                <button class="dropdown-item" id="btnBukaTemplateModel">
-                  <div class="dropdown-icon-box template-box">
-                    <span class="material-icons-round">dashboard_customize</span>
-                  </div>
-                  <div class="dropdown-text">
-                    <div class="dropdown-title">Template Model</div>
-                    <span class="dropdown-item-desc">Model mediasi & template siap pakai</span>
-                  </div>
+              </div>
+
+              <div class="toolbar-divider"></div>
+
+              <!-- Canvas Modeling Tools Segmented Group -->
+              <div class="toolbar-btn-group">
+                <button class="btn btn-sm btn-ghost btn-group-item btn-highlight-primary" id="btnTambahVariabel" title="Tambah Variabel Laten Baru (Klik / Shortcut)">
+                  <span class="material-icons-round" style="color: #009bf2;">add_circle</span>
+                  <span>+ Variabel</span>
                 </button>
-                <div class="dropdown-divider"></div>
-                <!-- Export File Project -->
-                <button class="dropdown-item" id="btnEksporProyekFile">
-                  <div class="dropdown-icon-box backup-box">
-                    <span class="material-icons-round">file_download</span>
-                  </div>
-                  <div class="dropdown-text">
-                    <div class="dropdown-title">Ekspor File Proyek</div>
-                    <span class="dropdown-item-desc">Simpan backup lengkap (.freepls)</span>
-                  </div>
+                <button class="btn btn-sm btn-ghost btn-group-item" id="btnTambahJalur" title="Tambah Hubungan Jalur / Pengaruh">
+                  <span class="material-icons-round" style="color: #ec4899;">trending_flat</span>
+                  <span>+ Jalur</span>
                 </button>
+                <button class="btn btn-sm btn-ghost btn-group-item" id="btnAutoLayout" title="Tata Letak Otomatis Diagram (Rapikan)">
+                  <span class="material-icons-round" style="color: #a855f7;">auto_awesome</span>
+                  <span>Rapikan</span>
+                </button>
+              </div>
+
+              <!-- Dropdown Align & Distribute -->
+              <div class="dropdown" id="dropdownAlign">
+                <button class="btn btn-sm btn-ghost btn-dropdown-trigger" id="btnDropdownAlign" title="Perataan & Distribusi Variabel Laten">
+                  <span class="material-icons-round" style="color: #06b6d4;">align_horizontal_left</span>
+                  <span>Ratakan</span>
+                  <span class="material-icons-round dropdown-chevron">expand_more</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-left">
+                  <div class="dropdown-header">PERATAAN POSISI (ALIGN)</div>
+                  <button class="dropdown-item" id="btnAlignLeft">
+                    <div class="dropdown-icon-box"><span class="material-icons-round">align_horizontal_left</span></div>
+                    <div class="dropdown-text"><div class="dropdown-title">Rata Kiri</div><span class="dropdown-item-desc">Sejajarkan sisi kiri variabel</span></div>
+                  </button>
+                  <button class="dropdown-item" id="btnAlignCenterH">
+                    <div class="dropdown-icon-box"><span class="material-icons-round">align_horizontal_center</span></div>
+                    <div class="dropdown-text"><div class="dropdown-title">Rata Tengah Horizontal</div><span class="dropdown-item-desc">Sejajarkan sumbu horizontal</span></div>
+                  </button>
+                  <button class="dropdown-item" id="btnAlignRight">
+                    <div class="dropdown-icon-box"><span class="material-icons-round">align_horizontal_right</span></div>
+                    <div class="dropdown-text"><div class="dropdown-title">Rata Kanan</div><span class="dropdown-item-desc">Sejajarkan sisi kanan variabel</span></div>
+                  </button>
+                  <div class="dropdown-divider"></div>
+                  <button class="dropdown-item" id="btnAlignTop">
+                    <div class="dropdown-icon-box"><span class="material-icons-round">align_vertical_top</span></div>
+                    <div class="dropdown-text"><div class="dropdown-title">Rata Atas</div><span class="dropdown-item-desc">Sejajarkan sisi atas variabel</span></div>
+                  </button>
+                  <button class="dropdown-item" id="btnAlignCenterV">
+                    <div class="dropdown-icon-box"><span class="material-icons-round">align_vertical_center</span></div>
+                    <div class="dropdown-text"><div class="dropdown-title">Rata Tengah Vertikal</div><span class="dropdown-item-desc">Sejajarkan sumbu vertikal</span></div>
+                  </button>
+                  <button class="dropdown-item" id="btnAlignBottom">
+                    <div class="dropdown-icon-box"><span class="material-icons-round">align_vertical_bottom</span></div>
+                    <div class="dropdown-text"><div class="dropdown-title">Rata Bawah</div><span class="dropdown-item-desc">Sejajarkan sisi bawah variabel</span></div>
+                  </button>
+                  <div class="dropdown-divider"></div>
+                  <div class="dropdown-header">DISTRIBUSI JARAK (DISTRIBUTE)</div>
+                  <button class="dropdown-item" id="btnDistributeH">
+                    <div class="dropdown-icon-box"><span class="material-icons-round">horizontal_distribute</span></div>
+                    <div class="dropdown-text"><div class="dropdown-title">Sebar Rata Horizontal</div><span class="dropdown-item-desc">Beri jarak horizontal yang sama</span></div>
+                  </button>
+                  <button class="dropdown-item" id="btnDistributeV">
+                    <div class="dropdown-icon-box"><span class="material-icons-round">vertical_distribute</span></div>
+                    <div class="dropdown-text"><div class="dropdown-title">Sebar Rata Vertikal</div><span class="dropdown-item-desc">Beri jarak vertikal yang sama</span></div>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Dropdown Menu Lainnya (Catatan, Indikator, Template, Export File Project) -->
+              <div class="dropdown" id="dropdownLainnya">
+                <button class="btn btn-sm btn-ghost btn-dropdown-trigger" id="btnDropdownLainnya" title="Fitur Tambahan (Catatan, Indikator, Template, Backup)">
+                  <span class="material-icons-round" style="color: #8b5cf6;">apps</span>
+                  <span>Lainnya</span>
+                  <span class="material-icons-round dropdown-chevron">expand_more</span>
+                </button>
+                <div class="dropdown-menu">
+                  <div class="dropdown-header">FITUR MODELING LANJUTAN</div>
+                  <!-- Tambah Efek Moderasi -->
+                  <button class="dropdown-item" id="btnBukaTambahModerasiModel">
+                    <div class="dropdown-icon-box" style="background: rgba(236, 72, 153, 0.15); color: #ec4899;">
+                      <span class="material-icons-round">tune</span>
+                    </div>
+                    <div class="dropdown-text">
+                      <div class="dropdown-title">+ Efek Moderasi</div>
+                      <span class="dropdown-item-desc">Buat variabel interaksi (X × M → Y)</span>
+                    </div>
+                  </button>
+                  <!-- Duplikat Variabel (Ctrl+D) -->
+                  <button class="dropdown-item" id="btnDuplikatVariabel">
+                    <div class="dropdown-icon-box" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">
+                      <span class="material-icons-round">content_copy</span>
+                    </div>
+                    <div class="dropdown-text">
+                      <div class="dropdown-title">Duplikat Variabel (Ctrl+D)</div>
+                      <span class="dropdown-item-desc">Kloning variabel & indikator terpilih</span>
+                    </div>
+                  </button>
+                  <!-- Rotasi Orientasi Indikator Cepat -->
+                  <button class="dropdown-item" id="btnRotasiIndikatorCepat">
+                    <div class="dropdown-icon-box" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
+                      <span class="material-icons-round">rotate_right</span>
+                    </div>
+                    <div class="dropdown-text">
+                      <div class="dropdown-title">Putar Posisi Indikator (Alt+R)</div>
+                      <span class="dropdown-item-desc">Kiri → Atas → Kanan → Bawah</span>
+                    </div>
+                  </button>
+                  <div class="dropdown-divider"></div>
+                  <!-- Catatan Canvas -->
+                  <button class="dropdown-item" id="btnTambahCatatan">
+                    <div class="dropdown-icon-box note-box">
+                      <span class="material-icons-round">note_add</span>
+                    </div>
+                    <div class="dropdown-text">
+                      <div class="dropdown-title">Catatan Canvas</div>
+                      <span class="dropdown-item-desc">Tambah sticky note keterangan</span>
+                    </div>
+                  </button>
+                  <!-- Toggle Indikator -->
+                  <button class="dropdown-item" id="btnToggleIndikator">
+                    <div class="dropdown-icon-box eye-box">
+                      <span class="material-icons-round" id="iconToggleIndikator">visibility</span>
+                    </div>
+                    <div class="dropdown-text">
+                      <div class="dropdown-title" id="labelToggleIndikator">Indikator</div>
+                      <span class="dropdown-item-desc">Show / Hide kotak indikator</span>
+                    </div>
+                  </button>
+                  <!-- Template Model -->
+                  <button class="dropdown-item" id="btnBukaTemplateModel">
+                    <div class="dropdown-icon-box template-box">
+                      <span class="material-icons-round">dashboard_customize</span>
+                    </div>
+                    <div class="dropdown-text">
+                      <div class="dropdown-title">Template Model</div>
+                      <span class="dropdown-item-desc">Model mediasi & template siap pakai</span>
+                    </div>
+                  </button>
+                  <div class="dropdown-divider"></div>
+                  <!-- Export File Project -->
+                  <button class="dropdown-item" id="btnEksporProyekFile">
+                    <div class="dropdown-icon-box backup-box">
+                      <span class="material-icons-round">file_download</span>
+                    </div>
+                    <div class="dropdown-text">
+                      <div class="dropdown-title">Ekspor File Proyek</div>
+                      <span class="dropdown-item-desc">Simpan backup lengkap (.freepls)</span>
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div class="toolbar-divider"></div>
-
-            <!-- Export Gambar (600 DPI) & Simpan Model -->
-            <button class="btn btn-sm btn-outline btn-toolbar-export" id="btnBukaEksporGambar" title="Ekspor Gambar High-Resolution 600 DPI (PNG / JPG / SVG)">
-              <span class="material-icons-round" style="color: #3b82f6;">image</span>
-              <span>Export Gambar</span>
-            </button>
-
-            <button class="btn btn-sm btn-primary btn-toolbar-save" id="btnSimpanModel">
-              <span class="material-icons-round">save</span>
-              <span>Simpan</span>
-            </button>
+            <div class="toolbar-bottom-right">
+              <button class="btn btn-sm btn-ghost" id="btnTogglePanelProperties" title="Buka / Sembunyikan Panel Properti Variabel & Jalur" style="gap: 5px; font-weight: 600;">
+                <span class="material-icons-round" style="color: var(--color-primary); font-size: 16px;">tune</span>
+                <span>Panel Properti</span>
+              </button>
+            </div>
           </div>
         </div>
         
@@ -297,7 +403,7 @@
               <span>Properti</span>
             </button>
 
-            <!-- Floating Zoom & Fullscreen Controls (Pojok Kanan Bawah Canvas) -->
+            <!-- Floating Zoom, Fit View & Fullscreen Controls (Pojok Kanan Bawah Canvas) -->
             <div class="canvas-floating-controls" style="position: absolute; bottom: 14px; right: 14px; z-index: 25; display: flex; align-items: center; background: var(--bg-card); backdrop-filter: blur(10px); border-radius: var(--radius-lg); border: 1.5px solid var(--border-color); padding: 4px 6px; box-shadow: var(--shadow-lg); gap: 2px;">
               <button class="btn btn-icon btn-ghost" id="btnZoomOut" title="Zoom Out (Ctrl -)" style="width: 30px; height: 30px;">
                 <span class="material-icons-round" style="font-size: 17px;">remove</span>
@@ -309,6 +415,9 @@
                 <span class="material-icons-round" style="font-size: 17px;">add</span>
               </button>
               <div style="width: 1px; height: 18px; background: var(--border-color); margin: 0 4px;"></div>
+              <button class="btn btn-icon btn-ghost" id="btnCanvasFitView" title="Pusatkan & Sesuaikan Seluruh Diagram ke Layar (Fit to Screen)" style="width: 30px; height: 30px; color: var(--color-primary);">
+                <span class="material-icons-round" style="font-size: 18px;">center_focus_strong</span>
+              </button>
               <button class="btn btn-icon btn-ghost" id="btnCanvasFullscreen" title="Layar Penuh Canvas (F / F11)" style="width: 30px; height: 30px;">
                 <span class="material-icons-round" style="font-size: 17px;">fullscreen</span>
               </button>
@@ -343,34 +452,109 @@
       
       <!-- HALAMAN DATA -->
       <section class="halaman tersembunyi" id="halaman-data">
-        <div class="editor-toolbar">
-          <div class="toolbar-left">
-            <h2 class="page-title">Kelola Data</h2>
-            <span class="proyek-nama-aktif" id="proyekNamaData" title="Klik untuk membuat proyek baru atau mengubah nama proyek">Belum ada proyek dipilih</span>
+        <div class="page-toolbar">
+          <div class="page-toolbar-left">
+            <div class="page-title-icon-box" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(99, 102, 241, 0.15)); color: #3b82f6;">
+              <span class="material-icons-round">table_chart</span>
+            </div>
+            <div class="page-title-info">
+              <div class="page-title-row">
+                <h2 class="page-title">Kelola Dataset</h2>
+                <span class="page-project-badge proyek-nama-aktif" id="proyekNamaData" title="Proyek Aktif (Klik untuk ganti nama atau buat baru)">Belum ada proyek dipilih</span>
+              </div>
+              <span class="page-subtitle">Impor dataset, pra-pemrosesan data, uji instrumen, dan analisis deskriptif</span>
+            </div>
           </div>
-          <div class="toolbar-right" style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="btn btn-sm btn-outline" id="btnBukaImputasiData" title="Imputasi data kosong (Missing Values)">
-              <span class="material-icons-round" style="font-size: 16px; color: #f59e0b;">healing</span> Imputasi Data
-            </button>
-            <button class="btn btn-sm btn-outline" id="btnBukaReverseScore" title="Balik skor indikator negatif (Reverse Coding)">
-              <span class="material-icons-round" style="font-size: 16px; color: #8b5cf6;">swap_horiz</span> Reverse Skala
-            </button>
-            <button class="btn btn-sm btn-outline" id="btnBukaDeteksiOutlier" title="Deteksi data pencilan ekstrem (Outliers)">
-              <span class="material-icons-round" style="font-size: 16px; color: #ec4899;">rule</span> Cek Outlier
-            </button>
+          <div class="page-toolbar-actions">
             <button class="btn btn-sm btn-primary" id="btnImporData">
               <span class="material-icons-round">upload_file</span> Impor Data
+            </button>
+            <button class="btn btn-sm btn-outline" id="btnBukaUjiInstrumen" title="Uji Validitas (Pearson) & Reliabilitas (Cronbach Alpha) Butir Instrumen">
+              <span class="material-icons-round" style="font-size: 16px; color: #3b82f6;">psychology</span> Uji Instrumen
+            </button>
+            <button class="btn btn-sm btn-outline" id="btnBukaStatistikDeskriptif" title="Statistik Deskriptif Lengkap, TCR, dan Evaluasi Normalitas Univariat">
+              <span class="material-icons-round" style="font-size: 16px; color: #10b981;">analytics</span> Deskriptif
+            </button>
+
+            <!-- Dropdown Alat Pra-Proses Data -->
+            <div class="dropdown" id="dropdownDataTools">
+              <button class="btn btn-sm btn-outline btn-dropdown-trigger" id="btnDropdownDataTools" title="Menu alat pembersihan dan transformasi data">
+                <span class="material-icons-round" style="font-size: 16px; color: #f59e0b;">build</span>
+                <span>Pra-Proses</span>
+                <span class="material-icons-round dropdown-chevron">expand_more</span>
+              </button>
+              <div class="dropdown-menu dropdown-menu-right" id="menuDataTools">
+                <div class="dropdown-header">PEMBERSIHAN & TRANSFORMASI DATA</div>
+                <button class="dropdown-item" id="btnBukaImputasiData">
+                  <div class="dropdown-icon-box heal-box">
+                    <span class="material-icons-round">healing</span>
+                  </div>
+                  <div class="dropdown-text">
+                    <div class="dropdown-title">Imputasi Missing Values</div>
+                    <span class="dropdown-item-desc">Isi sel kosong dengan Mean / Median</span>
+                  </div>
+                </button>
+                <button class="dropdown-item" id="btnBukaReverseScore">
+                  <div class="dropdown-icon-box swap-box">
+                    <span class="material-icons-round">swap_horiz</span>
+                  </div>
+                  <div class="dropdown-text">
+                    <div class="dropdown-title">Reverse Skala Indikator</div>
+                    <span class="dropdown-item-desc">Balik skor butir negatif (1↔5)</span>
+                  </div>
+                </button>
+                <button class="dropdown-item" id="btnBukaDeteksiOutlier">
+                  <div class="dropdown-icon-box rule-box">
+                    <span class="material-icons-round">rule</span>
+                  </div>
+                  <div class="dropdown-text">
+                    <div class="dropdown-title">Deteksi Outlier Ekstrem</div>
+                    <span class="dropdown-item-desc">Identifikasi data pencilan |Z| &ge; 3.0</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <button class="btn btn-sm btn-outline" id="btnEksporCSVData" title="Ekspor dataset aktif ke format Excel / CSV">
+              <span class="material-icons-round" style="font-size: 16px; color: #10b981;">file_download</span> Ekspor
             </button>
           </div>
         </div>
         
         <div class="data-container">
-          <div class="dataset-list" id="datasetList">
-            <div class="empty-state">
-              <span class="material-icons-round">cloud_upload</span>
-              <p>Belum ada dataset. Impor file CSV atau Excel.</p>
+          <div class="dataset-sidebar">
+            <div class="dataset-sidebar-header">
+              <div class="d-flex align-items-center justify-content-between" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; color: var(--text-primary);">
+                  <span class="material-icons-round" style="color: var(--color-primary); font-size: 18px;">storage</span>
+                  <span>Dataset Proyek</span>
+                </div>
+                <span class="badge-chip" id="datasetCountBadge">0 File</span>
+              </div>
+              <p style="font-size: 11.5px; color: var(--text-muted); margin: 0; line-height: 1.35;">Pilih dataset untuk melihat pratinjau tabel, eksplorasi distribusi, dan kalkulasi ringkasan statistik.</p>
+            </div>
+            
+            <div class="dataset-list" id="datasetList">
+              <div class="empty-state">
+                <span class="material-icons-round">cloud_upload</span>
+                <p>Belum ada dataset. Impor file CSV atau Excel.</p>
+              </div>
+            </div>
+
+            <!-- Quick Data Health & Guidelines Box -->
+            <div class="data-guideline-card">
+              <div class="data-guideline-header">
+                <span class="material-icons-round" style="font-size: 16px; color: var(--color-primary);">lightbulb</span>
+                <strong>Panduan Metodologi Data</strong>
+              </div>
+              <ul class="data-guideline-list">
+                <li>Gunakan <strong>Uji Instrumen</strong> untuk validitas Pearson dan reliabilitas Cronbach Alpha.</li>
+                <li>Gunakan <strong>Deskriptif</strong> untuk ringkasan distribusi data dan evaluasi normalitas univariat.</li>
+                <li>Mendukung skala pengukuran Likert 1-5, 1-7, maupun data metrik kontinu.</li>
+              </ul>
             </div>
           </div>
+
           <div class="data-preview" id="dataPreview">
             <div class="empty-state">
               <span class="material-icons-round">visibility</span>
@@ -382,20 +566,29 @@
       
       <!-- HALAMAN ANALISIS -->
       <section class="halaman tersembunyi" id="halaman-analisis">
-        <div class="editor-toolbar">
-          <div class="toolbar-left">
-            <h2 class="page-title">Analisis PLS-SEM</h2>
-            <span class="proyek-nama-aktif" id="proyekNamaAnalisis" title="Klik untuk membuat proyek baru atau mengubah nama proyek">Belum ada proyek dipilih</span>
+        <div class="page-toolbar">
+          <div class="page-toolbar-left">
+            <div class="page-title-icon-box" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(139, 92, 246, 0.15)); color: #6366f1;">
+              <span class="material-icons-round">analytics</span>
+            </div>
+            <div class="page-title-info">
+              <div class="page-title-row">
+                <h2 class="page-title">Pusat Analisis Kuantitatif</h2>
+                <span class="page-project-badge proyek-nama-aktif" id="proyekNamaAnalisis" title="Proyek Aktif (Klik untuk ganti nama atau buat baru)">Belum ada proyek dipilih</span>
+              </div>
+              <span class="page-subtitle">Modul estimasi PLS-SEM, Bootstrapping, Uji Butir Instrumen, dan Statistik Deskriptif</span>
+            </div>
           </div>
         </div>
         
-        <div class="analisis-container">
+        <div class="analisis-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+          <!-- Card 1: Algoritma PLS -->
           <div class="analisis-card">
-            <div class="analisis-card-icon">
+            <div class="analisis-card-icon" style="background: rgba(79, 70, 229, 0.12); color: #6366f1;">
               <span class="material-icons-round">calculate</span>
             </div>
-            <h3>Algoritma PLS</h3>
-            <p>Jalankan algoritma PLS-SEM untuk menghitung koefisien jalur, outer loading, HTMT, VIF, Model Fit, dan nilai R²</p>
+            <h3>Algoritma PLS-SEM</h3>
+            <p>Estimasi parameter model pengukuran (Outer Model) dan model struktural (Inner Model): Outer Loading, AVE, Composite Reliability, HTMT, VIF, dan R².</p>
             <div class="analisis-options">
               <div class="form-group">
                 <label>Iterasi Maksimum</label>
@@ -408,66 +601,258 @@
               <div class="form-group">
                 <label>Skema Bobot</label>
                 <select class="form-input" id="skemaBobot">
-                  <option value="path">Skema Jalur (Path - Standar Hair et al.)</option>
+                  <option value="path">Skema Jalur (Path - Standar)</option>
                   <option value="centroid">Skema Centroid</option>
                   <option value="factorial">Skema Faktorial</option>
                 </select>
               </div>
             </div>
-            <button class="btn btn-primary btn-block" id="btnJalankanPLS">
+            <button class="btn btn-primary btn-block" id="btnJalankanPLS" style="margin-top: auto;">
               <span class="material-icons-round">play_arrow</span> Jalankan Algoritma PLS
             </button>
           </div>
           
+          <!-- Card 2: Bootstrapping -->
           <div class="analisis-card">
-            <div class="analisis-card-icon">
+            <div class="analisis-card-icon" style="background: rgba(139, 92, 246, 0.12); color: #8b5cf6;">
               <span class="material-icons-round">shuffle</span>
             </div>
-            <h3>Bootstrapping</h3>
-            <p>Uji signifikansi koefisien jalur, efek mediasi tidak langsung (Specific Indirect Effects), dan outer loadings</p>
+            <h3>Bootstrapping (Uji Hipotesis)</h3>
+            <p>Uji signifikansi koefisien jalur (T-Statistic & P-Values), pengujian hipotesis pengaruh langsung, dan efek mediasi spesifik (Specific Indirect Effects).</p>
             <div class="analisis-options">
               <div class="form-group">
                 <label>Jumlah Subsampel</label>
                 <input type="number" class="form-input" id="jumlahBootstrap" value="5000" min="500" max="10000">
               </div>
               <div class="form-group">
-                <label>Tingkat Signifikansi</label>
+                <label>Tingkat Signifikansi (&alpha;)</label>
                 <select class="form-input" id="tingkatSignifikansi">
-                  <option value="0.05">0.05 (95% Confidence Interval)</option>
+                  <option value="0.05">0.05 (95% Confidence Interval - Standar)</option>
                   <option value="0.01">0.01 (99% Confidence Interval)</option>
                   <option value="0.10">0.10 (90% Confidence Interval)</option>
                 </select>
               </div>
               <div class="form-group">
-                <label>Tipe Uji</label>
+                <label>Tipe Uji Hipotesis</label>
                 <select class="form-input" id="tipeUji">
-                  <option value="two-tailed">Dua Sisi (Two-tailed)</option>
-                  <option value="one-tailed">Satu Sisi (One-tailed)</option>
+                  <option value="two-tailed">Dua Sisi (Two-tailed - Tidak Berarah)</option>
+                  <option value="one-tailed">Satu Sisi (One-tailed - Berarah Positif/Negatif)</option>
                 </select>
               </div>
             </div>
-            <button class="btn btn-primary btn-block" id="btnJalankanBootstrap">
+            <button class="btn btn-primary btn-block" id="btnJalankanBootstrap" style="background: linear-gradient(135deg, #7c3aed, #a855f7); margin-top: auto;">
               <span class="material-icons-round">play_arrow</span> Jalankan Bootstrapping
             </button>
           </div>
+
+          <!-- Card 3: Uji Validitas & Reliabilitas Instrumen -->
+          <div class="analisis-card">
+            <div class="analisis-card-icon" style="background: rgba(59, 130, 246, 0.12); color: #3b82f6;">
+              <span class="material-icons-round">psychology</span>
+            </div>
+            <h3>Uji Validitas & Reliabilitas Butir</h3>
+            <p>Pengujian butir instrumen kuesioner pada tahap pra-riset: Korelasi Pearson (r-Hitung vs r-Tabel), Corrected Item-Total, dan Cronbach's Alpha if Item Deleted.</p>
+            <div class="analisis-options">
+              <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; padding: 4px 0;">
+                <p style="margin: 0 0 6px 0;">✓ Evaluasi otomatis terhadap <strong>r-Tabel Kritis</strong> sesuai derajat kebebasan ($df = N-2$).</p>
+                <p style="margin: 0 0 6px 0;">✓ Diagnosa butir kuesioner yang gugur beserta rekomendasi eliminasi.</p>
+                <p style="margin: 0;">✓ Disertai rumus matematis, tahapan komputasi, dan referensi metodologi.</p>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" id="btnBukaModalUjiInstrumenDariAnalisis" style="border-color: #3b82f6; color: #3b82f6; margin-top: auto;">
+              <span class="material-icons-round">open_in_new</span> Buka Uji Instrumen
+            </button>
+          </div>
+
+          <!-- Card 4: Statistik Deskriptif & Normalitas Univariat -->
+          <div class="analisis-card">
+            <div class="analisis-card-icon" style="background: rgba(16, 185, 129, 0.12); color: #10b981;">
+              <span class="material-icons-round">analytics</span>
+            </div>
+            <h3>Statistik Deskriptif & Normalitas</h3>
+            <p>Tabel ringkasan deskriptif variabel penelitian: Mean, Median, Modus, Standar Deviasi, Varians, Min, Max, TCR (%), Skewness, dan Kurtosis (Uji Normalitas Univariat).</p>
+            <div class="analisis-options">
+              <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; padding: 4px 0;">
+                <p style="margin: 0 0 6px 0;">✓ Nilai <strong>Tingkat Capaian Responden (TCR)</strong> beserta interpretasi kategori.</p>
+                <p style="margin: 0 0 6px 0;">✓ Uji rasio Z-Score Skewness & Kurtosis (&plusmn; 1.96).</p>
+                <p style="margin: 0;">✓ Draf narasi hasil analisis data yang siap disalin untuk laporan.</p>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" id="btnBukaModalDeskriptifDariAnalisis" style="border-color: #10b981; color: #10b981; margin-top: auto;">
+              <span class="material-icons-round">open_in_new</span> Buka Statistik Deskriptif
+            </button>
+          </div>
+
+          <!-- Card 5: Uji Pengaruh Moderasi & Simple Slope Plot -->
+          <div class="analisis-card">
+            <div class="analisis-card-icon" style="background: rgba(236, 72, 153, 0.12); color: #ec4899;">
+              <span class="material-icons-round">tune</span>
+            </div>
+            <h3>Uji Pengaruh Moderasi & Simple Slope</h3>
+            <p>Pengujian efek moderasi Two-Stage / Product Indicator ($X \times M \rightarrow Y$), efek ukuran $f^2$, dan pembuatan grafik interaktif <strong>Simple Slope Plot</strong> (&plusmn;1 SD).</p>
+            <div class="analisis-options">
+              <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; padding: 4px 0;">
+                <p style="margin: 0 0 6px 0;">✓ Analisis interaksi variabel moderasi terhadap hubungan kausalitas.</p>
+                <p style="margin: 0 0 6px 0;">✓ Visualisasi grafik garis slope pada level moderator Rendah, Rata-rata, & Tinggi.</p>
+                <p style="margin: 0;">✓ Evaluasi tipe efek (<em>Strengthening</em> vs <em>Dampening effect</em>).</p>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" id="btnBukaModalModerasiDariAnalisis" style="border-color: #ec4899; color: #ec4899; margin-top: auto;">
+              <span class="material-icons-round">open_in_new</span> Buka Uji Moderasi
+            </button>
+          </div>
+
+          <!-- Card: PLSc -->
+          <div class="analisis-card">
+            <div class="analisis-card-icon" style="background: rgba(6,182,212,0.12); color: #06b6d4;">
+              <span class="material-icons-round">tune</span>
+            </div>
+            <h3>Consistent PLS (PLSc)</h3>
+            <p>Koreksi <em>attenuation bias</em> pada konstruk reflektif menggunakan Dijkstra-Henseler ρ_A. Menghasilkan koefisien jalur terkoreksi dan korelasi <em>disattenuated</em> — disarankan saat membandingkan hasil dengan CB-SEM.</p>
+            <div class="analisis-options">
+              <div style="font-size:12px; color:var(--text-secondary); line-height:1.5; padding:4px 0;">
+                <p style="margin:0 0 6px 0;">✓ Menghitung ρ_A (rho_A) per konstruk reflektif.</p>
+                <p style="margin:0;">✓ Path coefficients PLSc via OLS pada korelasi laten terkoreksi.</p>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" id="btnJalankanPLSc" style="border-color:#06b6d4; color:#06b6d4; margin-top:auto;">
+              <span class="material-icons-round">play_arrow</span> Jalankan PLSc
+            </button>
+          </div>
+
+          <!-- Card: IPMA -->
+          <div class="analisis-card">
+            <div class="analisis-card-icon" style="background: rgba(245,158,11,0.12); color: #f59e0b;">
+              <span class="material-icons-round">map</span>
+            </div>
+            <h3>IPMA — Importance-Performance Map</h3>
+            <p>Peta kuadran: sumbu-X = performa indikator (rerata rescaled 0–100), sumbu-Y = total efek ke konstruk target. Identifikasi variabel mana yang <em>penting tapi kinerjanya rendah</em> untuk diprioritaskan.</p>
+            <div class="analisis-options">
+              <div class="form-group">
+                <label>Variabel Target IPMA</label>
+                <select class="form-input" id="ipmaTargetVar">
+                  <option value="">— pilih variabel endogen —</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" id="btnJalankanIPMA" style="border-color:#f59e0b; color:#f59e0b; margin-top:auto;">
+              <span class="material-icons-round">play_arrow</span> Jalankan IPMA
+            </button>
+          </div>
+
+          <!-- Card: MGA -->
+          <div class="analisis-card">
+            <div class="analisis-card-icon" style="background: rgba(239,68,68,0.12); color: #ef4444;">
+              <span class="material-icons-round">group</span>
+            </div>
+            <h3>Multi-Group Analysis (MGA)</h3>
+            <p>Bandingkan koefisien jalur antar dua kelompok responden (mis. laki-laki vs perempuan, kota vs desa) menggunakan uji parametrik Henseler. Wajib ada untuk penelitian komparatif.</p>
+            <div class="analisis-options">
+              <div class="form-group">
+                <label>Kolom Grup (isi nilai 1 atau 2)</label>
+                <select class="form-input" id="mgaKolomGrup">
+                  <option value="">— pilih kolom —</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Jumlah Bootstrap MGA</label>
+                <input type="number" class="form-input" id="mgaJumlahBootstrap" value="500" min="100" max="5000">
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" id="btnJalankanMGA" style="border-color:#ef4444; color:#ef4444; margin-top:auto;">
+              <span class="material-icons-round">play_arrow</span> Jalankan MGA
+            </button>
+          </div>
+
+          <!-- Card: PLSpredict -->
+          <div class="analisis-card">
+            <div class="analisis-card-icon" style="background: rgba(168,85,247,0.12); color: #a855f7;">
+              <span class="material-icons-round">batch_prediction</span>
+            </div>
+            <h3>PLSpredict — Relevansi Prediktif</h3>
+            <p>Evaluasi kemampuan prediksi <em>out-of-sample</em> menggunakan k-fold cross-validation. Menghasilkan RMSE, MAE, dan Q²_predict per variabel endogen (Hair et al. 2019).</p>
+            <div class="analisis-options">
+              <div class="form-group">
+                <label>Jumlah Fold (k)</label>
+                <input type="number" class="form-input" id="plspredictKFolds" value="10" min="5" max="20">
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" id="btnJalankanPLSpredict" style="border-color:#a855f7; color:#a855f7; margin-top:auto;">
+              <span class="material-icons-round">play_arrow</span> Jalankan PLSpredict
+            </button>
+          </div>
+
+          <!-- Card: Harman CMV -->
+          <div class="analisis-card">
+            <div class="analisis-card-icon" style="background: rgba(234,179,8,0.12); color: #ca8a04;">
+              <span class="material-icons-round">warning_amber</span>
+            </div>
+            <h3>Harman Single Factor (CMV)</h3>
+            <p>Uji <em>Common Method Bias</em> paling umum diminta reviewer jurnal Indonesia. Jika variansi faktor pertama &gt; 50%, CMV dapat menjadi ancaman validitas.</p>
+            <div class="analisis-options">
+              <div style="font-size:12px; color:var(--text-secondary); line-height:1.5; padding:4px 0;">
+                <p style="margin:0 0 6px 0;">✓ Eigenvalue decomposition seluruh indikator.</p>
+                <p style="margin:0;">✓ Kesimpulan otomatis beserta rekomendasi tindak lanjut.</p>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" id="btnJalankanHarman" style="border-color:#ca8a04; color:#ca8a04; margin-top:auto;">
+              <span class="material-icons-round">play_arrow</span> Jalankan Uji Harman
+            </button>
+          </div>
+
+          <!-- Card: APA Export -->
+          <div class="analisis-card">
+            <div class="analisis-card-icon" style="background: rgba(20,184,166,0.12); color: #14b8a6;">
+              <span class="material-icons-round">table_chart</span>
+            </div>
+            <h3>Ekspor Tabel APA 7</h3>
+            <p>Generate empat tabel siap-tempel ke Word/LaTeX: outer loadings, reliabilitas &amp; AVE, HTMT (lower triangle), serta koefisien jalur &amp; R² dalam format APA edisi ke-7.</p>
+            <div class="analisis-options">
+              <div style="font-size:12px; color:var(--text-secondary); line-height:1.5; padding:4px 0;">
+                <p style="margin:0 0 6px 0;">✓ Tabel 1: Outer Loadings Matrix</p>
+                <p style="margin:0 0 6px 0;">✓ Tabel 2: AVE, CR, Cronbach α</p>
+                <p style="margin:0 0 6px 0;">✓ Tabel 3: HTMT Discriminant Validity</p>
+                <p style="margin:0;">✓ Tabel 4: Path Coefficients, R², f²</p>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-block" id="btnEksporAPA" style="border-color:#14b8a6; color:#14b8a6; margin-top:auto;">
+              <span class="material-icons-round">download</span> Generate Tabel APA
+            </button>
+          </div>
+
         </div>
       </section>
       
       <!-- HALAMAN HASIL -->
       <section class="halaman tersembunyi" id="halaman-hasil">
-        <div class="editor-toolbar">
-          <div class="toolbar-left">
-            <h2 class="page-title">Hasil Analisis</h2>
-            <span class="proyek-nama-aktif" id="proyekNamaHasil" title="Klik untuk membuat proyek baru atau mengubah nama proyek">Belum ada proyek dipilih</span>
+        <div class="page-toolbar">
+          <div class="page-toolbar-left">
+            <div class="page-title-icon-box" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(59, 130, 246, 0.2)); color: #10b981;">
+              <span class="material-icons-round">assessment</span>
+            </div>
+            <div class="page-title-info">
+              <div class="page-title-row">
+                <h2 class="page-title">Hasil Analisis & Laporan</h2>
+                <span class="page-project-badge proyek-nama-aktif" id="proyekNamaHasil" title="Proyek Aktif (Klik untuk ganti nama atau buat baru)">Belum ada proyek dipilih</span>
+                <span class="toolbar-pill-chip" id="badgeStatusHasilAnalisis" style="font-size: 11.5px; padding: 3px 10px; background: var(--bg-hover); border: 1px solid var(--border-color); color: var(--text-secondary); display: inline-flex; align-items: center; gap: 5px;">
+                  <span class="material-icons-round" style="font-size: 14px; color: var(--color-warning);">hourglass_empty</span>
+                  <span>Belum Dianalisis</span>
+                </span>
+              </div>
+              <span class="page-subtitle">Evaluasi Model Pengukuran, Model Struktural, Mediasi, Uji Hipotesis, dan Laporan Riset Standar APA 7th</span>
+            </div>
           </div>
-          <div class="toolbar-right" style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="btn btn-sm btn-outline" id="btnSalinLaporanBab4" title="Salin Draf Bab 4 Lengkap dalam Bahasa Indonesia">
-              <span class="material-icons-round" style="color: #6366f1;">content_copy</span> Salin Draf Bab 4
+          <div class="page-toolbar-actions">
+            <button class="btn btn-sm btn-outline" id="btnSalinLaporanBab4" title="Salin Draf Narasi Laporan Lengkap ke Clipboard">
+              <span class="material-icons-round" style="color: #6366f1;">content_copy</span> Salin Draf Laporan
             </button>
-            <button class="btn btn-sm btn-outline" id="btnDownloadLaporanBab4" title="Unduh Dokumen Laporan Lengkap (.html / Word)">
-              <span class="material-icons-round" style="color: #10b981;">description</span> Unduh Laporan
+            <button class="btn btn-sm btn-outline" id="btnCetakLaporanBab4" title="Cetak / Simpan Laporan sebagai Dokumen PDF">
+              <span class="material-icons-round" style="color: #06b6d4;">print</span> Cetak / PDF
             </button>
-            <button class="btn btn-sm btn-primary" id="btnEksporHasil" title="Ekspor Seluruh Tabel Hasil ke Excel">
+            <button class="btn btn-sm btn-outline" id="btnDownloadLaporanBab4" title="Unduh Dokumen Laporan Lengkap (.html / Word .doc)">
+              <span class="material-icons-round" style="color: #10b981;">description</span> Unduh Dokumen (.doc)
+            </button>
+            <button class="btn btn-sm btn-primary" id="btnEksporHasil" title="Ekspor Seluruh Tabel Hasil ke Format Microsoft Excel (.xlsx)">
               <span class="material-icons-round">download</span> Ekspor Excel
             </button>
           </div>
@@ -476,76 +861,146 @@
         <div class="hasil-container">
           <div class="hasil-tabs">
             <button class="hasil-tab active" data-tab="ringkasan">
-              <span class="material-icons-round" style="font-size: 16px;">insights</span> Ringkasan & Fit Model
+              <span class="material-icons-round">insights</span>
+              <span>Ringkasan & Fit</span>
             </button>
             <button class="hasil-tab" data-tab="outer-model">
-              <span class="material-icons-round" style="font-size: 16px;">fact_check</span> Outer Model & HTMT
+              <span class="material-icons-round">fact_check</span>
+              <span>Outer Model & HTMT</span>
             </button>
             <button class="hasil-tab" data-tab="inner-model">
-              <span class="material-icons-round" style="font-size: 16px;">account_tree</span> Inner Model & VIF
+              <span class="material-icons-round">account_tree</span>
+              <span>Inner Model & VIF</span>
             </button>
-            <button class="hasil-tab" data-tab="mediasi">
-              <span class="material-icons-round" style="font-size: 16px;">mediation</span> Efek Mediasi
+            <button class="hasil-tab" data-tab="q2-predictive">
+              <span class="material-icons-round" style="color: #8b5cf6;">batch_prediction</span>
+              <span>Relevansi Prediktif (Q²)</span>
+            </button>
+            <button class="hasil-tab" data-tab="mediasi-spesifik">
+              <span class="material-icons-round" style="color: #06b6d4;">alt_route</span>
+              <span>Mediasi Spesifik & VAF</span>
+            </button>
+            <button class="hasil-tab" data-tab="moderasi">
+              <span class="material-icons-round" style="color: #ec4899;">tune</span>
+              <span>Uji Moderasi & Slope</span>
+            </button>
+            <button class="hasil-tab" data-tab="common-method-bias">
+              <span class="material-icons-round" style="color: #f59e0b;">security</span>
+              <span>Common Method Bias</span>
             </button>
             <button class="hasil-tab" data-tab="bootstrap">
-              <span class="material-icons-round" style="font-size: 16px;">shuffle</span> Bootstrapping
+              <span class="material-icons-round">shuffle</span>
+              <span>Bootstrapping</span>
             </button>
             <button class="hasil-tab" data-tab="laporan-bab4">
-              <span class="material-icons-round" style="font-size: 16px;">auto_stories</span> Draf Bab 4 & APA 7th
+              <span class="material-icons-round" style="color: #6366f1;">auto_stories</span>
+              <span>Draf Laporan APA 7th</span>
             </button>
           </div>
           
           <div class="hasil-content" id="hasilContent">
             <!-- Tab Ringkasan -->
             <div class="hasil-panel active" id="tab-ringkasan">
-              <div class="empty-state">
-                <span class="material-icons-round">bar_chart</span>
-                <p>Belum ada hasil analisis. Jalankan algoritma PLS terlebih dahulu.</p>
+              <div class="empty-state-hasil" id="emptyStateRingkasan">
+                <!-- Akan diisi secara dinamis dengan banner interaktif -->
               </div>
             </div>
             
             <!-- Tab Outer Model -->
             <div class="hasil-panel" id="tab-outer-model">
-              <div class="empty-state">
-                <span class="material-icons-round">bar_chart</span>
-                <p>Belum ada hasil model pengukuran.</p>
+              <div class="empty-state-hasil">
+                <div class="empty-state-icon"><span class="material-icons-round">fact_check</span></div>
+                <h3>Model Pengukuran (Outer Model)</h3>
+                <p>Belum ada hasil evaluasi validitas konvergen, reliabilitas konstruk, HTMT, dan Fornell-Larcker.</p>
+                <button class="btn btn-primary btn-sm" onclick="jalankanPLSdariHasil()">
+                  <span class="material-icons-round">play_arrow</span> Jalankan PLS-SEM
+                </button>
               </div>
             </div>
             
             <!-- Tab Inner Model -->
             <div class="hasil-panel" id="tab-inner-model">
-              <div class="empty-state">
-                <span class="material-icons-round">bar_chart</span>
-                <p>Belum ada hasil model struktural.</p>
+              <div class="empty-state-hasil">
+                <div class="empty-state-icon"><span class="material-icons-round">account_tree</span></div>
+                <h3>Model Struktural (Inner Model)</h3>
+                <p>Belum ada koefisien jalur struktural (β), ukuran efek (f²), dan Inner VIF.</p>
+                <button class="btn btn-primary btn-sm" onclick="jalankanPLSdariHasil()">
+                  <span class="material-icons-round">play_arrow</span> Jalankan PLS-SEM
+                </button>
               </div>
             </div>
 
-            <!-- Tab Mediasi -->
-            <div class="hasil-panel" id="tab-mediasi">
-              <div class="empty-state">
-                <span class="material-icons-round">mediation</span>
-                <p>Belum ada analisis efek mediasi. Jalankan bootstrapping untuk melihat signifikansi efek tidak langsung.</p>
+            <!-- Tab Q2 Predictive Relevance -->
+            <div class="hasil-panel" id="tab-q2-predictive">
+              <div class="empty-state-hasil">
+                <div class="empty-state-icon" style="color: #8b5cf6;"><span class="material-icons-round">batch_prediction</span></div>
+                <h3>Relevansi Prediktif Stone-Geisser (Q²)</h3>
+                <p>Prosedur blindfolding menghitung kapabilitas prediksi model untuk setiap konstruk endogen.</p>
+                <button class="btn btn-primary btn-sm" onclick="jalankanPLSdariHasil()">
+                  <span class="material-icons-round">play_arrow</span> Jalankan PLS-SEM
+                </button>
+              </div>
+            </div>
+
+            <!-- Tab Mediasi Spesifik & VAF -->
+            <div class="hasil-panel" id="tab-mediasi-spesifik">
+              <div class="empty-state-hasil">
+                <div class="empty-state-icon" style="color: #06b6d4;"><span class="material-icons-round">alt_route</span></div>
+                <h3>Analisis Mediasi Spesifik & VAF</h3>
+                <p>Jalankan bootstrapping untuk menguji signifikansi efek tidak langsung dan menghitung Variance Accounted For (VAF).</p>
+                <button class="btn btn-primary btn-sm" onclick="jalankanBootstrapDariHasil()">
+                  <span class="material-icons-round">shuffle</span> Jalankan Bootstrapping
+                </button>
+              </div>
+            </div>
+
+            <!-- Tab Moderasi & Simple Slope -->
+            <div class="hasil-panel" id="tab-moderasi">
+              <div class="empty-state-hasil">
+                <div class="empty-state-icon" style="color: #ec4899;"><span class="material-icons-round">tune</span></div>
+                <h3>Uji Efek Moderasi & Simple Slope Plot</h3>
+                <p>Uji apakah variabel moderasi (M) memperkuat atau memperlemah hubungan variabel bebas terhadap terikat.</p>
+                <button class="btn btn-primary btn-sm" onclick="showModal('modalUjiModerasi')">
+                  <span class="material-icons-round">tune</span> Konfigurasi Uji Moderasi
+                </button>
+              </div>
+            </div>
+
+            <!-- Tab Common Method Bias -->
+            <div class="hasil-panel" id="tab-common-method-bias">
+              <div class="empty-state-hasil">
+                <div class="empty-state-icon" style="color: #f59e0b;"><span class="material-icons-round">security</span></div>
+                <h3>Evaluasi Common Method Bias (Full Collinearity VIF)</h3>
+                <p>Prosedur Kock (2015) untuk menguji bebas bias metode pengumpulan data survei.</p>
+                <button class="btn btn-primary btn-sm" onclick="jalankanPLSdariHasil()">
+                  <span class="material-icons-round">play_arrow</span> Jalankan PLS-SEM
+                </button>
               </div>
             </div>
             
             <!-- Tab Bootstrap -->
             <div class="hasil-panel" id="tab-bootstrap">
-              <div class="empty-state">
-                <span class="material-icons-round">bar_chart</span>
-                <p>Belum ada hasil bootstrapping.</p>
+              <div class="empty-state-hasil">
+                <div class="empty-state-icon"><span class="material-icons-round">shuffle</span></div>
+                <h3>Hasil Uji Hipotesis Bootstrapping</h3>
+                <p>Jalankan resampling non-parametrik (5000 subsampel) untuk menghitung t-statistik, p-values, dan 95% Confidence Interval.</p>
+                <button class="btn btn-primary btn-sm" onclick="jalankanBootstrapDariHasil()">
+                  <span class="material-icons-round">shuffle</span> Jalankan Bootstrapping
+                </button>
               </div>
             </div>
 
-            <!-- Tab Laporan Bab 4 -->
+            <!-- Tab Laporan Riset -->
             <div class="hasil-panel" id="tab-laporan-bab4">
-              <div class="empty-state">
-                <span class="material-icons-round">auto_stories</span>
-                <p>Jalankan PLS atau Bootstrapping untuk menghasilkan narasi akademik otomatis Bab 4 dan format tabel APA 7th.</p>
+              <div class="empty-state-hasil">
+                <div class="empty-state-icon" style="color: #6366f1;"><span class="material-icons-round">auto_stories</span></div>
+                <h3>Draf Narasi Laporan Riset & APA 7th</h3>
+                <p>Dokumentasi metodologi, rumus, tabel standar APA 7th, dan interpretasi akademik siap pakai.</p>
+                <button class="btn btn-primary btn-sm" onclick="jalankanPLSdariHasil()">
+                  <span class="material-icons-round">play_arrow</span> Jalankan PLS-SEM
+                </button>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
           </div>
         </div>
       </section>
@@ -588,12 +1043,164 @@
               </div>
             </div>
           </div>
+
+          <div class="pengaturan-group">
+            <h3>MCP Server (AI Agent Integration)</h3>
+            <div class="pengaturan-item">
+              <div class="pengaturan-info">
+                <span class="material-icons-round">smart_toy</span>
+                <div>
+                  <strong>Model Context Protocol (MCP)</strong>
+                  <p>Hubungkan FreePLS ke AI agent seperti Claude Desktop, Cursor, Windsurf, dan Antigravity. Agent dapat menjalankan analisis PLS-SEM, membaca proyek, dan menghasilkan interpretasi otomatis.</p>
+                </div>
+              </div>
+              <div id="mcp-status-badge" class="mcp-badge mcp-checking">
+                <span class="material-icons-round" style="font-size:14px">circle</span>
+                <span id="mcp-status-text">Memeriksa...</span>
+              </div>
+            </div>
+
+            <div class="mcp-config-panel">
+              <div class="mcp-tools-list">
+                <div class="mcp-tool-chip"><span class="material-icons-round">analytics</span> pls_run_analysis</div>
+                <div class="mcp-tool-chip"><span class="material-icons-round">shuffle</span> pls_run_bootstrap</div>
+                <div class="mcp-tool-chip"><span class="material-icons-round">bar_chart</span> pls_descriptive_stats</div>
+                <div class="mcp-tool-chip"><span class="material-icons-round">join_inner</span> pls_moderation</div>
+                <div class="mcp-tool-chip"><span class="material-icons-round">folder_open</span> pls_run_from_project</div>
+                <div class="mcp-tool-chip"><span class="material-icons-round">auto_awesome</span> pls_interpret_results</div>
+                <div class="mcp-tool-chip"><span class="material-icons-round">list</span> pls_list_projects</div>
+                <div class="mcp-tool-chip"><span class="material-icons-round">storage</span> pls_get_project</div>
+                <div class="mcp-tool-chip"><span class="material-icons-round">history</span> pls_get_results</div>
+              </div>
+
+              <div class="mcp-section-label">Konfigurasi untuk AI Agent</div>
+
+              <div class="mcp-tabs">
+                <button class="mcp-tab active" data-target="mcp-tab-claude">Claude Desktop</button>
+                <button class="mcp-tab" data-target="mcp-tab-cursor">Cursor / Windsurf</button>
+                <button class="mcp-tab" data-target="mcp-tab-agy">Antigravity (AGY)</button>
+                <button class="mcp-tab" data-target="mcp-tab-cli">CLI Manual</button>
+              </div>
+
+              <div id="mcp-tab-claude" class="mcp-tab-content active">
+                <p class="mcp-hint">Tambahkan ke <code>claude_desktop_config.json</code> (biasanya di <code>%APPDATA%\Claude\</code>):</p>
+                <div class="mcp-code-block">
+                  <pre id="mcp-config-claude"></pre>
+                  <button class="btn btn-icon btn-ghost mcp-copy-btn" title="Salin" data-copy="mcp-config-claude"><span class="material-icons-round">content_copy</span></button>
+                </div>
+              </div>
+
+              <div id="mcp-tab-cursor" class="mcp-tab-content">
+                <p class="mcp-hint">Tambahkan ke <code>.cursor/mcp.json</code> di folder workspace (atau <code>.windsurf/mcp.json</code>):</p>
+                <div class="mcp-code-block">
+                  <pre id="mcp-config-cursor"></pre>
+                  <button class="btn btn-icon btn-ghost mcp-copy-btn" title="Salin" data-copy="mcp-config-cursor"><span class="material-icons-round">content_copy</span></button>
+                </div>
+              </div>
+
+              <div id="mcp-tab-agy" class="mcp-tab-content">
+                <p class="mcp-hint">Tambahkan ke <code>~/.gemini/config/mcp.json</code>:</p>
+                <div class="mcp-code-block">
+                  <pre id="mcp-config-agy"></pre>
+                  <button class="btn btn-icon btn-ghost mcp-copy-btn" title="Salin" data-copy="mcp-config-agy"><span class="material-icons-round">content_copy</span></button>
+                </div>
+              </div>
+
+              <div id="mcp-tab-cli" class="mcp-tab-content">
+                <p class="mcp-hint">Jalankan langsung dari terminal untuk debug atau tes koneksi:</p>
+                <div class="mcp-code-block">
+                  <pre id="mcp-config-cli"></pre>
+                  <button class="btn btn-icon btn-ghost mcp-copy-btn" title="Salin" data-copy="mcp-config-cli"><span class="material-icons-round">content_copy</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
       
     </main>
   </div>
   
+  <!-- ============ MODALS FITUR BARU ============ -->
+
+  <!-- Modal PLSc -->
+  <div class="modal-overlay tersembunyi" id="modalPLSc">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3><span class="material-icons-round" style="color:#06b6d4;vertical-align:middle;">tune</span> Hasil Consistent PLS (PLSc)</h3>
+        <button class="btn btn-icon btn-ghost modal-close"><span class="material-icons-round">close</span></button>
+      </div>
+      <div class="modal-body">
+        <div id="hasilPLSc"><div class="empty-state"><span class="material-icons-round">hourglass_empty</span><p>Belum ada hasil. Klik "Jalankan PLSc".</p></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal IPMA -->
+  <div class="modal-overlay tersembunyi" id="modalIPMA">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3><span class="material-icons-round" style="color:#f59e0b;vertical-align:middle;">map</span> IPMA — Importance-Performance Map</h3>
+        <button class="btn btn-icon btn-ghost modal-close"><span class="material-icons-round">close</span></button>
+      </div>
+      <div class="modal-body">
+        <div id="hasilIPMA"><div class="empty-state"><span class="material-icons-round">hourglass_empty</span><p>Pilih variabel target dan klik "Jalankan IPMA".</p></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal MGA -->
+  <div class="modal-overlay tersembunyi" id="modalMGA">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3><span class="material-icons-round" style="color:#ef4444;vertical-align:middle;">group</span> Hasil Multi-Group Analysis (MGA)</h3>
+        <button class="btn btn-icon btn-ghost modal-close"><span class="material-icons-round">close</span></button>
+      </div>
+      <div class="modal-body">
+        <div id="hasilMGA"><div class="empty-state"><span class="material-icons-round">hourglass_empty</span><p>Belum ada hasil. Pilih kolom grup dan klik "Jalankan MGA".</p></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal PLSpredict -->
+  <div class="modal-overlay tersembunyi" id="modalPLSpredict">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3><span class="material-icons-round" style="color:#a855f7;vertical-align:middle;">batch_prediction</span> Hasil PLSpredict</h3>
+        <button class="btn btn-icon btn-ghost modal-close"><span class="material-icons-round">close</span></button>
+      </div>
+      <div class="modal-body">
+        <div id="hasilPLSpredict"><div class="empty-state"><span class="material-icons-round">hourglass_empty</span><p>Belum ada hasil. Klik "Jalankan PLSpredict".</p></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Harman -->
+  <div class="modal-overlay tersembunyi" id="modalHarman">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3><span class="material-icons-round" style="color:#ca8a04;vertical-align:middle;">warning_amber</span> Uji Harman Single Factor (CMV)</h3>
+        <button class="btn btn-icon btn-ghost modal-close"><span class="material-icons-round">close</span></button>
+      </div>
+      <div class="modal-body">
+        <div id="hasilHarman"><div class="empty-state"><span class="material-icons-round">hourglass_empty</span><p>Belum ada hasil. Klik "Jalankan Uji Harman".</p></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal APA -->
+  <div class="modal-overlay tersembunyi" id="modalAPA">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3><span class="material-icons-round" style="color:#14b8a6;vertical-align:middle;">table_chart</span> Tabel APA 7</h3>
+        <button class="btn btn-icon btn-ghost modal-close"><span class="material-icons-round">close</span></button>
+      </div>
+      <div class="modal-body">
+        <div id="hasilAPA"><div class="empty-state"><span class="material-icons-round">hourglass_empty</span><p>Belum ada hasil. Klik "Generate Tabel APA".</p></div></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ MODAL PROYEK BARU ============ -->
   <div class="modal-overlay tersembunyi" id="modalProyekBaru">
     <div class="modal">
@@ -606,7 +1213,7 @@
       <div class="modal-body">
         <div class="form-group">
           <label for="inputNamaProyek">Nama Proyek</label>
-          <input type="text" class="form-input" id="inputNamaProyek" placeholder="Contoh: Penelitian Skripsi 2024">
+          <input type="text" class="form-input" id="inputNamaProyek" placeholder="Contoh: Model Analisis Mediasi 2025">
         </div>
         <div class="form-group">
           <label for="inputDeskripsiProyek">Deskripsi (opsional)</label>
@@ -896,7 +1503,7 @@
           </div>
           <div>
             <h3 style="margin: 0; font-size: 17px;">Galeri Template Model Penelitian</h3>
-            <span style="font-size: 12px; color: var(--text-secondary);">Pilih kerangka konseptual siap pakai untuk skripsi, tesis, dan publikasi</span>
+            <span style="font-size: 12px; color: var(--text-secondary);">Pilih kerangka konseptual siap pakai untuk riset, publikasi jurnal, dan penelitian kuantitatif</span>
           </div>
         </div>
         <button class="btn btn-icon btn-ghost modal-close">
@@ -1002,7 +1609,7 @@
                 <h4 style="margin: 0; font-size: 15px; font-weight: 700;">Model Regresi Struktural Standar (2 Eksogen → 1 Endogen)</h4>
               </div>
               <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
-                Model dasar klasik skripsi/penelitian: <strong>Motivasi Kerja (X1)</strong> & <strong>Disiplin Kerja (X2)</strong> $\rightarrow$ <strong>Kinerja Karyawan (Y)</strong>.
+                Model dasar klasik analisis struktural: <strong>Motivasi Kerja (X1)</strong> & <strong>Disiplin Kerja (X2)</strong> $\rightarrow$ <strong>Kinerja Karyawan (Y)</strong>.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;">
                 <span class="badge badge-sukses">3 Variabel</span>
@@ -1038,7 +1645,7 @@
       <div class="modal-body">
         <div class="info-alert" style="background: rgba(102, 126, 234, 0.12); border-left: 4px solid var(--color-primary); padding: 10px 14px; border-radius: 6px; margin-bottom: 16px;">
           <strong style="display: block; color: var(--color-primary); margin-bottom: 2px;">📐 Standar Publikasi Jurnal (600 DPI)</strong>
-          <span style="font-size: 12px; color: var(--text-secondary);">Gambar dirender dengan resolusi ultra-tajam anti-pecah, siap untuk artikel ilmiah, Scopus / WoS, tesis, dan skripsi.</span>
+          <span style="font-size: 12px; color: var(--text-secondary);">Gambar dirender dengan resolusi ultra-tajam anti-pecah, siap untuk publikasi jurnal internasional dan laporan riset.</span>
         </div>
         
         <div class="form-group">
@@ -1345,7 +1952,7 @@
           <div>
             <h4 style="margin: 0 0 4px 0; font-size: 14.5px; font-weight: 700; color: var(--color-primary);">FreePLS Indonesia</h4>
             <p style="margin: 0; font-size: 12.5px; color: var(--text-color); line-height: 1.55;">
-              Perangkat lunak analisis statistik <strong>PLS-SEM (Partial Least Squares - Structural Equation Modeling)</strong> independen dan terbuka yang dirancang khusus untuk memfasilitasi riset akademik, skripsi, tesis, disertasi, dan pembelajaran sains terbuka.
+              Perangkat lunak analisis statistik <strong>PLS-SEM (Partial Least Squares - Structural Equation Modeling)</strong> independen dan terbuka yang dirancang khusus untuk memfasilitasi riset ilmiah, publikasi jurnal, olah data kuantitatif, dan pembelajaran sains terbuka.
             </p>
           </div>
         </div>
@@ -1574,14 +2181,615 @@
     </div>
   </div>
 
+  <!-- ============ MODAL UJI VALIDITAS & RELIABILITAS INSTRUMEN ============ -->
+  <div class="modal-overlay tersembunyi" id="modalUjiInstrumen">
+    <div class="modal modal-xl" style="max-width: 1080px; width: 95vw;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(59, 130, 246, 0.12); color: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+            <span class="material-icons-round">psychology</span>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Uji Validitas & Reliabilitas Butir Instrumen</h3>
+            <span style="font-size: 11.5px; color: var(--text-muted);">Metode Pearson Product Moment ($r$-Hitung vs $r$-Tabel), Corrected Item-Total & Cronbach's Alpha if Item Deleted</span>
+          </div>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+
+      <div class="modal-body" style="max-height: 75vh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 16px 20px;">
+        <!-- Config Bar -->
+        <div class="uji-instrumen-config" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr auto; gap: 12px; align-items: flex-end;">
+            <div class="form-group" style="margin: 0;">
+              <label for="selectDatasetUjiInstrumen" style="font-size: 12px; font-weight: 600;">Dataset Penelitian</label>
+              <select class="form-input" id="selectDatasetUjiInstrumen"></select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label for="selectAlphaUjiInstrumen" style="font-size: 12px; font-weight: 600;">Tingkat Signifikansi (&alpha;)</label>
+              <select class="form-input" id="selectAlphaUjiInstrumen">
+                <option value="0.05" selected>&alpha; = 0.05 (95% Tingkat Kepercayaan)</option>
+                <option value="0.01">&alpha; = 0.01 (99% Tingkat Kepercayaan)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label for="selectSkalaUjiInstrumen" style="font-size: 12px; font-weight: 600;">Skala Instrumen</label>
+              <select class="form-input" id="selectSkalaUjiInstrumen">
+                <option value="5" selected>Skala Likert 1 - 5</option>
+                <option value="7">Skala Likert 1 - 7</option>
+                <option value="4">Skala Likert 1 - 4 (Tanpa Netral)</option>
+                <option value="10">Skala 1 - 10</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="btnJalankanUjiInstrumen" style="height: 38px; white-space: nowrap; gap: 6px;">
+              <span class="material-icons-round">play_arrow</span>
+              <span>Hitung Uji Instrumen</span>
+            </button>
+          </div>
+
+          <!-- Indicator Selection Pills -->
+          <div style="border-top: 1px solid var(--border-light); padding-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin: 0;">Pilih Butir / Indikator Kuesioner:</label>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-sm btn-ghost" id="btnPilihSemuaItemUji" style="font-size: 11px; padding: 2px 8px; height: 24px;">Pilih Semua</button>
+                <button class="btn btn-sm btn-ghost" id="btnResetItemUji" style="font-size: 11px; padding: 2px 8px; height: 24px;">Kosongkan</button>
+              </div>
+            </div>
+            <div id="containerItemCheckboxes" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 90px; overflow-y: auto; padding: 2px;">
+              <!-- Checkbox pills dinamis -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Output Tabs & Content -->
+        <div id="containerHasilUjiInstrumen" style="display: none; flex-direction: column; gap: 14px;">
+          <!-- Summary Cards Row -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            <div class="ringkasan-card" style="padding: 12px 14px; text-align: left; display: flex; align-items: center; gap: 12px;">
+              <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(16, 185, 129, 0.12); color: #10b981; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                <span class="material-icons-round">verified</span>
+              </div>
+              <div>
+                <span class="label" style="font-size: 11px; color: var(--text-muted);">Cronbach's Alpha</span>
+                <span class="value" id="valOverallAlpha" style="font-size: 20px; font-weight: 800; color: var(--color-primary);">0.000</span>
+                <span id="badgeReliabilityCategory" class="badge-chip badge-success" style="margin-top: 2px;">Reliabel</span>
+              </div>
+            </div>
+
+            <div class="ringkasan-card" style="padding: 12px 14px; text-align: left; display: flex; align-items: center; gap: 12px;">
+              <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(59, 130, 246, 0.12); color: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                <span class="material-icons-round">check_circle</span>
+              </div>
+              <div>
+                <span class="label" style="font-size: 11px; color: var(--text-muted);">Status Validitas Butir</span>
+                <span class="value" id="valValidCount" style="font-size: 18px; font-weight: 800; color: #10b981;">0 / 0 Valid</span>
+                <span style="font-size: 11px; color: var(--text-muted); display: block;" id="valGugurCount">0 Gugur</span>
+              </div>
+            </div>
+
+            <div class="ringkasan-card" style="padding: 12px 14px; text-align: left; display: flex; align-items: center; gap: 12px;">
+              <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(245, 158, 11, 0.12); color: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                <span class="material-icons-round">straighten</span>
+              </div>
+              <div>
+                <span class="label" style="font-size: 11px; color: var(--text-muted);">Nilai r-Tabel Kritis</span>
+                <span class="value" id="valRTabelKritis" style="font-size: 18px; font-weight: 800; color: var(--text-primary);">0.361</span>
+                <span style="font-size: 11px; color: var(--text-muted); display: block;" id="valDfInfo">df = 28 (N=30)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabs Sub-navigation -->
+          <div class="hasil-tabs" style="margin-bottom: 0; padding-bottom: 4px; border-bottom: 1px solid var(--border-color);">
+            <button class="hasil-tab active" data-subtab="tabelUji">📊 Tabel Validitas & Reliabilitas Butir</button>
+            <button class="hasil-tab" data-subtab="rumusUji">📐 Alur Hitung, Rumus & Referensi</button>
+            <button class="hasil-tab" data-subtab="drafUji">📝 Draf Narasi Laporan</button>
+          </div>
+
+          <!-- Tab Content 1: Tabel -->
+          <div class="subtab-panel active" id="subtab-tabelUji">
+            <div style="overflow-x: auto; max-height: 380px; border: 1px solid var(--border-light); border-radius: var(--radius-md);">
+              <table class="data-table" id="tableHasilUjiInstrumen">
+                <thead>
+                  <tr>
+                    <th>Butir Indikator</th>
+                    <th>Mean</th>
+                    <th>StDev</th>
+                    <th>r-Hitung (Pearson)</th>
+                    <th>r-Tabel</th>
+                    <th>Sig. (2-Tailed)</th>
+                    <th>Status Validitas</th>
+                    <th>Corrected Item-Total</th>
+                    <th>Alpha if Item Deleted</th>
+                    <th>Kesimpulan</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyHasilUjiInstrumen"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tab Content 2: Rumus & Metodologi -->
+          <div class="subtab-panel tersembunyi" id="subtab-rumusUji">
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+              <h4 style="margin: 0; font-size: 14px; color: var(--color-primary);">1. Uji Validitas Butir (Korelasi Pearson Product Moment)</h4>
+              <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0; line-height: 1.6;">
+                Digunakan untuk menguji apakah setiap butir pernyataan kuesioner berkorelasi linier positif dan signifikan dengan skor total konstruk.
+              </p>
+              <div style="background: var(--bg-input); padding: 10px 14px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 12px; border-left: 3px solid var(--color-primary);">
+                r_xy = [ N &sum;XY - (&sum;X)(&sum;Y) ] / &radic;[ [ N &sum;X&sup2; - (&sum;X)&sup2; ] [ N &sum;Y&sup2; - (&sum;Y)&sup2; ] ]
+              </div>
+              <p style="font-size: 12px; color: var(--text-muted); margin: 0;">
+                <strong>Kriteria Keputusan:</strong> Butir dinyatakan <em>Valid</em> jika <strong>r-Hitung &gt; r-Tabel</strong> pada taraf signifikansi &alpha; = 0.05 ($df = N - 2$) dan nilai $p &lt; 0.05$ (Sugiyono, 2019; Azwar, 2018).
+              </p>
+
+              <h4 style="margin: 10px 0 0 0; font-size: 14px; color: var(--color-primary);">2. Korelasi Butir-Total Terkoreksi (Corrected Item-Total Correlation)</h4>
+              <div style="background: var(--bg-input); padding: 10px 14px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 12px; border-left: 3px solid #8b5cf6;">
+                r_i(total-i) = [ r_i,total &middot; s_total - s_i ] / &radic;[ s_total&sup2; + s_i&sup2; - 2 &middot; r_i,total &middot; s_total &middot; s_i ]
+              </div>
+              <p style="font-size: 12px; color: var(--text-muted); margin: 0;">
+                <strong>Kriteria Keputusan:</strong> Mencegah korelasi semu (*spurious correlation*) karena skor butir $i$ tidak diikutsertakan dalam skor total. Butir memiliki daya beda yang baik jika <strong>r_koreksi &ge; 0.300</strong> (Azwar, 2018; Nunnally & Bernstein, 1994).
+              </p>
+
+              <h4 style="margin: 10px 0 0 0; font-size: 14px; color: var(--color-primary);">3. Uji Reliabilitas (Cronbach's Alpha) & Alpha if Item Deleted</h4>
+              <div style="background: var(--bg-input); padding: 10px 14px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 12px; border-left: 3px solid #10b981;">
+                &alpha; = [ k / (k - 1) ] &times; [ 1 - ( &sum; s_i&sup2; / s_total&sup2; ) ]
+              </div>
+              <p style="font-size: 12px; color: var(--text-muted); margin: 0;">
+                <strong>Kriteria Keputusan:</strong> Konstruk dinyatakan reliabel jika koefisien <strong>Cronbach's Alpha &ge; 0.700</strong> (Hair et al., 2022; Ghozali, 2021). Kolom <em>Alpha if Item Deleted</em> menunjukkan nilai reliabilitas jika butir tertentu dihapus (membantu mengidentifikasi butir penggugur).
+              </p>
+            </div>
+          </div>
+
+          <!-- Tab Content 3: Draf Laporan -->
+          <div class="subtab-panel tersembunyi" id="subtab-drafUji">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12.5px; color: var(--text-secondary);">Draf teks narasi hasil uji instrumen penelitian:</span>
+                <button class="btn btn-sm btn-outline" id="btnSalinDrafUjiInstrumen" style="gap: 4px;">
+                  <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin Teks Draf
+                </button>
+              </div>
+              <textarea class="form-input" id="textareaDrafUjiInstrumen" rows="12" style="font-family: inherit; font-size: 12.5px; line-height: 1.6;" readonly></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: space-between;">
+        <button class="btn btn-ghost modal-close">Tutup</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-outline" id="btnEksporExcelUjiInstrumen" style="gap: 4px;">
+            <span class="material-icons-round" style="font-size: 16px; color: #10b981;">file_download</span> Ekspor Tabel ke Excel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL UJI PENGARUH MODERASI & SIMPLE SLOPE ============ -->
+  <div class="modal-overlay tersembunyi" id="modalUjiModerasi">
+    <div class="modal modal-xl" style="max-width: 1100px; width: 95vw;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(236, 72, 153, 0.12); color: #ec4899; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+            <span class="material-icons-round">tune</span>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Uji Pengaruh Moderasi & Simple Slope Plot</h3>
+            <span style="font-size: 11.5px; color: var(--text-muted);">Pendekatan Two-Stage / Product Indicator (X × M → Y), Effect Size f², dan Visualisasi Gradien Slope (±1 SD)</span>
+          </div>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+
+      <div class="modal-body" style="max-height: 75vh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 16px 20px;">
+        <!-- Config Selection Bar -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 14px 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) auto; gap: 12px; align-items: flex-end;">
+          <div class="form-group" style="margin: 0;">
+            <label for="selectModerasiIV" style="font-size: 12px; font-weight: 600;">Variabel Independen (X)</label>
+            <select class="form-input" id="selectModerasiIV"></select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="selectModerasiMOD" style="font-size: 12px; font-weight: 600;">Variabel Moderasi (M)</label>
+            <select class="form-input" id="selectModerasiMOD"></select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="selectModerasiDV" style="font-size: 12px; font-weight: 600;">Variabel Dependen (Y)</label>
+            <select class="form-input" id="selectModerasiDV"></select>
+          </div>
+          <button class="btn btn-primary" id="btnJalankanUjiModerasi" style="height: 38px; white-space: nowrap; gap: 6px; background: linear-gradient(135deg, #db2777, #ec4899);">
+            <span class="material-icons-round">play_arrow</span>
+            <span>Uji Efek Moderasi</span>
+          </button>
+        </div>
+
+        <!-- Output Container -->
+        <div id="containerHasilModerasi" style="display: none; flex-direction: column; gap: 16px;">
+          <!-- Summary Metrics Cards -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+            <div class="fit-card">
+              <span class="fit-label" style="font-size: 11.5px; color: var(--text-muted);">Koefisien Interaksi (β_int)</span>
+              <span class="fit-val" id="valModBetaInt" style="font-size: 20px; font-weight: 800; color: #ec4899;">0.000</span>
+              <span class="fit-desc" id="valModTStat" style="font-size: 11px; color: var(--text-secondary);">t = 0.000 (p = 0.000)</span>
+            </div>
+            <div class="fit-card">
+              <span class="fit-label" style="font-size: 11.5px; color: var(--text-muted);">Effect Size Moderasi (f²)</span>
+              <span class="fit-val" id="valModF2" style="font-size: 20px; font-weight: 800; color: var(--color-primary);">0.000</span>
+              <span class="fit-desc" id="valModF2Desc" style="font-size: 11px; color: var(--text-secondary);">Efek Kecil (f² &ge; 0.02)</span>
+            </div>
+            <div class="fit-card">
+              <span class="fit-label" style="font-size: 11.5px; color: var(--text-muted);">Perubahan R² (ΔR²)</span>
+              <span class="fit-val" id="valModDeltaR2" style="font-size: 20px; font-weight: 800; color: #10b981;">+0.000</span>
+              <span class="fit-desc" id="valModR2Info" style="font-size: 11px; color: var(--text-secondary);">R² Mod vs R² Main</span>
+            </div>
+            <div class="fit-card">
+              <span class="fit-label" style="font-size: 11.5px; color: var(--text-muted);">Keputusan Hipotesis Moderasi</span>
+              <span class="badge-chip badge-success" id="badgeModStatus" style="align-self: flex-start; margin-top: 4px; font-size: 12px; padding: 4px 10px;">Signifikan</span>
+              <span class="fit-desc" id="valModTipeEfek" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Strengthening Effect</span>
+            </div>
+          </div>
+
+          <!-- 2-Column: Table & Simple Slope Plot -->
+          <div style="display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px;">
+            <!-- Left: Table APA & Equation -->
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div class="apa-table-wrapper" style="margin: 0;">
+                <h5 class="apa-table-title" style="font-size: 13px;">Tabel Hasil Uji Efek Moderasi (Product Indicator)</h5>
+                <table class="apa-table" id="tableHasilModerasi" style="font-size: 12px;">
+                  <thead>
+                    <tr>
+                      <th>Efek / Jalur</th>
+                      <th>Koefisien (β)</th>
+                      <th>t-Statistik</th>
+                      <th>p-Value</th>
+                      <th>Keterangan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyHasilModerasi"></tbody>
+                </table>
+              </div>
+
+              <!-- Simple Slopes Equations -->
+              <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; font-size: 12px;">
+                <strong style="display: block; margin-bottom: 6px; color: var(--text-primary);">Persamaan Gradien Simple Slopes:</strong>
+                <div style="display: flex; flex-direction: column; gap: 4px; font-family: 'Consolas', monospace;">
+                  <div style="color: #3b82f6;">• Moderator Rendah (-1 SD) : Slope = <span id="eqSlopeLow">0.000</span></div>
+                  <div style="color: #10b981;">• Moderator Rata-rata (Mean): Slope = <span id="eqSlopeMean">0.000</span></div>
+                  <div style="color: #ec4899;">• Moderator Tinggi (+1 SD) : Slope = <span id="eqSlopeHigh">0.000</span></div>
+                </div>
+              </div>
+
+              <!-- Narasi Laporan Moderasi -->
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Draf Narasi Hasil Uji Moderasi:</span>
+                  <button class="btn btn-xs btn-outline" id="btnSalinDrafModerasi">Salin Teks</button>
+                </div>
+                <textarea class="form-input" id="textareaDrafModerasi" rows="6" style="font-size: 12px; line-height: 1.5;" readonly></textarea>
+              </div>
+            </div>
+
+            <!-- Right: Interactive Simple Slope SVG Chart -->
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary);">Simple Slope Plot (Grafik Efek Moderasi)</h4>
+                  <span style="font-size: 11px; color: var(--text-muted);">Visualisasi interaksi variabel pada 3 level moderator</span>
+                </div>
+                <button class="btn btn-xs btn-outline" id="btnDownloadSlopePlotSvg" title="Unduh grafik Simple Slope (SVG)">
+                  <span class="material-icons-round" style="font-size: 14px;">download</span> SVG
+                </button>
+              </div>
+
+              <!-- SVG Canvas Area -->
+              <div id="svgSlopePlotContainer" style="width: 100%; height: 320px; background: var(--bg-panel); border-radius: var(--radius-md); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; position: relative;">
+                <!-- SVG dimuat dinamis via JavaScript -->
+              </div>
+
+              <!-- Legend Bar -->
+              <div style="display: flex; justify-content: center; gap: 18px; font-size: 11.5px; padding-top: 4px;">
+                <span style="display: flex; align-items: center; gap: 6px; color: #3b82f6;">
+                  <span style="width: 14px; height: 3px; background: #3b82f6; display: inline-block; border-radius: 2px;"></span>
+                  Moderator Rendah (-1 SD)
+                </span>
+                <span style="display: flex; align-items: center; gap: 6px; color: #10b981;">
+                  <span style="width: 14px; height: 3px; background: #10b981; display: inline-block; border-radius: 2px;"></span>
+                  Moderator Rata-rata (Mean)
+                </span>
+                <span style="display: flex; align-items: center; gap: 6px; color: #ec4899;">
+                  <span style="width: 14px; height: 3px; background: #ec4899; display: inline-block; border-radius: 2px;"></span>
+                  Moderator Tinggi (+1 SD)
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: space-between;">
+        <button class="btn btn-ghost modal-close">Tutup</button>
+        <button class="btn btn-outline" id="btnEksporExcelModerasi" style="gap: 4px;">
+          <span class="material-icons-round" style="font-size: 16px; color: #10b981;">file_download</span> Ekspor ke Excel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL STATISTIK DESKRIPTIF LENGKAP ============ -->
+  <div class="modal-overlay tersembunyi" id="modalStatistikDeskriptif">
+    <div class="modal modal-xl" style="max-width: 1100px; width: 95vw;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(16, 185, 129, 0.12); color: #10b981; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+            <span class="material-icons-round">analytics</span>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Statistik Deskriptif Variabel & Uji Normalitas Univariat</h3>
+            <span style="font-size: 11.5px; color: var(--text-muted);">Mean, Median, Modus, StDev, Varians, TCR (Tingkat Capaian Responden), Skewness & Kurtosis</span>
+          </div>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+
+      <div class="modal-body" style="max-height: 75vh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 16px 20px;">
+        <!-- Config Bar -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr auto; gap: 12px; align-items: flex-end;">
+            <div class="form-group" style="margin: 0;">
+              <label for="selectDatasetDeskriptif" style="font-size: 12px; font-weight: 600;">Dataset Penelitian</label>
+              <select class="form-input" id="selectDatasetDeskriptif"></select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label for="selectSkalaDeskriptif" style="font-size: 12px; font-weight: 600;">Skala Maksimum Kuesioner</label>
+              <select class="form-input" id="selectSkalaDeskriptif">
+                <option value="5" selected>Skala Likert 1 - 5 (Max = 5)</option>
+                <option value="7">Skala Likert 1 - 7 (Max = 7)</option>
+                <option value="4">Skala Likert 1 - 4 (Max = 4)</option>
+                <option value="10">Skala 1 - 10 (Max = 10)</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="btnJalankanDeskriptif" style="height: 38px; white-space: nowrap; gap: 6px; background: linear-gradient(135deg, #059669, #10b981);">
+              <span class="material-icons-round">play_arrow</span>
+              <span>Hitung Statistik Deskriptif</span>
+            </button>
+          </div>
+
+          <!-- Indicator Checkboxes -->
+          <div style="border-top: 1px solid var(--border-light); padding-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin: 0;">Pilih Kolom / Indikator yang Dianalisis:</label>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-sm btn-ghost" id="btnPilihSemuaDeskriptif" style="font-size: 11px; padding: 2px 8px; height: 24px;">Pilih Semua</button>
+                <button class="btn btn-sm btn-ghost" id="btnResetDeskriptif" style="font-size: 11px; padding: 2px 8px; height: 24px;">Kosongkan</button>
+              </div>
+            </div>
+            <div id="containerDeskriptifCheckboxes" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 90px; overflow-y: auto; padding: 2px;">
+              <!-- Checkboxes dinamis -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Output Tables & Panels -->
+        <div id="containerHasilDeskriptif" style="display: none; flex-direction: column; gap: 14px;">
+          <!-- Subtabs -->
+          <div class="hasil-tabs" style="margin-bottom: 0; padding-bottom: 4px; border-bottom: 1px solid var(--border-color);">
+            <button class="hasil-tab active" data-deskriptiftab="tabelDeskriptif">📊 Tabel Statistik Deskriptif Lengkap</button>
+            <button class="hasil-tab" data-deskriptiftab="tabelNormalitas">📈 Evaluasi Normalitas Univariat</button>
+            <button class="hasil-tab" data-deskriptiftab="drafDeskriptif">📝 Draf Narasi Laporan</button>
+          </div>
+
+          <!-- Panel 1: Tabel Deskriptif -->
+          <div class="deskriptif-panel active" id="deskriptif-tabelDeskriptif">
+            <div style="overflow-x: auto; max-height: 380px; border: 1px solid var(--border-light); border-radius: var(--radius-md);">
+              <table class="data-table" id="tableDeskriptifLengkap">
+                <thead>
+                  <tr>
+                    <th>Variabel / Indikator</th>
+                    <th>N</th>
+                    <th>Mean</th>
+                    <th>SE Mean</th>
+                    <th>Median</th>
+                    <th>Modus</th>
+                    <th>StDev</th>
+                    <th>Varians</th>
+                    <th>Min</th>
+                    <th>Max</th>
+                    <th>Range</th>
+                    <th>TCR (%)</th>
+                    <th>Kategori Capaian</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyDeskriptifLengkap"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Panel 2: Uji Normalitas Univariat -->
+          <div class="deskriptif-panel tersembunyi" id="deskriptif-tabelNormalitas">
+            <div style="overflow-x: auto; max-height: 380px; border: 1px solid var(--border-light); border-radius: var(--radius-md);">
+              <table class="data-table" id="tableNormalitasUnivariat">
+                <thead>
+                  <tr>
+                    <th>Variabel / Indikator</th>
+                    <th>N</th>
+                    <th>Skewness</th>
+                    <th>Std. Error Skew</th>
+                    <th>Z-Score Skew</th>
+                    <th>Kurtosis</th>
+                    <th>Std. Error Kurt</th>
+                    <th>Z-Score Kurt</th>
+                    <th>Distribusi Univariat</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyNormalitasUnivariat"></tbody>
+              </table>
+            </div>
+            <div style="margin-top: 10px; font-size: 11.5px; color: var(--text-muted); background: var(--bg-card); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+              💡 <strong>Kriteria Normalitas Univariat:</strong> Data dianggap berdistribusi normal secara univariat jika nilai <strong>Z-Score Skewness dan Kurtosis berada di antara -1.96 sampai +1.96</strong> pada taraf signifikansi &alpha; = 0.05 (Hair et al., 2022; Ghozali, 2021). Pada PLS-SEM, asumsi normalitas multivariat bersifat non-parametrik (bebas distribusi).
+            </div>
+          </div>
+
+          <!-- Panel 3: Draf Narasi Laporan -->
+          <div class="deskriptif-panel tersembunyi" id="deskriptif-drafDeskriptif">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12.5px; color: var(--text-secondary);">Draf teks narasi hasil analisis data:</span>
+                <button class="btn btn-sm btn-outline" id="btnSalinDrafDeskriptif" style="gap: 4px;">
+                  <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin Teks Draf
+                </button>
+              </div>
+              <textarea class="form-input" id="textareaDrafDeskriptif" rows="12" style="font-family: inherit; font-size: 12.5px; line-height: 1.6;" readonly></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: space-between;">
+        <button class="btn btn-ghost modal-close">Tutup</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-outline" id="btnEksporExcelDeskriptif" style="gap: 4px;">
+            <span class="material-icons-round" style="font-size: 16px; color: #10b981;">file_download</span> Ekspor Tabel ke Excel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL TAMBAH EFEK MODERASI KE MODEL ============ -->
+  <div class="modal-overlay tersembunyi" id="modalTambahEfekModerasi">
+    <div class="modal modal-md">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(236, 72, 153, 0.15); color: #ec4899; display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons-round" style="font-size: 18px;">tune</span>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 15px;">Tambah Efek Moderasi pada Model</h3>
+            <span style="font-size: 11px; color: var(--text-secondary);">Membentuk variabel interaksi laten (X × M → Y)</span>
+          </div>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close"><span class="material-icons-round">close</span></button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="form-group">
+          <label>Variabel Independen (X)</label>
+          <select class="form-input" id="selectQuickModIV"></select>
+        </div>
+        <div class="form-group">
+          <label>Variabel Moderasi (M)</label>
+          <select class="form-input" id="selectQuickModMOD"></select>
+        </div>
+        <div class="form-group">
+          <label>Variabel Dependen / Target (Y)</label>
+          <select class="form-input" id="selectQuickModDV"></select>
+        </div>
+        <div class="form-group">
+          <label>Nama Variabel Interaksi</label>
+          <input type="text" class="form-input" id="inputNamaVarInteraksi" placeholder="Contoh: X*M atau Motivasi*Disiplin">
+        </div>
+        <div style="background: var(--bg-hover); padding: 10px 12px; border-radius: 8px; font-size: 11.5px; color: var(--text-secondary); line-height: 1.4;">
+          💡 <strong>Otomatisasi Kanvas:</strong> Kanvas akan otomatis membuat node interaksi baru berkode warna moderasi, menghubungkan jalur $X \rightarrow Y$, $M \rightarrow Y$, dan $(X \times M) \rightarrow Y$.
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between;">
+        <button class="btn btn-ghost modal-close">Batal</button>
+        <button class="btn btn-primary" id="btnProsesTambahEfekModerasi" style="background: linear-gradient(135deg, #ec4899, #db2777);">
+          <span class="material-icons-round" style="font-size: 16px;">add_circle</span> Buat Efek Moderasi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CANVAS CONTEXT MENU (KLIK KANAN) ============ -->
+  <div class="canvas-context-menu tersembunyi" id="canvasContextMenu">
+    <div class="context-menu-header" id="contextMenuTitle">Variabel Laten</div>
+    
+    <div class="context-menu-section">
+      <div class="context-menu-label">Orientasi Indikator</div>
+      <div class="context-orientasi-grid">
+        <button class="context-item-btn" id="ctxOrientKiri" title="Pindah Indikator ke Kiri">Kiri</button>
+        <button class="context-item-btn" id="ctxOrientAtas" title="Pindah Indikator ke Atas">Atas</button>
+        <button class="context-item-btn" id="ctxOrientKanan" title="Pindah Indikator ke Kanan">Kanan</button>
+        <button class="context-item-btn" id="ctxOrientBawah" title="Pindah Indikator ke Bawah">Bawah</button>
+      </div>
+    </div>
+
+    <div class="context-menu-section">
+      <div class="context-menu-label">Tema Warna Konstruk</div>
+      <div class="context-color-palette" id="ctxColorPalette">
+        <div class="color-dot active" data-color="#009bf2" style="background: #009bf2;" title="Biru SmartPLS"></div>
+        <div class="color-dot" data-color="#0ea5e9" style="background: #0ea5e9;" title="Sky Blue (Eksogen)"></div>
+        <div class="color-dot" data-color="#f59e0b" style="background: #f59e0b;" title="Amber (Mediasi)"></div>
+        <div class="color-dot" data-color="#ec4899" style="background: #ec4899;" title="Rose (Moderasi)"></div>
+        <div class="color-dot" data-color="#10b981" style="background: #10b981;" title="Emerald (Endogen)"></div>
+        <div class="color-dot" data-color="#8b5cf6" style="background: #8b5cf6;" title="Purple Violet"></div>
+        <div class="color-dot" data-color="#64748b" style="background: #64748b;" title="Slate"></div>
+      </div>
+    </div>
+
+    <div class="context-menu-divider"></div>
+
+    <button class="context-item" id="ctxBtnDuplikat">
+      <span class="material-icons-round">content_copy</span>
+      <span>Duplikat Variabel (Ctrl+D)</span>
+    </button>
+    <button class="context-item" id="ctxBtnModerasi">
+      <span class="material-icons-round" style="color: #ec4899;">tune</span>
+      <span>Buat Efek Moderasi...</span>
+    </button>
+    <button class="context-item" id="ctxBtnBalikArah">
+      <span class="material-icons-round" style="color: #3b82f6;">sync_alt</span>
+      <span>Ubah Reflektif / Formatif</span>
+    </button>
+    
+    <div class="context-menu-divider"></div>
+
+    <button class="context-item context-item-danger" id="ctxBtnHapus">
+      <span class="material-icons-round">delete</span>
+      <span>Hapus dari Diagram</span>
+    </button>
+  </div>
+
   <!-- ============ TOAST NOTIFICATION ============ -->
   <div class="toast-container" id="toastContainer"></div>
   
   <!-- ============ LOADING OVERLAY ============ -->
   <div class="loading-overlay tersembunyi" id="loadingOverlay">
-    <div class="loading-spinner">
-      <div class="spinner"></div>
-      <p id="loadingText">Memproses...</p>
+    <div class="loading-card">
+      <div class="loading-animation-box">
+        <div class="spinner-dual-ring"></div>
+        <span class="material-icons-round loading-center-icon" id="loadingIcon">sync</span>
+      </div>
+      <h3 class="loading-title" id="loadingText">Menghitung Regresi Moderasi &amp; Gradien...</h3>
+      <p class="loading-subtitle" id="loadingDetail">Estimasi Two-Stage Interaction, f² Effect Size &amp; Simple Slopes ±1 SD</p>
+      
+      <!-- Progress Bar Container -->
+      <div class="loading-progress-wrapper">
+        <div class="loading-progress-track">
+          <div class="loading-progress-bar" id="loadingProgressBar" style="width: 0%;"></div>
+        </div>
+        <div class="loading-meta-info">
+          <div class="loading-timer-item">
+            <span class="material-icons-round" style="font-size: 13px; color: var(--color-primary);">timer</span>
+            <span>Waktu: <strong id="loadingElapsedTimer" style="color: var(--text-primary); font-family: 'Consolas', monospace;">0.0s</strong></span>
+          </div>
+          <div class="loading-percentage-item">
+            <span id="loadingPercent" style="font-weight: 700; color: var(--color-primary);">0%</span>
+          </div>
+          <div class="loading-timer-item">
+            <span class="material-icons-round" style="font-size: 13px; color: #10b981;">hourglass_top</span>
+            <span>Estimasi: <strong id="loadingEstimateTimer" style="color: var(--text-primary); font-family: 'Consolas', monospace;">~1.2s</strong></span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   

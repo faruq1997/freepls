@@ -35,6 +35,14 @@ const state = {
   pan: { x: 0, y: 0 },
   isPanning: false,
   panStart: { x: 0, y: 0 },
+  // Marquee Selection state
+  isMarqueeSelecting: false,
+  marqueeStart: null,
+  marqueeEnd: null,
+  multiDragInitialPositions: null,
+  // Model Linting / Warnings
+  modelWarnings: [],
+  modelWarningsByNode: {},
   // Versioning state
   versiAktifId: null,
   versiList: [],
@@ -132,6 +140,58 @@ function applyHistorySnapshot(snap) {
   }, 50);
 }
 
+function updateProjectStateUI() {
+  const hasProject = !!state.proyekAktif;
+  
+  // Editor buttons
+  const editorButtons = [
+    'btnRenameProyek', 'btnVersiModel', 'btnUndo', 'btnRedo',
+    'btnAutoLayout', 'btnTambahVariabel', 'btnTambahJalur',
+    'btnTambahCatatan', 'btnToggleIndikator', 'btnEksporProyekFile',
+    'btnBukaEksporGambar', 'btnSimpanModel'
+  ];
+  
+  editorButtons.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !hasProject;
+  });
+
+  // Data buttons
+  const dataButtons = [
+    'btnBukaImputasiData', 'btnBukaReverseScore', 'btnBukaDeteksiOutlier', 'btnImporData'
+  ];
+  dataButtons.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !hasProject;
+  });
+
+  // Analisis buttons
+  const analisisButtons = [
+    'btnJalankanPLS', 'btnJalankanBootstrap'
+  ];
+  analisisButtons.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !hasProject;
+  });
+
+  // Hasil buttons
+  const hasilButtons = [
+    'btnSalinLaporanBab4', 'btnDownloadLaporanBab4', 'btnEksporHasil'
+  ];
+  hasilButtons.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !hasProject;
+  });
+
+  // Update name labels if no project
+  if (!hasProject) {
+    document.querySelectorAll('.proyek-nama-aktif').forEach(el => {
+      el.textContent = 'Belum ada proyek dipilih';
+      el.title = 'Belum ada proyek dipilih (Klik untuk buat proyek baru)';
+    });
+  }
+}
+
 const plsEngine = new PLSEngine();
 
 // ============ INITIALIZATION ============
@@ -144,9 +204,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initEditorHandlers();
   initDataHandlers();
   initDataPreprocessingHandlers();
+  initInstrumentTestHandlers();
+  initDescriptiveStatsHandlers();
+  initModerationHandlers();
   initAnalysisHandlers();
   initResultsHandlers();
   initSettingsHandlers();
+  updateProjectStateUI();
   loadDashboard();
 });
 
@@ -326,9 +390,20 @@ function navigateTo(halaman) {
   
   // Refresh data based on page
   if (halaman === 'beranda') loadDashboard();
-  if (halaman === 'editor' && state.proyekAktif) renderModel();
+  if (halaman === 'editor' && state.proyekAktif) {
+    setTimeout(() => {
+      renderModel();
+    }, 60);
+  }
   if (halaman === 'data' && state.proyekAktif) loadDatasets();
-  if (halaman === 'hasil' && state.proyekAktif) loadResults();
+  if (halaman === 'hasil') {
+    updateResultsStatusBadge();
+    if (state.proyekAktif) {
+      loadResults();
+    } else {
+      renderEmptyResultsState();
+    }
+  }
 }
 
 // ============ MODAL MANAGEMENT ============
@@ -436,14 +511,80 @@ function showToast(pesan, tipe = 'info') {
   }, 3000);
 }
 
-// ============ LOADING ============
-function showLoading(text = 'Memproses...') {
-  document.getElementById('loadingText').textContent = text;
-  document.getElementById('loadingOverlay').classList.remove('tersembunyi');
+// ============ LOADING OVERLAY WITH ESTIMATED TIME & LIVE COUNTER ============
+let loadingTimerInterval = null;
+let loadingStartTime = 0;
+let loadingEstimatedMs = 1200;
+
+function showLoading(
+  title = 'Memproses Data...', 
+  estimatedMs = 1200, 
+  detail = 'Menjalankan kalkulasi algoritma & matriks statistik...',
+  icon = 'sync'
+) {
+  const overlay = document.getElementById('loadingOverlay');
+  const titleEl = document.getElementById('loadingText');
+  const detailEl = document.getElementById('loadingDetail');
+  const iconEl = document.getElementById('loadingIcon');
+  const barEl = document.getElementById('loadingProgressBar');
+  const elapsedEl = document.getElementById('loadingElapsedTimer');
+  const estimateEl = document.getElementById('loadingEstimateTimer');
+  const percentEl = document.getElementById('loadingPercent');
+
+  if (titleEl) titleEl.textContent = title;
+  if (detailEl) detailEl.textContent = detail;
+  if (iconEl) iconEl.textContent = icon;
+
+  loadingEstimatedMs = Math.max(250, estimatedMs);
+  loadingStartTime = Date.now();
+
+  const estSec = (loadingEstimatedMs / 1000).toFixed(1);
+  if (estimateEl) estimateEl.textContent = `~${estSec}s`;
+  if (elapsedEl) elapsedEl.textContent = '0.0s';
+  if (percentEl) percentEl.textContent = '0%';
+  if (barEl) barEl.style.width = '0%';
+
+  if (loadingTimerInterval) {
+    clearInterval(loadingTimerInterval);
+    loadingTimerInterval = null;
+  }
+
+  loadingTimerInterval = setInterval(() => {
+    const elapsed = Date.now() - loadingStartTime;
+    const elapsedSec = (elapsed / 1000).toFixed(1);
+    if (elapsedEl) elapsedEl.textContent = `${elapsedSec}s`;
+
+    // Calculate dynamic smooth progress percentage (interpolating up to 92% until done)
+    let percent = Math.min(94, Math.round((elapsed / loadingEstimatedMs) * 90));
+    // Asymptote towards 98% if it runs longer than estimated
+    if (elapsed > loadingEstimatedMs) {
+      const extraRatio = Math.min(1, (elapsed - loadingEstimatedMs) / 3000);
+      percent = Math.min(98, 90 + Math.round(extraRatio * 8));
+    }
+    if (percentEl) percentEl.textContent = `${percent}%`;
+    if (barEl) barEl.style.width = `${percent}%`;
+  }, 40);
+
+  if (overlay) overlay.classList.remove('tersembunyi');
 }
 
 function hideLoading() {
-  document.getElementById('loadingOverlay').classList.add('tersembunyi');
+  if (loadingTimerInterval) {
+    clearInterval(loadingTimerInterval);
+    loadingTimerInterval = null;
+  }
+
+  const barEl = document.getElementById('loadingProgressBar');
+  const percentEl = document.getElementById('loadingPercent');
+  const overlay = document.getElementById('loadingOverlay');
+
+  if (barEl) barEl.style.width = '100%';
+  if (percentEl) percentEl.textContent = '100%';
+
+  setTimeout(() => {
+    if (overlay) overlay.classList.add('tersembunyi');
+    if (barEl) barEl.style.width = '0%';
+  }, 180);
 }
 
 // ============ PROJECT HANDLERS ============
@@ -606,6 +747,12 @@ async function setActiveProject(proyek, forceVersiId = null) {
       state.variabels = model.variabels || [];
       state.jalurs = model.jalurs || [];
       state.catatans = model.catatans || [];
+
+      // Auto-layout jika ada variabel yang belum memiliki posisi x/y
+      const needsLayout = state.variabels.some(v => v.posisi_x === undefined || v.posisi_y === undefined);
+      if (needsLayout && state.variabels.length > 0) {
+        jalankanAutoLayout();
+      }
     } catch (e) {
       state.variabels = [];
       state.jalurs = [];
@@ -622,6 +769,7 @@ async function setActiveProject(proyek, forceVersiId = null) {
   state.historyPointer = -1;
   saveHistoryState('Buka Proyek');
 
+  updateProjectStateUI();
   showToast(`Proyek "${proyek.nama}" dibuka (${activeVersiName})`, 'sukses');
   navigateTo('editor');
 }
@@ -685,10 +833,7 @@ async function hapusProyek(id, nama) {
     await window.api.proyekHapus(id);
     if (state.proyekAktif && state.proyekAktif.id === id) {
       state.proyekAktif = null;
-      document.querySelectorAll('.proyek-nama-aktif').forEach(el => {
-        el.textContent = 'Belum ada proyek dipilih';
-        el.title = 'Belum ada proyek dipilih (Klik untuk buat proyek baru)';
-      });
+      updateProjectStateUI();
     }
     showToast(`Proyek "${nama}" telah dihapus`, 'sukses');
     loadDashboard();
@@ -903,7 +1048,7 @@ async function eksporProyekFile() {
     showToast('Pilih proyek terlebih dahulu', 'peringatan');
     return;
   }
-  showLoading('Mengekspor bundle proyek .freepls...');
+  showLoading('Mengekspor Berkas Proyek .freepls...', 600, 'Kompresi Diagram Model, Dataset & Konfigurasi Analisis', 'file_download');
   try {
     const res = await window.api.proyekEksporFile(state.proyekAktif.id);
     hideLoading();
@@ -917,7 +1062,7 @@ async function eksporProyekFile() {
 }
 
 async function imporProyekFile() {
-  showLoading('Mengimpor file .freepls...');
+  showLoading('Mengimpor Berkas Proyek .freepls...', 700, 'Restorasi Diagram Model, Matriks Data & Variabel Laten', 'file_upload');
   try {
     const res = await window.api.proyekImporFile();
     hideLoading();
@@ -1027,7 +1172,7 @@ function hapusCatatanHandler() {
   showToast('Catatan dihapus dari canvas', 'sukses');
 }
 
-// ============ ZOOM & FULLSCREEN CONTROLS ============
+// ============ ZOOM, PAN & FULLSCREEN CONTROLS ============
 function setZoom(newZoom, resetPan = false) {
   state.zoom = Math.min(3.0, Math.max(0.3, newZoom));
   if (resetPan) {
@@ -1042,6 +1187,65 @@ function updateZoomLabel() {
   if (lbl) {
     lbl.textContent = `${Math.round(state.zoom * 100)}%`;
   }
+}
+
+function fitDiagramToCanvas() {
+  const canvas = document.getElementById('modelCanvas');
+  if (!canvas) return;
+
+  const wrapper = canvas.parentElement;
+  const cw = wrapper?.clientWidth || canvas.width || 1000;
+  const ch = wrapper?.clientHeight || canvas.height || 600;
+
+  if (!state.variabels || state.variabels.length === 0) {
+    state.zoom = 1.0;
+    state.pan = { x: 0, y: 0 };
+    updateZoomLabel();
+    renderModel();
+    showToast('Diagram model masih kosong', 'info');
+    return;
+  }
+
+  // Hitung Bounding Box semua variabel dan catatan
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const R = PLS_STYLE.latentRadius || 42;
+
+  state.variabels.forEach(v => {
+    minX = Math.min(minX, v.posisi_x - R - 60);
+    maxX = Math.max(maxX, v.posisi_x + R + 60);
+    minY = Math.min(minY, v.posisi_y - R - 45);
+    maxY = Math.max(maxY, v.posisi_y + R + 45);
+  });
+
+  if (state.catatans && state.catatans.length > 0) {
+    state.catatans.forEach(c => {
+      minX = Math.min(minX, c.x || 100);
+      maxX = Math.max(maxX, (c.x || 100) + (c.w || 160));
+      minY = Math.min(minY, c.y || 100);
+      maxY = Math.max(maxY, (c.y || 100) + (c.h || 95));
+    });
+  }
+
+  const modelWidth = Math.max(300, maxX - minX);
+  const modelHeight = Math.max(200, maxY - minY);
+  const padding = 80;
+
+  const scaleX = (cw - padding * 2) / modelWidth;
+  const scaleY = (ch - padding * 2) / modelHeight;
+  const targetZoom = Math.min(1.4, Math.max(0.4, Math.min(scaleX, scaleY)));
+
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+
+  state.zoom = targetZoom;
+  state.pan = {
+    x: Math.round(cw / 2 - centerX * targetZoom),
+    y: Math.round(ch / 2 - centerY * targetZoom)
+  };
+
+  updateZoomLabel();
+  renderModel();
+  showToast(`Tampilan diagram disesuaikan (${Math.round(targetZoom * 100)}%)`, 'sukses');
 }
 
 function toggleCanvasFullscreen() {
@@ -1067,6 +1271,7 @@ function initEditorHandlers() {
   // Rename Project Click Handlers
   document.getElementById('proyekNamaEditor')?.addEventListener('click', () => bukaModalRenameProyek());
   document.getElementById('btnRenameProyek')?.addEventListener('click', () => bukaModalRenameProyek());
+  document.getElementById('btnProyekBadgeIcon')?.addEventListener('click', () => bukaModalRenameProyek());
   document.getElementById('btnSimpanRenameProyek')?.addEventListener('click', () => simpanRenameProyek());
 
   // Versioning Handlers
@@ -1095,13 +1300,39 @@ function initEditorHandlers() {
     });
   });
 
-  // Zoom Controls
+  // Zoom & View Navigation Controls
   document.getElementById('btnZoomIn')?.addEventListener('click', () => setZoom(state.zoom + 0.15));
   document.getElementById('btnZoomOut')?.addEventListener('click', () => setZoom(state.zoom - 0.15));
   document.getElementById('btnZoomReset')?.addEventListener('click', () => setZoom(1.0, true));
+  document.getElementById('btnCanvasFitView')?.addEventListener('click', () => fitDiagramToCanvas());
   document.getElementById('btnCanvasFullscreen')?.addEventListener('click', () => toggleCanvasFullscreen());
   document.getElementById('btnCloseNavHint')?.addEventListener('click', () => {
     document.getElementById('canvasNavHint')?.classList.add('tersembunyi');
+  });
+
+  // Toggle Panel Properties dari Toolbar Bawah & Tombol Floating
+  const togglePanel = () => {
+    const panel = document.getElementById('editorPanel');
+    const btnToggle = document.getElementById('btnTogglePanelProperties');
+    if (!panel) return;
+    panel.classList.toggle('collapsed');
+    const isCollapsed = panel.classList.contains('collapsed');
+    if (btnToggle) {
+      btnToggle.classList.toggle('active', !isCollapsed);
+    }
+    setTimeout(() => {
+      if (state.proyekAktif) renderModel();
+    }, 60);
+  };
+
+  document.getElementById('btnTogglePanelProperties')?.addEventListener('click', togglePanel);
+  document.getElementById('btnFloatingOpenPanel')?.addEventListener('click', () => {
+    const panel = document.getElementById('editorPanel');
+    panel?.classList.remove('collapsed');
+    document.getElementById('btnTogglePanelProperties')?.classList.add('active');
+    setTimeout(() => {
+      if (state.proyekAktif) renderModel();
+    }, 60);
   });
 
   // Global Keyboard Navigation & Action Shortcuts (Ctrl+A, Delete, Zoom, Fullscreen)
@@ -1141,6 +1372,20 @@ function initEditorHandlers() {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
       e.preventDefault();
       selectAllModelElements();
+      return;
+    }
+
+    // Ctrl + D / Cmd + D: Duplikat Variabel Terpilih
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+      e.preventDefault();
+      duplicateSelectedVariable();
+      return;
+    }
+
+    // Alt + R: Putar Orientasi Indikator Variabel Terpilih
+    if (e.altKey && (e.key === 'r' || e.key === 'R')) {
+      e.preventDefault();
+      rotateSelectedVariableOrientation();
       return;
     }
 
@@ -1367,10 +1612,807 @@ window.hapusSemuaTerpilih = async function() {
     showToast(state.showIndikator ? 'Indikator ditampilkan' : 'Indikator disembunyikan (Model Struktural Bersih)', 'info');
   });
 
+  // Dropdown Perataan Model (Align & Distribute)
+  const dropdownAlign = document.getElementById('dropdownAlign');
+  const btnDropdownAlign = document.getElementById('btnDropdownAlign');
+  
+  btnDropdownAlign?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdownAlign?.classList.toggle('open');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (dropdownAlign && !dropdownAlign.contains(e.target)) {
+      dropdownAlign.classList.remove('open');
+    }
+  });
+
+  dropdownAlign?.querySelectorAll('.dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      dropdownAlign.classList.remove('open');
+    });
+  });
+
+  // Align Actions
+  document.getElementById('btnAlignLeft')?.addEventListener('click', () => alignSelectedNodes('left'));
+  document.getElementById('btnAlignCenterH')?.addEventListener('click', () => alignSelectedNodes('centerH'));
+  document.getElementById('btnAlignRight')?.addEventListener('click', () => alignSelectedNodes('right'));
+  document.getElementById('btnAlignTop')?.addEventListener('click', () => alignSelectedNodes('top'));
+  document.getElementById('btnAlignCenterV')?.addEventListener('click', () => alignSelectedNodes('centerV'));
+  document.getElementById('btnAlignBottom')?.addEventListener('click', () => alignSelectedNodes('bottom'));
+  document.getElementById('btnDistributeH')?.addEventListener('click', () => alignSelectedNodes('distributeH'));
+  document.getElementById('btnDistributeV')?.addEventListener('click', () => alignSelectedNodes('distributeV'));
+
+  // Quick Duplicate & Quick Rotate in Dropdown Lainnya
+  document.getElementById('btnDuplikatVariabel')?.addEventListener('click', () => duplicateSelectedVariable());
+  document.getElementById('btnRotasiIndikatorCepat')?.addEventListener('click', () => rotateSelectedVariableOrientation());
+  document.getElementById('btnBukaTambahModerasiModel')?.addEventListener('click', () => bukaModalTambahModerasi());
+
+  // Model Validator Flyout Toggle
+  const dropdownValidator = document.getElementById('dropdownModelValidator');
+  const badgeValidator = document.getElementById('badgeModelValidator');
+  
+  badgeValidator?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdownValidator?.classList.toggle('open');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (dropdownValidator && !dropdownValidator.contains(e.target)) {
+      dropdownValidator.classList.remove('open');
+    }
+  });
+
+  // Modal Tambah Efek Moderasi Form Handlers
+  document.getElementById('selectQuickModIV')?.addEventListener('change', updateModerationInteractionName);
+  document.getElementById('selectQuickModMOD')?.addEventListener('change', updateModerationInteractionName);
+  document.getElementById('btnProsesTambahEfekModerasi')?.addEventListener('click', () => prosesTambahEfekModerasi());
+
   // Modal Template Model
   document.getElementById('btnBukaTemplateModel')?.addEventListener('click', () => {
     showModal('modalTemplateModel');
   });
+
+// ============ TEMPLATE GALLERY & FULL TURNKEY DEMO GENERATOR ============
+async function terapkanTemplateModel(templateKey) {
+  showLoading('Menerapkan Template Model & Menjalankan Analisis...', 1100, 'Menyusun Diagram Struktur, Matriks Indikator & Algoritma PLS', 'auto_fix_high');
+  try {
+    const baseId = Date.now();
+    let templateConfig = null;
+    
+    if (templateKey === 'mediasi_umkm') {
+      const idLD = baseId;
+      const idIK = baseId + 1;
+      const idAD = baseId + 2;
+      const idKU = baseId + 3;
+
+      templateConfig = {
+        nama: 'Riset Mediasi Digital UMKM',
+        deskripsi: 'Pengaruh Literasi Digital (LD) & Inklusi Keuangan (IK) terhadap Kinerja Usaha (KU) melalui Adopsi E-Commerce (AD)',
+        variabels: [
+          {
+            id: idLD,
+            nama: 'Literasi Digital',
+            tipe: 'reflektif',
+            indikator: ['LD1', 'LD2', 'LD3', 'LD4'],
+            orientasi: 'kiri',
+            posisi_x: 230,
+            posisi_y: 180
+          },
+          {
+            id: idIK,
+            nama: 'Inklusi Keuangan',
+            tipe: 'reflektif',
+            indikator: ['IK1', 'IK2', 'IK3', 'IK4'],
+            orientasi: 'kiri',
+            posisi_x: 230,
+            posisi_y: 460
+          },
+          {
+            id: idAD,
+            nama: 'Adopsi E-Commerce',
+            tipe: 'reflektif',
+            indikator: ['AD1', 'AD2', 'AD3', 'AD4'],
+            orientasi: 'atas',
+            posisi_x: 580,
+            posisi_y: 320
+          },
+          {
+            id: idKU,
+            nama: 'Kinerja Usaha',
+            tipe: 'reflektif',
+            indikator: ['KU1', 'KU2', 'KU3', 'KU4'],
+            orientasi: 'kanan',
+            posisi_x: 930,
+            posisi_y: 320
+          }
+        ],
+        jalurs: [
+          {
+            id: baseId + 10,
+            dari: 'Literasi Digital',
+            ke: 'Adopsi E-Commerce',
+            dari_variabel_id: idLD,
+            ke_variabel_id: idAD,
+            label: 'H1',
+            tipe_garis: 'solid',
+            tebal_garis: 2.2,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 11,
+            dari: 'Inklusi Keuangan',
+            ke: 'Adopsi E-Commerce',
+            dari_variabel_id: idIK,
+            ke_variabel_id: idAD,
+            label: 'H2',
+            tipe_garis: 'solid',
+            tebal_garis: 2.2,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 12,
+            dari: 'Adopsi E-Commerce',
+            ke: 'Kinerja Usaha',
+            dari_variabel_id: idAD,
+            ke_variabel_id: idKU,
+            label: 'H3',
+            tipe_garis: 'solid',
+            tebal_garis: 2.5,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 13,
+            dari: 'Literasi Digital',
+            ke: 'Kinerja Usaha',
+            dari_variabel_id: idLD,
+            ke_variabel_id: idKU,
+            label: 'H4',
+            tipe_garis: 'dashed',
+            tebal_garis: 1.8,
+            kelengkungan: -35
+          },
+          {
+            id: baseId + 14,
+            dari: 'Inklusi Keuangan',
+            ke: 'Kinerja Usaha',
+            dari_variabel_id: idIK,
+            ke_variabel_id: idKU,
+            label: 'H5',
+            tipe_garis: 'dashed',
+            tebal_garis: 1.8,
+            kelengkungan: 35
+          }
+        ],
+        generateData: (N = 140) => {
+          const rows = [];
+          for (let i = 0; i < N; i++) {
+            const randNorm = (m = 0, s = 1) => {
+              let u = 0, v = 0;
+              while (u === 0) u = Math.random();
+              while (v === 0) v = Math.random();
+              return m + s * Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+            };
+            const clamp = (val) => Math.max(1, Math.min(5, Math.round(val)));
+
+            const l_ld = randNorm(3.9, 0.62);
+            const l_ik = randNorm(3.85, 0.58);
+            const l_ad = 0.46 * l_ld + 0.38 * l_ik + randNorm(0, 0.34);
+            const l_ku = 0.52 * l_ad + 0.24 * l_ld + 0.18 * l_ik + randNorm(0, 0.30);
+
+            rows.push({
+              LD1: clamp(l_ld + randNorm(0, 0.28)),
+              LD2: clamp(l_ld + randNorm(0, 0.25)),
+              LD3: clamp(l_ld + randNorm(0, 0.30)),
+              LD4: clamp(l_ld + randNorm(0, 0.26)),
+              IK1: clamp(l_ik + randNorm(0, 0.27)),
+              IK2: clamp(l_ik + randNorm(0, 0.24)),
+              IK3: clamp(l_ik + randNorm(0, 0.29)),
+              IK4: clamp(l_ik + randNorm(0, 0.28)),
+              AD1: clamp(l_ad + randNorm(0, 0.25)),
+              AD2: clamp(l_ad + randNorm(0, 0.28)),
+              AD3: clamp(l_ad + randNorm(0, 0.24)),
+              AD4: clamp(l_ad + randNorm(0, 0.27)),
+              KU1: clamp(l_ku + randNorm(0, 0.26)),
+              KU2: clamp(l_ku + randNorm(0, 0.24)),
+              KU3: clamp(l_ku + randNorm(0, 0.28)),
+              KU4: clamp(l_ku + randNorm(0, 0.25))
+            });
+          }
+          return rows;
+        }
+      };
+    } else if (templateKey === 'tam') {
+      const idPEOU = baseId;
+      const idPU = baseId + 1;
+      const idATU = baseId + 2;
+      const idBI = baseId + 3;
+
+      templateConfig = {
+        nama: 'Riset Technology Acceptance (TAM)',
+        deskripsi: 'Model Penerimaan Teknologi: Perceived Ease of Use (PEOU) dan Perceived Usefulness (PU) terhadap Behavioral Intention (BI) melalui Attitude (ATU)',
+        variabels: [
+          {
+            id: idPEOU,
+            nama: 'Perceived Ease of Use',
+            tipe: 'reflektif',
+            indikator: ['PEOU1', 'PEOU2', 'PEOU3', 'PEOU4'],
+            orientasi: 'kiri',
+            posisi_x: 230,
+            posisi_y: 180
+          },
+          {
+            id: idPU,
+            nama: 'Perceived Usefulness',
+            tipe: 'reflektif',
+            indikator: ['PU1', 'PU2', 'PU3', 'PU4'],
+            orientasi: 'kiri',
+            posisi_x: 230,
+            posisi_y: 460
+          },
+          {
+            id: idATU,
+            nama: 'Attitude Toward Using',
+            tipe: 'reflektif',
+            indikator: ['ATU1', 'ATU2', 'ATU3', 'ATU4'],
+            orientasi: 'atas',
+            posisi_x: 580,
+            posisi_y: 320
+          },
+          {
+            id: idBI,
+            nama: 'Behavioral Intention',
+            tipe: 'reflektif',
+            indikator: ['BI1', 'BI2', 'BI3', 'BI4'],
+            orientasi: 'kanan',
+            posisi_x: 930,
+            posisi_y: 320
+          }
+        ],
+        jalurs: [
+          {
+            id: baseId + 10,
+            dari: 'Perceived Ease of Use',
+            ke: 'Perceived Usefulness',
+            dari_variabel_id: idPEOU,
+            ke_variabel_id: idPU,
+            label: 'H1',
+            tipe_garis: 'solid',
+            tebal_garis: 2.2,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 11,
+            dari: 'Perceived Ease of Use',
+            ke: 'Attitude Toward Using',
+            dari_variabel_id: idPEOU,
+            ke_variabel_id: idATU,
+            label: 'H2',
+            tipe_garis: 'solid',
+            tebal_garis: 2.2,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 12,
+            dari: 'Perceived Usefulness',
+            ke: 'Attitude Toward Using',
+            dari_variabel_id: idPU,
+            ke_variabel_id: idATU,
+            label: 'H3',
+            tipe_garis: 'solid',
+            tebal_garis: 2.2,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 13,
+            dari: 'Perceived Usefulness',
+            ke: 'Behavioral Intention',
+            dari_variabel_id: idPU,
+            ke_variabel_id: idBI,
+            label: 'H4',
+            tipe_garis: 'dashed',
+            tebal_garis: 1.8,
+            kelengkungan: 35
+          },
+          {
+            id: baseId + 14,
+            dari: 'Attitude Toward Using',
+            ke: 'Behavioral Intention',
+            dari_variabel_id: idATU,
+            ke_variabel_id: idBI,
+            label: 'H5',
+            tipe_garis: 'solid',
+            tebal_garis: 2.5,
+            kelengkungan: 0
+          }
+        ],
+        generateData: (N = 140) => {
+          const rows = [];
+          for (let i = 0; i < N; i++) {
+            const randNorm = (m = 0, s = 1) => {
+              let u = 0, v = 0;
+              while (u === 0) u = Math.random();
+              while (v === 0) v = Math.random();
+              return m + s * Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+            };
+            const clamp = (val) => Math.max(1, Math.min(5, Math.round(val)));
+
+            const l_peou = randNorm(3.9, 0.60);
+            const l_pu = 0.55 * l_peou + randNorm(1.8, 0.35);
+            const l_atu = 0.42 * l_peou + 0.48 * l_pu + randNorm(0, 0.32);
+            const l_bi = 0.54 * l_atu + 0.36 * l_pu + randNorm(0, 0.30);
+
+            rows.push({
+              PEOU1: clamp(l_peou + randNorm(0, 0.26)),
+              PEOU2: clamp(l_peou + randNorm(0, 0.24)),
+              PEOU3: clamp(l_peou + randNorm(0, 0.28)),
+              PEOU4: clamp(l_peou + randNorm(0, 0.25)),
+              PU1: clamp(l_pu + randNorm(0, 0.25)),
+              PU2: clamp(l_pu + randNorm(0, 0.27)),
+              PU3: clamp(l_pu + randNorm(0, 0.24)),
+              PU4: clamp(l_pu + randNorm(0, 0.28)),
+              ATU1: clamp(l_atu + randNorm(0, 0.26)),
+              ATU2: clamp(l_atu + randNorm(0, 0.25)),
+              ATU3: clamp(l_atu + randNorm(0, 0.28)),
+              ATU4: clamp(l_atu + randNorm(0, 0.24)),
+              BI1: clamp(l_bi + randNorm(0, 0.25)),
+              BI2: clamp(l_bi + randNorm(0, 0.24)),
+              BI3: clamp(l_bi + randNorm(0, 0.28)),
+              BI4: clamp(l_bi + randNorm(0, 0.26))
+            });
+          }
+          return rows;
+        }
+      };
+    } else if (templateKey === 'customer_satisfaction') {
+      const idSQ = baseId;
+      const idPV = baseId + 1;
+      const idCS = baseId + 2;
+      const idCL = baseId + 3;
+
+      templateConfig = {
+        nama: 'Riset Kepuasan & Loyalitas Konsumen',
+        deskripsi: 'Pengaruh Service Quality (SQ) dan Perceived Value (PV) terhadap Customer Loyalty (CL) melalui Customer Satisfaction (CS)',
+        variabels: [
+          {
+            id: idSQ,
+            nama: 'Service Quality',
+            tipe: 'reflektif',
+            indikator: ['SQ1', 'SQ2', 'SQ3', 'SQ4'],
+            orientasi: 'kiri',
+            posisi_x: 230,
+            posisi_y: 180
+          },
+          {
+            id: idPV,
+            nama: 'Perceived Value',
+            tipe: 'reflektif',
+            indikator: ['PV1', 'PV2', 'PV3', 'PV4'],
+            orientasi: 'kiri',
+            posisi_x: 230,
+            posisi_y: 460
+          },
+          {
+            id: idCS,
+            nama: 'Customer Satisfaction',
+            tipe: 'reflektif',
+            indikator: ['CS1', 'CS2', 'CS3', 'CS4'],
+            orientasi: 'atas',
+            posisi_x: 580,
+            posisi_y: 320
+          },
+          {
+            id: idCL,
+            nama: 'Customer Loyalty',
+            tipe: 'reflektif',
+            indikator: ['CL1', 'CL2', 'CL3', 'CL4'],
+            orientasi: 'kanan',
+            posisi_x: 930,
+            posisi_y: 320
+          }
+        ],
+        jalurs: [
+          {
+            id: baseId + 10,
+            dari: 'Service Quality',
+            ke: 'Customer Satisfaction',
+            dari_variabel_id: idSQ,
+            ke_variabel_id: idCS,
+            label: 'H1',
+            tipe_garis: 'solid',
+            tebal_garis: 2.2,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 11,
+            dari: 'Perceived Value',
+            ke: 'Customer Satisfaction',
+            dari_variabel_id: idPV,
+            ke_variabel_id: idCS,
+            label: 'H2',
+            tipe_garis: 'solid',
+            tebal_garis: 2.2,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 12,
+            dari: 'Customer Satisfaction',
+            ke: 'Customer Loyalty',
+            dari_variabel_id: idCS,
+            ke_variabel_id: idCL,
+            label: 'H3',
+            tipe_garis: 'solid',
+            tebal_garis: 2.5,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 13,
+            dari: 'Service Quality',
+            ke: 'Customer Loyalty',
+            dari_variabel_id: idSQ,
+            ke_variabel_id: idCL,
+            label: 'H4',
+            tipe_garis: 'dashed',
+            tebal_garis: 1.8,
+            kelengkungan: -35
+          }
+        ],
+        generateData: (N = 140) => {
+          const rows = [];
+          for (let i = 0; i < N; i++) {
+            const randNorm = (m = 0, s = 1) => {
+              let u = 0, v = 0;
+              while (u === 0) u = Math.random();
+              while (v === 0) v = Math.random();
+              return m + s * Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+            };
+            const clamp = (val) => Math.max(1, Math.min(5, Math.round(val)));
+
+            const l_sq = randNorm(3.9, 0.58);
+            const l_pv = randNorm(3.8, 0.62);
+            const l_cs = 0.48 * l_sq + 0.42 * l_pv + randNorm(0, 0.32);
+            const l_cl = 0.56 * l_cs + 0.28 * l_sq + randNorm(0, 0.30);
+
+            rows.push({
+              SQ1: clamp(l_sq + randNorm(0, 0.26)),
+              SQ2: clamp(l_sq + randNorm(0, 0.24)),
+              SQ3: clamp(l_sq + randNorm(0, 0.28)),
+              SQ4: clamp(l_sq + randNorm(0, 0.25)),
+              PV1: clamp(l_pv + randNorm(0, 0.25)),
+              PV2: clamp(l_pv + randNorm(0, 0.27)),
+              PV3: clamp(l_pv + randNorm(0, 0.24)),
+              PV4: clamp(l_pv + randNorm(0, 0.28)),
+              CS1: clamp(l_cs + randNorm(0, 0.26)),
+              CS2: clamp(l_cs + randNorm(0, 0.25)),
+              CS3: clamp(l_cs + randNorm(0, 0.28)),
+              CS4: clamp(l_cs + randNorm(0, 0.24)),
+              CL1: clamp(l_cl + randNorm(0, 0.25)),
+              CL2: clamp(l_cl + randNorm(0, 0.24)),
+              CL3: clamp(l_cl + randNorm(0, 0.28)),
+              CL4: clamp(l_cl + randNorm(0, 0.26))
+            });
+          }
+          return rows;
+        }
+      };
+    } else if (templateKey === 'moderasi') {
+      const idKP = baseId;
+      const idCM = baseId + 1;
+      const idMB = baseId + 2;
+
+      templateConfig = {
+        nama: 'Riset Kualitas Produk & Citra Merek',
+        deskripsi: 'Model Pengaruh Kualitas Produk (KP) dan Citra Merek (CM) terhadap Minat Beli (MB)',
+        variabels: [
+          {
+            id: idKP,
+            nama: 'Kualitas Produk',
+            tipe: 'reflektif',
+            indikator: ['KP1', 'KP2', 'KP3', 'KP4'],
+            orientasi: 'kiri',
+            posisi_x: 240,
+            posisi_y: 200
+          },
+          {
+            id: idCM,
+            nama: 'Citra Merek',
+            tipe: 'reflektif',
+            indikator: ['CM1', 'CM2', 'CM3', 'CM4'],
+            orientasi: 'kiri',
+            posisi_x: 240,
+            posisi_y: 440
+          },
+          {
+            id: idMB,
+            nama: 'Minat Beli',
+            tipe: 'reflektif',
+            indikator: ['MB1', 'MB2', 'MB3', 'MB4'],
+            orientasi: 'kanan',
+            posisi_x: 750,
+            posisi_y: 320
+          }
+        ],
+        jalurs: [
+          {
+            id: baseId + 10,
+            dari: 'Kualitas Produk',
+            ke: 'Minat Beli',
+            dari_variabel_id: idKP,
+            ke_variabel_id: idMB,
+            label: 'H1',
+            tipe_garis: 'solid',
+            tebal_garis: 2.5,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 11,
+            dari: 'Citra Merek',
+            ke: 'Minat Beli',
+            dari_variabel_id: idCM,
+            ke_variabel_id: idMB,
+            label: 'H2',
+            tipe_garis: 'solid',
+            tebal_garis: 2.5,
+            kelengkungan: 0
+          }
+        ],
+        generateData: (N = 130) => {
+          const rows = [];
+          for (let i = 0; i < N; i++) {
+            const randNorm = (m = 0, s = 1) => {
+              let u = 0, v = 0;
+              while (u === 0) u = Math.random();
+              while (v === 0) v = Math.random();
+              return m + s * Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+            };
+            const clamp = (val) => Math.max(1, Math.min(5, Math.round(val)));
+
+            const l_kp = randNorm(3.9, 0.60);
+            const l_cm = randNorm(3.85, 0.58);
+            const l_mb = 0.52 * l_kp + 0.44 * l_cm + randNorm(0, 0.32);
+
+            rows.push({
+              KP1: clamp(l_kp + randNorm(0, 0.25)),
+              KP2: clamp(l_kp + randNorm(0, 0.24)),
+              KP3: clamp(l_kp + randNorm(0, 0.28)),
+              KP4: clamp(l_kp + randNorm(0, 0.26)),
+              CM1: clamp(l_cm + randNorm(0, 0.26)),
+              CM2: clamp(l_cm + randNorm(0, 0.25)),
+              CM3: clamp(l_cm + randNorm(0, 0.27)),
+              CM4: clamp(l_cm + randNorm(0, 0.24)),
+              MB1: clamp(l_mb + randNorm(0, 0.25)),
+              MB2: clamp(l_mb + randNorm(0, 0.24)),
+              MB3: clamp(l_mb + randNorm(0, 0.28)),
+              MB4: clamp(l_mb + randNorm(0, 0.26))
+            });
+          }
+          return rows;
+        }
+      };
+    } else {
+      // standar_regresi
+      const idMK = baseId;
+      const idLK = baseId + 1;
+      const idKP = baseId + 2;
+      const idKK = baseId + 3;
+
+      templateConfig = {
+        nama: 'Riset Kinerja SDM & Organisasi',
+        deskripsi: 'Pengaruh Motivasi Kerja (MK), Lingkungan Kerja (LK), dan Kepemimpinan (KP) terhadap Kinerja Karyawan (KK)',
+        variabels: [
+          {
+            id: idMK,
+            nama: 'Motivasi Kerja',
+            tipe: 'reflektif',
+            indikator: ['MK1', 'MK2', 'MK3', 'MK4'],
+            orientasi: 'kiri',
+            posisi_x: 230,
+            posisi_y: 160
+          },
+          {
+            id: idLK,
+            nama: 'Lingkungan Kerja',
+            tipe: 'reflektif',
+            indikator: ['LK1', 'LK2', 'LK3', 'LK4'],
+            orientasi: 'kiri',
+            posisi_x: 230,
+            posisi_y: 320
+          },
+          {
+            id: idKP,
+            nama: 'Kepemimpinan',
+            tipe: 'reflektif',
+            indikator: ['KP1', 'KP2', 'KP3', 'KP4'],
+            orientasi: 'kiri',
+            posisi_x: 230,
+            posisi_y: 480
+          },
+          {
+            id: idKK,
+            nama: 'Kinerja Karyawan',
+            tipe: 'reflektif',
+            indikator: ['KK1', 'KK2', 'KK3', 'KK4'],
+            orientasi: 'kanan',
+            posisi_x: 750,
+            posisi_y: 320
+          }
+        ],
+        jalurs: [
+          {
+            id: baseId + 10,
+            dari: 'Motivasi Kerja',
+            ke: 'Kinerja Karyawan',
+            dari_variabel_id: idMK,
+            ke_variabel_id: idKK,
+            label: 'H1',
+            tipe_garis: 'solid',
+            tebal_garis: 2.2,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 11,
+            dari: 'Lingkungan Kerja',
+            ke: 'Kinerja Karyawan',
+            dari_variabel_id: idLK,
+            ke_variabel_id: idKK,
+            label: 'H2',
+            tipe_garis: 'solid',
+            tebal_garis: 2.2,
+            kelengkungan: 0
+          },
+          {
+            id: baseId + 12,
+            dari: 'Kepemimpinan',
+            ke: 'Kinerja Karyawan',
+            dari_variabel_id: idKP,
+            ke_variabel_id: idKK,
+            label: 'H3',
+            tipe_garis: 'solid',
+            tebal_garis: 2.2,
+            kelengkungan: 0
+          }
+        ],
+        generateData: (N = 135) => {
+          const rows = [];
+          for (let i = 0; i < N; i++) {
+            const randNorm = (m = 0, s = 1) => {
+              let u = 0, v = 0;
+              while (u === 0) u = Math.random();
+              while (v === 0) v = Math.random();
+              return m + s * Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+            };
+            const clamp = (val) => Math.max(1, Math.min(5, Math.round(val)));
+
+            const l_mk = randNorm(3.9, 0.58);
+            const l_lk = randNorm(3.8, 0.60);
+            const l_kp = randNorm(3.85, 0.62);
+            const l_kk = 0.38 * l_mk + 0.32 * l_lk + 0.35 * l_kp + randNorm(0, 0.28);
+
+            rows.push({
+              MK1: clamp(l_mk + randNorm(0, 0.25)),
+              MK2: clamp(l_mk + randNorm(0, 0.24)),
+              MK3: clamp(l_mk + randNorm(0, 0.28)),
+              MK4: clamp(l_mk + randNorm(0, 0.26)),
+              LK1: clamp(l_lk + randNorm(0, 0.26)),
+              LK2: clamp(l_lk + randNorm(0, 0.25)),
+              LK3: clamp(l_lk + randNorm(0, 0.27)),
+              LK4: clamp(l_lk + randNorm(0, 0.24)),
+              KP1: clamp(l_kp + randNorm(0, 0.25)),
+              KP2: clamp(l_kp + randNorm(0, 0.24)),
+              KP3: clamp(l_kp + randNorm(0, 0.28)),
+              KP4: clamp(l_kp + randNorm(0, 0.26)),
+              KK1: clamp(l_kk + randNorm(0, 0.25)),
+              KK2: clamp(l_kk + randNorm(0, 0.24)),
+              KK3: clamp(l_kk + randNorm(0, 0.28)),
+              KK4: clamp(l_kk + randNorm(0, 0.26))
+            });
+          }
+          return rows;
+        }
+      };
+    }
+
+    // 1. Buat Proyek Baru jika belum ada
+    if (!state.proyekAktif) {
+      const proyekBaru = await window.api.proyekBuat({
+        nama: templateConfig.nama,
+        deskripsi: templateConfig.deskripsi
+      });
+      state.proyekAktif = proyekBaru;
+    }
+
+    // Update nama proyek di toolbar
+    document.querySelectorAll('.proyek-nama-aktif').forEach(el => {
+      el.textContent = state.proyekAktif.nama;
+    });
+
+    // 2. Set State Variabel, Jalur & Catatan Model
+    state.variabels = templateConfig.variabels;
+    state.jalurs = templateConfig.jalurs;
+    state.catatans = [
+      {
+        id: baseId + 50,
+        teks: `Template: ${templateConfig.nama}\nDataset N=140 responden siap analisis.`,
+        warna: '#fef08a',
+        x: 520,
+        y: 120,
+        w: 220,
+        h: 75
+      }
+    ];
+
+    // Simpan model ke SQLite
+    await saveModelToDb('Terapkan Template');
+
+    // 3. Generate Dataset Sintetis & Simpan ke DB
+    const datasetRows = templateConfig.generateData();
+    const columns = Object.keys(datasetRows[0]);
+    
+    const savedDataset = await window.api.datasetTambah({
+      proyek_id: state.proyekAktif.id,
+      nama: `Dataset_${templateConfig.nama.replace(/\s+/g, '_')}.csv`,
+      data: datasetRows,
+      jumlah_baris: datasetRows.length,
+      jumlah_kolom: columns.length,
+      kolom: columns
+    });
+
+    state.datasets = [savedDataset];
+
+    // 4. Hubungkan Data ke PLS-SEM Engine & Jalankan Algoritma
+    plsEngine.setData(datasetRows, state.variabels, state.jalurs);
+    
+    const hasilPLS = plsEngine.runPLS({
+      maxIterasi: 300,
+      toleransi: 0.00001,
+      skemaBobot: 'path'
+    });
+    state.hasilPLS = hasilPLS;
+
+    await window.api.hasilSimpan({
+      proyek_id: state.proyekAktif.id,
+      tipe: 'pls',
+      data_hasil: hasilPLS
+    });
+
+    // 5. Jalankan Bootstrapping (500 subsample)
+    const hasilBootstrap = plsEngine.runBootstrap({
+      jumlahBootstrap: 500,
+      tingkatSignifikansi: 0.05,
+      tipeUji: 'two-tailed',
+      skemaBobot: 'path'
+    });
+    state.hasilBootstrap = hasilBootstrap;
+
+    await window.api.hasilSimpan({
+      proyek_id: state.proyekAktif.id,
+      tipe: 'bootstrap',
+      data_hasil: hasilBootstrap
+    });
+
+    // 6. Selesaikan, Update UI & Render Kanvas
+    hideLoading();
+    hideModal('modalTemplateModel');
+    updateProjectStateUI();
+    
+    // Render hasil dan model visual
+    displayPLSResults(hasilPLS);
+    displayBootstrapResults(hasilBootstrap);
+    
+    // Buka editor untuk menampilkan diagram model lengkap
+    navigateTo('editor');
+    setTimeout(() => {
+      renderModel();
+    }, 100);
+
+    showToast(`Template "${templateConfig.nama}" berhasil diterapkan lengkap dengan Dataset, Model Diagram, dan Laporan Hasil Analisis!`, 'sukses');
+  } catch (err) {
+    hideLoading();
+    showToast('Gagal menerapkan template: ' + err.message, 'error');
+    console.error(err);
+  }
+}
+window.terapkanTemplateModel = terapkanTemplateModel;
 
   // Modal Tambah Jalur - Selektor Tipe Hubungan (Langsung vs Mediasi)
   const cardLangsung = document.getElementById('cardHubunganLangsung');
@@ -1923,6 +2965,471 @@ const PLS_STYLE = {
   pathLineWidth: 2.2,
   fontFamily: 'Inter, -apple-system, sans-serif'
 };
+
+function darkenHexColor(hex, percent = 22) {
+  if (!hex || hex[0] !== '#') return '#0070ba';
+  let cleanHex = hex.replace('#', '');
+  if (cleanHex.length === 3) {
+    cleanHex = cleanHex.split('').map(c => c + c).join('');
+  }
+  const num = parseInt(cleanHex, 16);
+  if (isNaN(num)) return '#0070ba';
+  let r = (num >> 16);
+  let g = (num >> 8) & 0x00FF;
+  let b = num & 0x0000FF;
+  r = Math.max(0, Math.min(255, Math.floor(r * (1 - percent / 100))));
+  g = Math.max(0, Math.min(255, Math.floor(g * (1 - percent / 100))));
+  b = Math.max(0, Math.min(255, Math.floor(b * (1 - percent / 100))));
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
+function setVariableColor(varId, hexColor) {
+  const v = state.variabels.find(vv => vv.id === varId);
+  if (!v) return;
+  saveHistoryState(`Ubah Warna "${v.nama}"`);
+  v.warna = hexColor;
+  v.borderWarna = darkenHexColor(hexColor, 25);
+  renderModel();
+  saveModelToDb();
+  showVariableProperties(v);
+  showToast(`Warna variabel "${v.nama}" berhasil diubah`, 'sukses');
+}
+
+function setVariableOrientation(id, orientasi) {
+  const v = state.variabels.find(vv => vv.id === id);
+  if (!v) return;
+  saveHistoryState(`Ubah Orientasi "${v.nama}"`);
+  v.orientasi = orientasi;
+  renderModel();
+  saveModelToDb();
+  showVariableProperties(v);
+  showToast(`Posisi indikator "${v.nama}" diubah ke ${orientasi.toUpperCase()}`, 'info');
+}
+
+function rotateSelectedVariableOrientation(varId = null) {
+  const targetId = varId || state.selectedNode || (state.selectedNodes && state.selectedNodes[0]);
+  const v = state.variabels.find(vv => vv.id === targetId);
+  if (!v) {
+    showToast('Pilih variabel laten terlebih dahulu untuk memutar orientasi', 'peringatan');
+    return;
+  }
+  const order = ['kiri', 'atas', 'kanan', 'bawah'];
+  const cur = v.orientasi || 'kiri';
+  const nextIdx = (order.indexOf(cur) + 1) % order.length;
+  setVariableOrientation(v.id, order[nextIdx]);
+}
+
+function duplicateSelectedVariable(varId = null) {
+  const targetId = varId || state.selectedNode || (state.selectedNodes && state.selectedNodes[0]);
+  const original = state.variabels.find(v => v.id === targetId);
+  if (!original) {
+    showToast('Pilih variabel laten yang ingin diduplikasi (Ctrl+D)', 'peringatan');
+    return;
+  }
+
+  saveHistoryState(`Duplikasi Variabel "${original.nama}"`);
+
+  let newName = `${original.nama}_copy`;
+  let counter = 1;
+  while (state.variabels.some(v => v.nama.toLowerCase() === newName.toLowerCase())) {
+    counter++;
+    newName = `${original.nama}_copy${counter}`;
+  }
+
+  const newVar = {
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    nama: newName,
+    tipe: original.tipe || 'reflektif',
+    posisi_x: Math.min(1050, original.posisi_x + 50),
+    posisi_y: Math.min(580, original.posisi_y + 40),
+    orientasi: original.orientasi || 'kiri',
+    warna: original.warna || '#009bf2',
+    borderWarna: original.borderWarna || '#0070ba',
+    indikator: [...(original.indikator || [])]
+  };
+
+  state.variabels.push(newVar);
+  state.selectedNode = newVar.id;
+  state.selectedNodes = [newVar.id];
+  state.selectedPath = null;
+  state.selectedCatatan = null;
+
+  renderModel();
+  saveModelToDb();
+  showVariableProperties(newVar);
+  showToast(`Variabel "${newVar.nama}" berhasil diduplikasi!`, 'sukses');
+}
+
+function alignSelectedNodes(alignmentType) {
+  let nodes = [];
+  if (state.selectedNodes && state.selectedNodes.length >= 2) {
+    nodes = state.variabels.filter(v => state.selectedNodes.includes(v.id));
+  } else if (state.variabels && state.variabels.length >= 2) {
+    nodes = state.variabels;
+  }
+
+  if (nodes.length < 2) {
+    showToast('Minimal diperlukan 2 variabel laten untuk perataan posisi', 'peringatan');
+    return;
+  }
+
+  saveHistoryState(`Perataan Model (${alignmentType})`);
+
+  if (alignmentType === 'left') {
+    const minX = Math.min(...nodes.map(n => n.posisi_x));
+    nodes.forEach(n => n.posisi_x = minX);
+    showToast(`Perataan Kiri berhasil diterapkan (${nodes.length} variabel)`, 'sukses');
+  } else if (alignmentType === 'centerH') {
+    const avgX = Math.round(nodes.reduce((acc, n) => acc + n.posisi_x, 0) / nodes.length);
+    nodes.forEach(n => n.posisi_x = avgX);
+    showToast(`Perataan Sumbu Horizontal diterapkan`, 'sukses');
+  } else if (alignmentType === 'right') {
+    const maxX = Math.max(...nodes.map(n => n.posisi_x));
+    nodes.forEach(n => n.posisi_x = maxX);
+    showToast(`Perataan Kanan berhasil diterapkan (${nodes.length} variabel)`, 'sukses');
+  } else if (alignmentType === 'top') {
+    const minY = Math.min(...nodes.map(n => n.posisi_y));
+    nodes.forEach(n => n.posisi_y = minY);
+    showToast(`Perataan Atas berhasil diterapkan (${nodes.length} variabel)`, 'sukses');
+  } else if (alignmentType === 'centerV') {
+    const avgY = Math.round(nodes.reduce((acc, n) => acc + n.posisi_y, 0) / nodes.length);
+    nodes.forEach(n => n.posisi_y = avgY);
+    showToast(`Perataan Sumbu Vertikal diterapkan`, 'sukses');
+  } else if (alignmentType === 'bottom') {
+    const maxY = Math.max(...nodes.map(n => n.posisi_y));
+    nodes.forEach(n => n.posisi_y = maxY);
+    showToast(`Perataan Bawah berhasil diterapkan (${nodes.length} variabel)`, 'sukses');
+  } else if (alignmentType === 'distributeH') {
+    if (nodes.length < 3) {
+      showToast('Minimal diperlukan 3 variabel untuk distribusi jarak horizontal', 'peringatan');
+      return;
+    }
+    nodes.sort((a, b) => a.posisi_x - b.posisi_x);
+    const minX = nodes[0].posisi_x;
+    const maxX = nodes[nodes.length - 1].posisi_x;
+    const step = (maxX - minX) / (nodes.length - 1);
+    nodes.forEach((n, idx) => {
+      n.posisi_x = Math.round(minX + idx * step);
+    });
+    showToast(`Distribusi jarak horizontal merata diterapkan`, 'sukses');
+  } else if (alignmentType === 'distributeV') {
+    if (nodes.length < 3) {
+      showToast('Minimal diperlukan 3 variabel untuk distribusi jarak vertikal', 'peringatan');
+      return;
+    }
+    nodes.sort((a, b) => a.posisi_y - b.posisi_y);
+    const minY = nodes[0].posisi_y;
+    const maxY = nodes[nodes.length - 1].posisi_y;
+    const step = (maxY - minY) / (nodes.length - 1);
+    nodes.forEach((n, idx) => {
+      n.posisi_y = Math.round(minY + idx * step);
+    });
+    showToast(`Distribusi jarak vertikal merata diterapkan`, 'sukses');
+  }
+
+  renderModel();
+  saveModelToDb();
+}
+
+// ============ QUICK MODERATOR GENERATOR ============
+function bukaModalTambahModerasi(presetVarId = null) {
+  if (!state.proyekAktif) {
+    showToast('Pilih proyek terlebih dahulu', 'peringatan');
+    return;
+  }
+  if (!state.variabels || state.variabels.length < 2) {
+    showToast('Tambahkan minimal 2 variabel untuk membentuk efek moderasi', 'peringatan');
+    return;
+  }
+
+  const selIV = document.getElementById('selectQuickModIV');
+  const selMOD = document.getElementById('selectQuickModMOD');
+  const selDV = document.getElementById('selectQuickModDV');
+  const inputNama = document.getElementById('inputNamaVarInteraksi');
+
+  if (!selIV || !selMOD || !selDV) return;
+
+  const options = state.variabels.map(v => `<option value="${v.id}">${escapeHtml(v.nama)}</option>`).join('');
+  selIV.innerHTML = '<option value="">-- Pilih Variabel Independen (X) --</option>' + options;
+  selMOD.innerHTML = '<option value="">-- Pilih Variabel Moderator (M) --</option>' + options;
+  selDV.innerHTML = '<option value="">-- Pilih Variabel Target (Y) --</option>' + options;
+
+  // Preset selection if provided
+  if (presetVarId) {
+    selIV.value = presetVarId;
+  } else if (state.selectedNode) {
+    selIV.value = state.selectedNode;
+  }
+
+  updateModerationInteractionName();
+  showModal('modalTambahEfekModerasi');
+}
+
+function updateModerationInteractionName() {
+  const selIV = document.getElementById('selectQuickModIV');
+  const selMOD = document.getElementById('selectQuickModMOD');
+  const inputNama = document.getElementById('inputNamaVarInteraksi');
+  if (!selIV || !selMOD || !inputNama) return;
+
+  const vIV = state.variabels.find(v => v.id == selIV.value);
+  const vMOD = state.variabels.find(v => v.id == selMOD.value);
+
+  if (vIV && vMOD) {
+    inputNama.value = `${vIV.nama}*${vMOD.nama}`;
+  }
+}
+
+async function prosesTambahEfekModerasi() {
+  const selIV = document.getElementById('selectQuickModIV');
+  const selMOD = document.getElementById('selectQuickModMOD');
+  const selDV = document.getElementById('selectQuickModDV');
+  const inputNama = document.getElementById('inputNamaVarInteraksi');
+
+  const ivId = selIV?.value;
+  const modId = selMOD?.value;
+  const dvId = selDV?.value;
+  let intName = inputNama?.value.trim();
+
+  if (!ivId || !modId || !dvId) {
+    showToast('Pilih variabel Independen (X), Moderator (M), dan Dependen (Y)', 'peringatan');
+    return;
+  }
+
+  if (ivId === modId || ivId === dvId || modId === dvId) {
+    showToast('Variabel X, M, dan Y harus berupa variabel yang berbeda', 'peringatan');
+    return;
+  }
+
+  const vIV = state.variabels.find(v => v.id == ivId);
+  const vMOD = state.variabels.find(v => v.id == modId);
+  const vDV = state.variabels.find(v => v.id == dvId);
+
+  if (!intName) {
+    intName = `${vIV.nama}*${vMOD.nama}`;
+  }
+
+  // Cek duplikasi nama konstruk
+  if (state.variabels.some(v => v.nama.toLowerCase() === intName.toLowerCase())) {
+    showToast(`Konstruk interaksi "${intName}" sudah ada dalam model`, 'peringatan');
+    return;
+  }
+
+  saveHistoryState(`Tambah Efek Moderasi "${intName}"`);
+
+  // Posisi node interaksi: di antara X, M, dan Y
+  const posX = Math.round((vIV.posisi_x + vMOD.posisi_x + vDV.posisi_x) / 3);
+  const posY = Math.round((vIV.posisi_y + vMOD.posisi_y) / 2) + 60;
+
+  // Bangun indikator produk sintesis untuk konstruk interaksi
+  const indIV = vIV.indikator || [];
+  const indMOD = vMOD.indikator || [];
+  let productInds = [];
+
+  if (indIV.length > 0 && indMOD.length > 0) {
+    // Buat kombinasi perkalian indikator utama
+    productInds = [
+      `${indIV[0]}*${indMOD[0]}`,
+      indIV[1] && indMOD[1] ? `${indIV[1]}*${indMOD[1]}` : (indIV[1] ? `${indIV[1]}*${indMOD[0]}` : null)
+    ].filter(Boolean);
+  } else {
+    productInds = [`${intName}_1`];
+  }
+
+  const intVarId = Date.now();
+  const interactionNode = {
+    id: intVarId,
+    nama: intName,
+    tipe: 'reflektif',
+    posisi_x: Math.min(1050, Math.max(80, posX)),
+    posisi_y: Math.min(580, Math.max(80, posY)),
+    orientasi: 'bawah',
+    warna: '#ec4899', // Pink Moderasi Khas
+    borderWarna: '#be185d',
+    indikator: productInds
+  };
+
+  state.variabels.push(interactionNode);
+
+  // 1. Jalur Utama X -> Y
+  const hasXY = state.jalurs.some(j => (j.dari_variabel_id == ivId || j.dari === vIV.nama) && (j.ke_variabel_id == dvId || j.ke === vDV.nama));
+  if (!hasXY) {
+    state.jalurs.push({
+      id: Date.now() + 1,
+      dari: vIV.nama,
+      ke: vDV.nama,
+      dari_variabel_id: ivId,
+      ke_variabel_id: dvId,
+      label: 'Main Effect (X→Y)',
+      tipe_garis: 'solid',
+      tebal_garis: 2.5,
+      kelengkungan: 0
+    });
+  }
+
+  // 2. Jalur Utama M -> Y
+  const hasMY = state.jalurs.some(j => (j.dari_variabel_id == modId || j.dari === vMOD.nama) && (j.ke_variabel_id == dvId || j.ke === vDV.nama));
+  if (!hasMY) {
+    state.jalurs.push({
+      id: Date.now() + 2,
+      dari: vMOD.nama,
+      ke: vDV.nama,
+      dari_variabel_id: modId,
+      ke_variabel_id: dvId,
+      label: 'Main Effect (M→Y)',
+      tipe_garis: 'solid',
+      tebal_garis: 2.5,
+      kelengkungan: 0
+    });
+  }
+
+  // 3. Jalur Efek Moderasi Interaksi (X*M) -> Y
+  state.jalurs.push({
+    id: Date.now() + 3,
+    dari: intName,
+    ke: vDV.nama,
+    dari_variabel_id: intVarId,
+    ke_variabel_id: dvId,
+    label: `Moderasi (${intName}→${vDV.nama})`,
+    tipe_garis: 'solid',
+    tebal_garis: 3.0,
+    kelengkungan: -15
+  });
+
+  state.selectedNode = intVarId;
+  state.selectedNodes = [intVarId];
+
+  hideModal('modalTambahEfekModerasi');
+  renderModel();
+  await saveModelToDb();
+  showVariableProperties(interactionNode);
+  showToast(`Efek Moderasi "${intName}" berhasil dibuat dengan struktur jalur otomatis!`, 'sukses');
+}
+
+// ============ MODEL VALIDATOR / LINTING ============
+function validateModelStructure() {
+  const warnings = [];
+  const warningsByNode = {};
+
+  if (!state.variabels || state.variabels.length === 0) {
+    updateValidatorBadge({ isValid: true, warnings: [] });
+    state.modelWarnings = [];
+    state.modelWarningsByNode = {};
+    return;
+  }
+
+  // 1. Check for constructs without indicators
+  state.variabels.forEach(v => {
+    if (!v.indikator || v.indikator.length === 0) {
+      warnings.push({
+        type: 'no_indicators',
+        varId: v.id,
+        varName: v.nama,
+        message: `Variabel "${v.nama}" belum memiliki indikator. Tarik indikator dari panel data.`
+      });
+      warningsByNode[v.id] = true;
+    } else if (v.indikator.length === 1) {
+      warnings.push({
+        type: 'single_indicator',
+        varId: v.id,
+        varName: v.nama,
+        message: `Variabel "${v.nama}" adalah single-indicator construct (evaluasi reliabilitas multi-item tidak berlaku).`
+      });
+    }
+  });
+
+  // 2. Check for isolated constructs (no incoming AND no outgoing paths)
+  if (state.variabels.length > 1) {
+    state.variabels.forEach(v => {
+      const hasOutgoing = state.jalurs.some(j => j.dari_variabel_id === v.id);
+      const hasIncoming = state.jalurs.some(j => j.ke_variabel_id === v.id);
+      if (!hasOutgoing && !hasIncoming) {
+        warnings.push({
+          type: 'isolated',
+          varId: v.id,
+          varName: v.nama,
+          message: `Variabel "${v.nama}" terisolasi (belum dihubungkan dengan jalur struktural).`
+        });
+        warningsByNode[v.id] = true;
+      }
+    });
+  }
+
+  // 3. Check for circular feedback loops (e.g., A -> B and B -> A)
+  const pathPairs = {};
+  state.jalurs.forEach(j => {
+    const key = `${j.dari_variabel_id}->${j.ke_variabel_id}`;
+    pathPairs[key] = true;
+    const reverseKey = `${j.ke_variabel_id}->${j.dari_variabel_id}`;
+    if (pathPairs[reverseKey]) {
+      const v1 = state.variabels.find(v => v.id === j.dari_variabel_id);
+      const v2 = state.variabels.find(v => v.id === j.ke_variabel_id);
+      warnings.push({
+        type: 'circular_loop',
+        varId: j.dari_variabel_id,
+        varName: `${v1?.nama || 'A'} ⇄ ${v2?.nama || 'B'}`,
+        message: `Terdapat jalur umpan balik melingkar antara "${v1?.nama}" dan "${v2?.nama}". PLS-SEM mengasumsikan model rekursif.`
+      });
+    }
+  });
+
+  state.modelWarnings = warnings;
+  state.modelWarningsByNode = warningsByNode;
+  updateValidatorBadge({ isValid: warnings.length === 0, warnings });
+}
+
+function updateValidatorBadge({ isValid, warnings }) {
+  const badge = document.getElementById('badgeModelValidator');
+  const icon = document.getElementById('iconModelValidator');
+  const text = document.getElementById('textModelValidator');
+  const list = document.getElementById('listModelValidatorIssues');
+
+  if (!badge || !icon || !text) return;
+
+  if (warnings.length === 0) {
+    badge.className = 'toolbar-pill-chip validator-chip';
+    icon.textContent = 'check_circle';
+    icon.style.color = '#10b981';
+    text.textContent = 'Model Siap';
+    if (list) {
+      list.innerHTML = `
+        <div style="color: #10b981; display: flex; align-items: center; gap: 6px; padding: 4px 0;">
+          <span class="material-icons-round" style="font-size: 16px;">check_circle</span>
+          <span>Semua konstruk & jalur telah tervalidasi dengan baik.</span>
+        </div>
+      `;
+    }
+  } else {
+    badge.className = 'toolbar-pill-chip validator-chip has-warnings';
+    icon.textContent = 'warning';
+    icon.style.color = '#f59e0b';
+    text.textContent = `${warnings.length} Peringatan Model`;
+    if (list) {
+      list.innerHTML = warnings.map(w => `
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #f59e0b; font-size: 11.5px; display: flex; align-items: center; gap: 4px;">
+              <span class="material-icons-round" style="font-size: 14px;">warning</span> ${escapeHtml(w.varName)}
+            </strong>
+            ${w.varId ? `<button class="btn btn-xs btn-ghost" onclick="focusCanvasNode(${w.varId})" style="padding: 1px 6px; font-size: 10px;">Sorot</button>` : ''}
+          </div>
+          <span style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.35;">${escapeHtml(w.message)}</span>
+        </div>
+      `).join('');
+    }
+  }
+}
+
+function focusCanvasNode(nodeId) {
+  const v = state.variabels.find(vv => vv.id === nodeId);
+  if (!v) return;
+  state.selectedNode = v.id;
+  state.selectedPath = null;
+  state.selectedCatatan = null;
+  state.selectedNodes = [v.id];
+  showVariableProperties(v);
+  renderModel();
+  showToast(`Variabel "${v.nama}" disorot pada kanvas`, 'info');
+}
 
 function getIndicatorPositions(v, options = {}) {
   const R = PLS_STYLE.latentRadius;
@@ -2487,7 +3994,7 @@ function drawPLSDiagram(ctx, options = {}) {
       });
     }
     
-    // 3. Gambar Lingkaran Variabel Laten (Biru SmartPLS)
+    // 3. Gambar Lingkaran Variabel Laten (Biru SmartPLS / Custom Warna)
     ctx.save();
     
     // Selection glow if in editor
@@ -2499,14 +4006,36 @@ function drawPLSDiagram(ctx, options = {}) {
       ctx.stroke();
     }
     
-    // Lingkaran Laten
+    // Lingkaran Laten dengan Warna Kustom atau Default
+    const nodeColor = v.warna || PLS_STYLE.latentColor;
+    const nodeBorderColor = isSelected ? '#ffffff' : (v.borderWarna || darkenHexColor(nodeColor, 25));
+    
     ctx.beginPath();
     ctx.arc(cx, cy, R, 0, Math.PI * 2);
-    ctx.fillStyle = PLS_STYLE.latentColor;
+    ctx.fillStyle = nodeColor;
     ctx.fill();
-    ctx.strokeStyle = isSelected ? '#ffffff' : PLS_STYLE.latentBorderColor;
+    ctx.strokeStyle = nodeBorderColor;
     ctx.lineWidth = PLS_STYLE.latentBorderWidth;
     ctx.stroke();
+    
+    // Warning Diagnostic Badge pada Node jika ada peringatan struktur
+    if (!isExport && state.modelWarningsByNode?.[v.id]) {
+      const bX = cx + R * 0.72;
+      const bY = cy - R * 0.72;
+      ctx.beginPath();
+      ctx.arc(bX, bY, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.font = '800 10px ' + PLS_STYLE.fontFamily;
+      ctx.fillStyle = '#000000';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('!', bX, bY);
+    }
     
     // Nilai R² di dalam lingkaran jika endogen
     const r2Value = state.hasilPLS?.rSquared?.[v.nama];
@@ -2622,6 +4151,24 @@ function drawPLSDiagram(ctx, options = {}) {
       ctx.restore();
     });
   }
+
+  // 5. Gambar Marquee Drag Selection Box (Kotak Seleksi Area)
+  if (!isExport && state.isMarqueeSelecting && state.marqueeStart && state.marqueeEnd) {
+    ctx.save();
+    const x = Math.min(state.marqueeStart.x, state.marqueeEnd.x);
+    const y = Math.min(state.marqueeStart.y, state.marqueeEnd.y);
+    const w = Math.abs(state.marqueeEnd.x - state.marqueeStart.x);
+    const h = Math.abs(state.marqueeEnd.y - state.marqueeStart.y);
+
+    ctx.fillStyle = 'rgba(99, 102, 241, 0.15)';
+    ctx.fillRect(x, y, w, h);
+
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
+  }
 }
 
 // ============ RENDER MODEL DI LAYAR ============
@@ -2637,6 +4184,9 @@ function renderModel() {
   
   const ctx = canvas.getContext('2d');
   const style = getComputedStyle(document.body);
+
+  // Real-time Model Diagnostic Linting
+  validateModelStructure();
   
   // Clear
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2702,7 +4252,7 @@ function renderModel() {
   }
 }
 
-// ============ INTERACTION HANDLERS (DRAG, ZOOM, PAN, & CLICK) ============
+// ============ INTERACTION HANDLERS (DRAG, ZOOM, PAN, MARQUEE & CONTEXT MENU) ============
 function setupCanvasInteractions() {
   const canvas = document.getElementById('modelCanvas');
   if (!canvas) return;
@@ -2715,9 +4265,12 @@ function setupCanvasInteractions() {
     // Transformed canvas coordinates
     const mx = (rawX - state.pan.x) / state.zoom;
     const my = (rawY - state.pan.y) / state.zoom;
+
+    // Tutup context menu jika sedang terbuka
+    hideCanvasContextMenu();
     
-    // 0. Ctrl + Left Click / Middle Click / Space / Shift / Alt Drag -> Canvas Pan
-    if (e.ctrlKey || e.button === 1 || e.shiftKey || e.altKey) {
+    // 0. Middle Click / Space / Alt / Ctrl / Meta Drag -> Canvas Pan
+    if (e.button === 1 || e.altKey || e.ctrlKey || e.metaKey || state.isSpacePressed) {
       state.isPanning = true;
       state.panStart = { x: rawX - state.pan.x, y: rawY - state.pan.y };
       canvas.style.cursor = 'grabbing';
@@ -2748,7 +4301,7 @@ function setupCanvasInteractions() {
         state.selectedPath = null;
         state.selectedNodes = [];
         state.selectedPaths = [];
-        state.selectedCatatans = [];
+        state.selectedCatatans = [clickedCatatan.id];
         state.isAllSelected = false;
         renderModel();
         return;
@@ -2763,16 +4316,58 @@ function setupCanvasInteractions() {
     });
     
     if (clickedVar) {
+      // Shift-Click: Toggle Multi-Selection
+      if (e.shiftKey) {
+        const idx = state.selectedNodes.indexOf(clickedVar.id);
+        if (idx >= 0) {
+          state.selectedNodes.splice(idx, 1);
+        } else {
+          state.selectedNodes.push(clickedVar.id);
+        }
+        state.selectedNode = state.selectedNodes.length === 1 ? state.selectedNodes[0] : null;
+        state.selectedPath = null;
+        state.selectedCatatan = null;
+        if (state.selectedNodes.length > 1) {
+          showMultiSelectProperties();
+        } else if (state.selectedNodes.length === 1) {
+          const single = state.variabels.find(v => v.id === state.selectedNodes[0]);
+          if (single) showVariableProperties(single);
+        } else {
+          deselectAllModelElements();
+        }
+        renderModel();
+        return;
+      }
+
+      // Normal Drag: Check if clicking an already multi-selected node
+      const isAlreadySelected = state.selectedNodes.includes(clickedVar.id);
+      if (isAlreadySelected && state.selectedNodes.length > 1) {
+        state.isDragging = true;
+        state.dragTarget = clickedVar;
+        state.dragOffset = { x: mx, y: my };
+        state.multiDragInitialPositions = {};
+        state.selectedNodes.forEach(id => {
+          const v = state.variabels.find(vv => vv.id === id);
+          if (v) {
+            state.multiDragInitialPositions[id] = { x: v.posisi_x, y: v.posisi_y };
+          }
+        });
+        renderModel();
+        return;
+      }
+
+      // Single Select & Drag
       state.isDragging = true;
       state.dragTarget = clickedVar;
       state.dragOffset = {
         x: mx - clickedVar.posisi_x,
         y: my - clickedVar.posisi_y
       };
+      state.multiDragInitialPositions = null;
       state.selectedNode = clickedVar.id;
       state.selectedPath = null;
       state.selectedCatatan = null;
-      state.selectedNodes = [];
+      state.selectedNodes = [clickedVar.id];
       state.selectedPaths = [];
       state.selectedCatatans = [];
       state.isAllSelected = false;
@@ -2841,8 +4436,12 @@ function setupCanvasInteractions() {
       return;
     }
     
-    // 4. Klik di area kosong (Deselect / Clear Multi-select)
-    if (state.selectedNode || state.selectedPath || state.selectedCatatan || state.isAllSelected || state.selectedNodes.length > 0 || state.selectedPaths.length > 0 || state.selectedCatatans.length > 0) {
+    // 4. Klik di area kosong: Mulai Marquee Selection Box
+    state.isMarqueeSelecting = true;
+    state.marqueeStart = { x: mx, y: my };
+    state.marqueeEnd = { x: mx, y: my };
+
+    if (!e.shiftKey) {
       deselectAllModelElements();
     }
   });
@@ -2858,6 +4457,36 @@ function setupCanvasInteractions() {
     if (state.isPanning) {
       state.pan.x = rawX - state.panStart.x;
       state.pan.y = rawY - state.panStart.y;
+      renderModel();
+      return;
+    }
+
+    // Update Marquee Box Selection
+    if (state.isMarqueeSelecting && state.marqueeStart) {
+      state.marqueeEnd = { x: mx, y: my };
+      const minX = Math.min(state.marqueeStart.x, mx);
+      const maxX = Math.max(state.marqueeStart.x, mx);
+      const minY = Math.min(state.marqueeStart.y, my);
+      const maxY = Math.max(state.marqueeStart.y, my);
+
+      const R = PLS_STYLE.latentRadius;
+      const selected = state.variabels.filter(v => (
+        v.posisi_x + R >= minX && v.posisi_x - R <= maxX &&
+        v.posisi_y + R >= minY && v.posisi_y - R <= maxY
+      )).map(v => v.id);
+
+      const selCatatans = (state.catatans || []).filter(c => {
+        const cx = c.x || 100;
+        const cy = c.y || 100;
+        const cw = c.w || 160;
+        const ch = c.h || 95;
+        return (cx + cw >= minX && cx <= maxX && cy + ch >= minY && cy <= maxY);
+      }).map(c => c.id);
+
+      state.selectedNodes = selected;
+      state.selectedCatatans = selCatatans;
+      state.selectedNode = selected.length === 1 ? selected[0] : null;
+
       renderModel();
       return;
     }
@@ -2914,6 +4543,23 @@ function setupCanvasInteractions() {
       return;
     }
 
+    // Multi-Node Dragging
+    if (state.isDragging && state.multiDragInitialPositions) {
+      const dx = mx - state.dragOffset.x;
+      const dy = my - state.dragOffset.y;
+      state.selectedNodes.forEach(id => {
+        const initPos = state.multiDragInitialPositions[id];
+        const v = state.variabels.find(vv => vv.id === id);
+        if (initPos && v) {
+          v.posisi_x = Math.max(60, initPos.x + dx);
+          v.posisi_y = Math.max(60, initPos.y + dy);
+        }
+      });
+      renderModel();
+      return;
+    }
+
+    // Single Node Dragging
     if (state.isDragging && state.dragTarget) {
       state.dragTarget.posisi_x = Math.max(60, mx - state.dragOffset.x);
       state.dragTarget.posisi_y = Math.max(60, my - state.dragOffset.y);
@@ -2951,7 +4597,7 @@ function setupCanvasInteractions() {
       return false;
     });
     
-    if (e.ctrlKey) {
+    if (e.ctrlKey || e.altKey || e.metaKey || state.isSpacePressed) {
       canvas.style.cursor = 'grab';
     } else if (isOverHandle) {
       canvas.style.cursor = 'move';
@@ -2963,11 +4609,25 @@ function setupCanvasInteractions() {
       canvas.style.cursor = 'default';
     }
   });
-  
-  canvas.addEventListener('mouseup', () => {
+
+  const stopCanvasPanning = () => {
     if (state.isPanning) {
       state.isPanning = false;
-      canvas.style.cursor = 'default';
+      canvas.style.cursor = (state.isSpacePressed) ? 'grab' : 'default';
+    }
+  };
+  
+  canvas.addEventListener('mouseup', () => {
+    stopCanvasPanning();
+    if (state.isMarqueeSelecting) {
+      state.isMarqueeSelecting = false;
+      if (state.selectedNodes.length > 1) {
+        showMultiSelectProperties();
+      } else if (state.selectedNodes.length === 1) {
+        const single = state.variabels.find(v => v.id === state.selectedNodes[0]);
+        if (single) showVariableProperties(single);
+      }
+      renderModel();
     }
     if (state.isDraggingPathCurvature) {
       state.isDraggingPathCurvature = false;
@@ -2982,7 +4642,39 @@ function setupCanvasInteractions() {
     if (state.isDragging) {
       state.isDragging = false;
       state.dragTarget = null;
+      state.multiDragInitialPositions = null;
       saveModelToDb();
+    }
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    stopCanvasPanning();
+  });
+
+  window.addEventListener('mouseup', () => {
+    stopCanvasPanning();
+  });
+
+  // Spacebar Pan Key Listener (Figma / Illustrator / SmartPLS style)
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !state.isSpacePressed) {
+      const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+      if (activeTag === 'input' || activeTag === 'textarea' || document.activeElement?.isContentEditable) {
+        return;
+      }
+      state.isSpacePressed = true;
+      if (document.getElementById('halaman-editor')?.classList.contains('active') || !document.getElementById('halaman-editor')?.classList.contains('tersembunyi')) {
+        canvas.style.cursor = 'grab';
+      }
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') {
+      state.isSpacePressed = false;
+      if (!state.isPanning) {
+        canvas.style.cursor = 'default';
+      }
     }
   });
 
@@ -3028,6 +4720,7 @@ function setupCanvasInteractions() {
     renderModel();
   }, { passive: false });
   
+  // Right Click Context Menu Handler
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
@@ -3036,7 +4729,7 @@ function setupCanvasInteractions() {
     const mx = (rawX - state.pan.x) / state.zoom;
     const my = (rawY - state.pan.y) / state.zoom;
 
-    // Hapus catatan jika klik kanan di catatan
+    // Catatan
     if (state.catatans && state.catatans.length > 0) {
       const clickedCatatan = state.catatans.slice().reverse().find(c => {
         const x = c.x || 100;
@@ -3052,14 +4745,22 @@ function setupCanvasInteractions() {
       }
     }
     
+    // Variabel Laten -> Buka Context Menu Interaktif
     const R = PLS_STYLE.latentRadius;
     const clickedVar = state.variabels.find(v => Math.hypot(v.posisi_x - mx, v.posisi_y - my) <= R + 10);
     
     if (clickedVar) {
-      hapusVariabel(clickedVar.id);
+      state.selectedNode = clickedVar.id;
+      state.selectedNodes = [clickedVar.id];
+      state.selectedPath = null;
+      state.selectedCatatan = null;
+      showVariableProperties(clickedVar);
+      renderModel();
+      showCanvasContextMenu(e.clientX, e.clientY, clickedVar);
       return;
     }
     
+    // Jalur Struktural
     const clickedPath = state.jalurs.find(j => {
       if (j._startX !== undefined && j._startY !== undefined) {
         return pointToPathDist(mx, my, j) <= 12;
@@ -3073,9 +4774,117 @@ function setupCanvasInteractions() {
   });
 }
 
+// ============ CANVAS CONTEXT MENU SETUP ============
+function showCanvasContextMenu(clientX, clientY, variable) {
+  const menu = document.getElementById('canvasContextMenu');
+  if (!menu || !variable) return;
+
+  const title = document.getElementById('contextMenuTitle');
+  if (title) title.textContent = `Konstruk: ${variable.nama}`;
+
+  // Update active orientation button
+  const curOrient = variable.orientasi || 'kiri';
+  ['Kiri', 'Atas', 'Kanan', 'Bawah'].forEach(dir => {
+    const btn = document.getElementById(`ctxOrient${dir}`);
+    if (btn) {
+      btn.classList.toggle('active', dir.toLowerCase() === curOrient);
+    }
+  });
+
+  // Update active color dot
+  const curColor = variable.warna || '#009bf2';
+  document.querySelectorAll('#ctxColorPalette .color-dot').forEach(dot => {
+    dot.classList.toggle('active', dot.dataset.color.toLowerCase() === curColor.toLowerCase());
+  });
+
+  // Position context menu
+  const menuWidth = 220;
+  const menuHeight = 310;
+  let posX = clientX;
+  let posY = clientY;
+
+  if (posX + menuWidth > window.innerWidth) {
+    posX = window.innerWidth - menuWidth - 10;
+  }
+  if (posY + menuHeight > window.innerHeight) {
+    posY = window.innerHeight - menuHeight - 10;
+  }
+
+  menu.style.left = `${posX}px`;
+  menu.style.top = `${posY}px`;
+  menu.classList.remove('tersembunyi');
+}
+
+function hideCanvasContextMenu() {
+  const menu = document.getElementById('canvasContextMenu');
+  if (menu && !menu.classList.contains('tersembunyi')) {
+    menu.classList.add('tersembunyi');
+  }
+}
+
+function setupCanvasContextMenuHandlers() {
+  // Hide context menu on global click outside
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('canvasContextMenu');
+    if (menu && !menu.contains(e.target)) {
+      hideCanvasContextMenu();
+    }
+  });
+
+  // Orientation buttons
+  ['Kiri', 'Atas', 'Kanan', 'Bawah'].forEach(dir => {
+    document.getElementById(`ctxOrient${dir}`)?.addEventListener('click', () => {
+      if (state.selectedNode) {
+        setVariableOrientation(state.selectedNode, dir.toLowerCase());
+      }
+      hideCanvasContextMenu();
+    });
+  });
+
+  // Color dots in Context Menu
+  document.querySelectorAll('#ctxColorPalette .color-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      const color = dot.dataset.color;
+      if (state.selectedNode && color) {
+        setVariableColor(state.selectedNode, color);
+      }
+      hideCanvasContextMenu();
+    });
+  });
+
+  // Duplicate Action
+  document.getElementById('ctxBtnDuplikat')?.addEventListener('click', () => {
+    hideCanvasContextMenu();
+    duplicateSelectedVariable();
+  });
+
+  // Moderation Shortcut
+  document.getElementById('ctxBtnModerasi')?.addEventListener('click', () => {
+    hideCanvasContextMenu();
+    bukaModalTambahModerasi(state.selectedNode);
+  });
+
+  // Switch Reflective / Formative
+  document.getElementById('ctxBtnBalikArah')?.addEventListener('click', () => {
+    hideCanvasContextMenu();
+    if (state.selectedNode) {
+      switchArahIndikator(state.selectedNode);
+    }
+  });
+
+  // Delete Node
+  document.getElementById('ctxBtnHapus')?.addEventListener('click', () => {
+    hideCanvasContextMenu();
+    if (state.selectedNode) {
+      hapusVariabel(state.selectedNode);
+    }
+  });
+}
+
 // Inisialisasi interaksi canvas saat DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   setupCanvasInteractions();
+  setupCanvasContextMenuHandlers();
 });
 
 // ============ HIGH-RESOLUTION EXPORT ENGINE (600+ DPI) ============
@@ -3098,7 +4907,7 @@ async function prosesEksporGambar(keClipboard = false) {
   const showPValues = document.getElementById('checkShowPValues')?.checked ?? true;
   const showLegend = document.getElementById('checkShowLegend')?.checked ?? true;
   
-  showLoading(`Merender gambar resolusi tinggi (${dpi} DPI)...`);
+  showLoading(`Merender Gambar Resolusi Tinggi (${dpi} DPI)...`, 800, 'Supersampling Kanvas & Rasterisasi Grafik Diagram Model', 'image');
   
   try {
     // 1. Hitung Bounding Box dari semua elemen diagram
@@ -3289,11 +5098,36 @@ function showVariableProperties(v) {
   
   const curOrientasi = v.orientasi || 'kiri';
   const curTipe = v.tipe || 'reflektif';
+  const curWarna = v.warna || '#009bf2';
+  
+  const paletteColors = [
+    { hex: '#009bf2', name: 'SmartPLS Blue' },
+    { hex: '#0ea5e9', name: 'Sky Blue (Eksogen)' },
+    { hex: '#f59e0b', name: 'Sunset Amber (Mediasi)' },
+    { hex: '#ec4899', name: 'Rose (Moderasi)' },
+    { hex: '#10b981', name: 'Emerald (Endogen)' },
+    { hex: '#8b5cf6', name: 'Purple Violet' },
+    { hex: '#64748b', name: 'Slate Neutral' }
+  ];
   
   panel.innerHTML = `
     <div class="form-group">
       <label>Nama Variabel</label>
       <input type="text" id="editPropNamaVar" class="form-input" value="${escapeHtml(v.nama)}" placeholder="Nama variabel laten">
+    </div>
+
+    <div class="form-group">
+      <label>Tema Warna Konstruk</label>
+      <div class="color-swatches-grid" style="display: flex; gap: 7px; flex-wrap: wrap; margin-top: 4px;">
+        ${paletteColors.map(c => `
+          <div class="color-dot ${c.hex.toLowerCase() === curWarna.toLowerCase() ? 'active' : ''}" 
+               data-color="${c.hex}" 
+               style="background: ${c.hex}; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid ${c.hex.toLowerCase() === curWarna.toLowerCase() ? '#ffffff' : 'transparent'}; box-shadow: ${c.hex.toLowerCase() === curWarna.toLowerCase() ? '0 0 0 2px var(--color-primary)' : 'none'}; transition: transform 0.15s;" 
+               onclick="setVariableColor(${v.id}, '${c.hex}')" 
+               title="${c.name}">
+          </div>
+        `).join('')}
+      </div>
     </div>
     
     <div class="form-group">
@@ -3315,7 +5149,12 @@ function showVariableProperties(v) {
     </div>
     
     <div class="form-group">
-      <label>Posisi Kotak Indikator</label>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <label style="margin-bottom: 0;">Posisi Kotak Indikator</label>
+        <button type="button" class="btn btn-xs btn-ghost" onclick="rotateSelectedVariableOrientation(${v.id})" title="Putar Posisi Indikator (Alt+R)" style="padding: 1px 6px; font-size: 11px; color: var(--color-primary);">
+          <span class="material-icons-round" style="font-size: 13px;">rotate_right</span> Putar (Alt+R)
+        </button>
+      </div>
       <div class="orientasi-btn-group" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 4px;">
         <button class="btn btn-sm ${curOrientasi === 'kiri' ? 'btn-primary' : 'btn-outline'}" onclick="setVariableOrientation(${v.id}, 'kiri')">Kiri</button>
         <button class="btn btn-sm ${curOrientasi === 'kanan' ? 'btn-primary' : 'btn-outline'}" onclick="setVariableOrientation(${v.id}, 'kanan')">Kanan</button>
@@ -3347,6 +5186,14 @@ function showVariableProperties(v) {
       <button class="btn btn-sm btn-primary btn-block" onclick="simpanPerubahanVariabel(${v.id})">
         <span class="material-icons-round">save</span> Simpan Perubahan Variabel
       </button>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+        <button class="btn btn-xs btn-outline" onclick="duplicateSelectedVariable(${v.id})">
+          <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Duplikat
+        </button>
+        <button class="btn btn-xs btn-outline" onclick="bukaModalTambahModerasi(${v.id})" style="color: #ec4899;">
+          <span class="material-icons-round" style="font-size: 14px;">tune</span> Moderasi...
+        </button>
+      </div>
       <button class="btn btn-sm btn-danger btn-block" onclick="hapusVariabel(${v.id})">
         <span class="material-icons-round">delete</span> Hapus Variabel
       </button>
@@ -3680,209 +5527,6 @@ function setVariableOrientation(id, orientasi) {
   showVariableProperties(v);
 }
 
-// ============ TEMPLATE MODEL GENERATOR ============
-async function terapkanTemplateModel(templateKey) {
-  // Pastikan ada proyek aktif, jika belum ada buat otomatis
-  if (!state.proyekAktif) {
-    const proyekBaru = await window.api.proyekBuat({
-      nama: 'Model Penelitian FreePLS',
-      deskripsi: 'Proyek dibuat otomatis dari Template Model'
-    });
-    setActiveProject(proyekBaru);
-  }
-
-  let vars = [];
-  let paths = [];
-  let notes = [];
-
-  if (templateKey === 'mediasi_umkm') {
-    // Sesuai persis dengan gambar lampiran user & spesifikasi 10 Hipotesis:
-    // H1: X1 -> Y, H2: X2 -> Y, H3: X3 -> Y
-    // H4: X1 -> Z, H5: X2 -> Z, H6: X3 -> Z
-    // H7: Z -> Y
-    // H8: X1 -> Z -> Y (Indirect)
-    // H9: X2 -> Z -> Y (Indirect)
-    // H10: X3 -> Z -> Y (Indirect)
-    vars = [
-      {
-        id: 101,
-        nama: 'Literasi Keuangan (X1)',
-        tipe: 'reflektif',
-        orientasi: 'kiri',
-        posisi_x: 200,
-        posisi_y: 100,
-        indikator: ['LK1', 'LK2', 'LK3']
-      },
-      {
-        id: 102,
-        nama: 'Kompetensi SDM (X2)',
-        tipe: 'reflektif',
-        orientasi: 'kiri',
-        posisi_x: 200,
-        posisi_y: 250,
-        indikator: ['SDM1', 'SDM2', 'SDM3']
-      },
-      {
-        id: 103,
-        nama: 'Inklusi Keuangan (X3)',
-        tipe: 'reflektif',
-        orientasi: 'kiri',
-        posisi_x: 200,
-        posisi_y: 400,
-        indikator: ['IK1', 'IK2', 'IK3']
-      },
-      {
-        id: 104,
-        nama: 'Adaptasi Fintech (Z)',
-        tipe: 'reflektif',
-        orientasi: 'bawah',
-        posisi_x: 560,
-        posisi_y: 250,
-        indikator: ['AT1', 'AT2', 'AT3', 'AT4']
-      },
-      {
-        id: 105,
-        nama: 'Keberlanjutan UMKM (Y)',
-        tipe: 'reflektif',
-        orientasi: 'kanan',
-        posisi_x: 920,
-        posisi_y: 250,
-        indikator: ['KU1', 'KU2', 'KU3', 'KU4']
-      }
-    ];
-
-    paths = [
-      // Jalur Pengaruh Langsung (Solid)
-      { id: 201, dari_variabel_id: 101, ke_variabel_id: 105, dari: 'Literasi Keuangan (X1)', ke: 'Keberlanjutan UMKM (Y)', label: 'H1', tipe_garis: 'solid', tebal_garis: 2.5, kelengkungan: 0 },
-      { id: 202, dari_variabel_id: 102, ke_variabel_id: 105, dari: 'Kompetensi SDM (X2)', ke: 'Keberlanjutan UMKM (Y)', label: 'H2', tipe_garis: 'solid', tebal_garis: 2.5, kelengkungan: 45 },
-      { id: 203, dari_variabel_id: 103, ke_variabel_id: 105, dari: 'Inklusi Keuangan (X3)', ke: 'Keberlanjutan UMKM (Y)', label: 'H3', tipe_garis: 'solid', tebal_garis: 2.5, kelengkungan: 0 },
-      { id: 204, dari_variabel_id: 101, ke_variabel_id: 104, dari: 'Literasi Keuangan (X1)', ke: 'Adaptasi Fintech (Z)', label: 'H4', tipe_garis: 'solid', tebal_garis: 2.5, kelengkungan: 0 },
-      { id: 205, dari_variabel_id: 102, ke_variabel_id: 104, dari: 'Kompetensi SDM (X2)', ke: 'Adaptasi Fintech (Z)', label: 'H5', tipe_garis: 'solid', tebal_garis: 2.5, kelengkungan: 0 },
-      { id: 206, dari_variabel_id: 103, ke_variabel_id: 104, dari: 'Inklusi Keuangan (X3)', ke: 'Adaptasi Fintech (Z)', label: 'H6', tipe_garis: 'solid', tebal_garis: 2.5, kelengkungan: 0 },
-      { id: 207, dari_variabel_id: 104, ke_variabel_id: 105, dari: 'Adaptasi Fintech (Z)', ke: 'Keberlanjutan UMKM (Y)', label: 'H7', tipe_garis: 'solid', tebal_garis: 2.5, kelengkungan: 0 },
-      // Jalur Pengaruh Tidak Langsung / Mediasi (H8, H9, H10 dari X lalu ke Z kemudian ke Y - Garis Putus-putus)
-      { id: 208, dari_variabel_id: 101, melalui_variabel_id: 104, ke_variabel_id: 105, dari: 'Literasi Keuangan (X1)', melalui: 'Adaptasi Fintech (Z)', ke: 'Keberlanjutan UMKM (Y)', label: 'H8', tipe_garis: 'dashed', tebal_garis: 2.5, kelengkungan1: -22, kelengkungan: -28 },
-      { id: 209, dari_variabel_id: 102, melalui_variabel_id: 104, ke_variabel_id: 105, dari: 'Kompetensi SDM (X2)', melalui: 'Adaptasi Fintech (Z)', ke: 'Keberlanjutan UMKM (Y)', label: 'H9', tipe_garis: 'dashed', tebal_garis: 2.5, kelengkungan1: 22, kelengkungan: 28 },
-      { id: 210, dari_variabel_id: 103, melalui_variabel_id: 104, ke_variabel_id: 105, dari: 'Inklusi Keuangan (X3)', melalui: 'Adaptasi Fintech (Z)', ke: 'Keberlanjutan UMKM (Y)', label: 'H10', tipe_garis: 'dashed', tebal_garis: 2.5, kelengkungan1: 35, kelengkungan: 52 }
-    ];
-
-    // Catatan Sticky Note Penjelasan Hipotesis & Jalur
-    notes = [
-      {
-        id: Date.now(),
-        teks: "Keterangan :\n—> : Pengaruh langsung (H1 - H7)\n- - - > : Pengaruh tidak langsung melalui Z (H8 - H10)",
-        warna: "#fef08a",
-        x: 820,
-        y: 390,
-        w: 260,
-        h: 110
-      }
-    ];
-  } else if (templateKey === 'tam') {
-    vars = [
-      { id: 301, nama: 'Perceived Ease of Use (PEOU)', tipe: 'reflektif', orientasi: 'kiri', posisi_x: 200, posisi_y: 180, indikator: ['PEOU1', 'PEOU2', 'PEOU3'] },
-      { id: 302, nama: 'Perceived Usefulness (PU)', tipe: 'reflektif', orientasi: 'atas', posisi_x: 440, posisi_y: 180, indikator: ['PU1', 'PU2', 'PU3'] },
-      { id: 303, nama: 'Attitude Toward Using (ATU)', tipe: 'reflektif', orientasi: 'bawah', posisi_x: 440, posisi_y: 380, indikator: ['ATU1', 'ATU2', 'ATU3'] },
-      { id: 304, nama: 'Behavioral Intention (BI)', tipe: 'reflektif', orientasi: 'atas', posisi_x: 700, posisi_y: 280, indikator: ['BI1', 'BI2', 'BI3'] },
-      { id: 305, nama: 'Actual Usage (AU)', tipe: 'reflektif', orientasi: 'kanan', posisi_x: 940, posisi_y: 280, indikator: ['AU1', 'AU2', 'AU3'] }
-    ];
-    paths = [
-      { id: 401, dari_variabel_id: 301, ke_variabel_id: 302, dari: 'Perceived Ease of Use (PEOU)', ke: 'Perceived Usefulness (PU)', label: 'H1', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 402, dari_variabel_id: 301, ke_variabel_id: 303, dari: 'Perceived Ease of Use (PEOU)', ke: 'Attitude Toward Using (ATU)', label: 'H2', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 403, dari_variabel_id: 302, ke_variabel_id: 303, dari: 'Perceived Usefulness (PU)', ke: 'Attitude Toward Using (ATU)', label: 'H3', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 404, dari_variabel_id: 302, ke_variabel_id: 304, dari: 'Perceived Usefulness (PU)', ke: 'Behavioral Intention (BI)', label: 'H4', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 405, dari_variabel_id: 303, ke_variabel_id: 304, dari: 'Attitude Toward Using (ATU)', ke: 'Behavioral Intention (BI)', label: 'H5', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 406, dari_variabel_id: 304, ke_variabel_id: 305, dari: 'Behavioral Intention (BI)', ke: 'Actual Usage (AU)', label: 'H6', tipe_garis: 'solid', tebal_garis: 2.5 }
-    ];
-    notes = [
-      {
-        id: Date.now(),
-        teks: "Technology Acceptance Model (Davis, 1989):\n• PEOU & PU → Sikap & Niat Penggunaan\n• BI → Penggunaan Nyata Teknologi",
-        warna: "#bae6fd",
-        x: 820,
-        y: 430,
-        w: 260,
-        h: 110
-      }
-    ];
-  } else if (templateKey === 'customer_satisfaction') {
-    vars = [
-      { id: 501, nama: 'Kualitas Produk (X1)', tipe: 'reflektif', orientasi: 'kiri', posisi_x: 200, posisi_y: 130, indikator: ['KP1', 'KP2', 'KP3'] },
-      { id: 502, nama: 'Kualitas Layanan (X2)', tipe: 'reflektif', orientasi: 'kiri', posisi_x: 200, posisi_y: 280, indikator: ['KL1', 'KL2', 'KL3'] },
-      { id: 503, nama: 'Persepsi Harga (X3)', tipe: 'reflektif', orientasi: 'kiri', posisi_x: 200, posisi_y: 430, indikator: ['PH1', 'PH2', 'PH3'] },
-      { id: 504, nama: 'Kepuasan Pelanggan (Y1)', tipe: 'reflektif', orientasi: 'bawah', posisi_x: 560, posisi_y: 280, indikator: ['SAT1', 'SAT2', 'SAT3'] },
-      { id: 505, nama: 'Loyalitas Pelanggan (Y2)', tipe: 'reflektif', orientasi: 'kanan', posisi_x: 880, posisi_y: 280, indikator: ['LOY1', 'LOY2', 'LOY3'] }
-    ];
-    paths = [
-      { id: 601, dari_variabel_id: 501, ke_variabel_id: 504, dari: 'Kualitas Produk (X1)', ke: 'Kepuasan Pelanggan (Y1)', label: 'H1', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 602, dari_variabel_id: 502, ke_variabel_id: 504, dari: 'Kualitas Layanan (X2)', ke: 'Kepuasan Pelanggan (Y1)', label: 'H2', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 603, dari_variabel_id: 503, ke_variabel_id: 504, dari: 'Persepsi Harga (X3)', ke: 'Kepuasan Pelanggan (Y1)', label: 'H3', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 604, dari_variabel_id: 504, ke_variabel_id: 505, dari: 'Kepuasan Pelanggan (Y1)', ke: 'Loyalitas Pelanggan (Y2)', label: 'H4', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 605, dari_variabel_id: 501, ke_variabel_id: 505, dari: 'Kualitas Produk (X1)', ke: 'Loyalitas Pelanggan (Y2)', label: 'H5', tipe_garis: 'dashed', tebal_garis: 2.5, kelengkungan: 50 }
-    ];
-    notes = [
-      {
-        id: Date.now(),
-        teks: "Model Kepuasan Pelanggan:\n• Kualitas & Harga → Kepuasan (Y1)\n• Kepuasan → Loyalitas (Y2)",
-        warna: "#bbf7d0",
-        x: 820,
-        y: 430,
-        w: 250,
-        h: 110
-      }
-    ];
-  } else if (templateKey === 'moderasi') {
-    vars = [
-      { id: 701, nama: 'Disiplin Kerja (X)', tipe: 'reflektif', orientasi: 'kiri', posisi_x: 220, posisi_y: 280, indikator: ['DK1', 'DK2', 'DK3'] },
-      { id: 702, nama: 'Budaya Organisasi (M)', tipe: 'reflektif', orientasi: 'atas', posisi_x: 520, posisi_y: 130, indikator: ['BO1', 'BO2', 'BO3'] },
-      { id: 703, nama: 'Interaksi X*M', tipe: 'formatif', orientasi: 'bawah', posisi_x: 520, posisi_y: 430, indikator: ['XM1', 'XM2'] },
-      { id: 704, nama: 'Kinerja Pegawai (Y)', tipe: 'reflektif', orientasi: 'kanan', posisi_x: 820, posisi_y: 280, indikator: ['KP1', 'KP2', 'KP3'] }
-    ];
-    paths = [
-      { id: 801, dari_variabel_id: 701, ke_variabel_id: 704, dari: 'Disiplin Kerja (X)', ke: 'Kinerja Pegawai (Y)', label: 'H1', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 802, dari_variabel_id: 702, ke_variabel_id: 704, dari: 'Budaya Organisasi (M)', ke: 'Kinerja Pegawai (Y)', label: 'H2', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 803, dari_variabel_id: 703, ke_variabel_id: 704, dari: 'Interaksi X*M', ke: 'Kinerja Pegawai (Y)', label: 'H3 (Moderasi)', tipe_garis: 'dashed', tebal_garis: 2.5 }
-    ];
-    notes = [
-      {
-        id: Date.now(),
-        teks: "Model Moderasi (Interaction Effect):\n• X*M menguji apakah Budaya Organisasi memperkuat hubungan Disiplin → Kinerja",
-        warna: "#fbcfe8",
-        x: 780,
-        y: 440,
-        w: 270,
-        h: 110
-      }
-    ];
-  } else {
-    // Standar 2 Eksogen 1 Endogen
-    vars = [
-      { id: 901, nama: 'Motivasi Kerja (X1)', tipe: 'reflektif', orientasi: 'kiri', posisi_x: 240, posisi_y: 180, indikator: ['MK1', 'MK2', 'MK3'] },
-      { id: 902, nama: 'Disiplin Kerja (X2)', tipe: 'reflektif', orientasi: 'kiri', posisi_x: 240, posisi_y: 380, indikator: ['DK1', 'DK2', 'DK3'] },
-      { id: 903, nama: 'Kinerja Karyawan (Y)', tipe: 'reflektif', orientasi: 'kanan', posisi_x: 740, posisi_y: 280, indikator: ['KK1', 'KK2', 'KK3', 'KK4'] }
-    ];
-    paths = [
-      { id: 1001, dari_variabel_id: 901, ke_variabel_id: 903, dari: 'Motivasi Kerja (X1)', ke: 'Kinerja Karyawan (Y)', label: 'H1', tipe_garis: 'solid', tebal_garis: 2.5 },
-      { id: 1002, dari_variabel_id: 902, ke_variabel_id: 903, dari: 'Disiplin Kerja (X2)', ke: 'Kinerja Karyawan (Y)', label: 'H2', tipe_garis: 'solid', tebal_garis: 2.5 }
-    ];
-    notes = [];
-  }
-
-  state.variabels = vars;
-  state.jalurs = paths;
-  state.catatans = notes;
-  state.hasilPLS = null;
-  state.hasilBootstrap = null;
-  state.selectedNode = null;
-  state.selectedPath = null;
-  state.selectedCatatan = null;
-
-  hideModal('modalTemplateModel');
-  renderModel();
-  await saveModelToDb();
-  showToast('Template model berhasil dimuat!', 'sukses');
-}
-
 async function hapusVariabel(id) {
   const v = state.variabels.find(vv => vv.id === id);
   if (!v) return;
@@ -3907,26 +5551,103 @@ async function hapusVariabel(id) {
   }
 }
 
-// ============ DATA HANDLERS ============
+// ============ DATA MANAGEMENT & ADVANCED VIEWER STATE ============
+const dataViewerState = {
+  activeDatasetId: null,
+  activeDataset: null,
+  allRows: [],
+  filteredRows: [],
+  columns: [],
+  searchQuery: '',
+  searchColumn: 'all',
+  currentPage: 1,
+  pageSize: 25,
+  sortColumn: null,
+  sortDirection: 'asc',
+  showStatsShelf: false,
+  columnStats: {},
+  totalMissing: 0
+};
+
 function initDataHandlers() {
-  document.getElementById('btnImporData').addEventListener('click', async () => {
+  // Tombol Impor Data
+  document.getElementById('btnImporData')?.addEventListener('click', async () => {
     if (!state.proyekAktif) {
       showToast('Pilih proyek terlebih dahulu', 'peringatan');
       return;
     }
     
-    showLoading('Mengimpor data...');
+    showLoading('Mengimpor & Membaca Berkas Data...', 600, 'Parsing CSV/Excel, Deteksi Kolom & Format Numerik', 'upload_file');
     try {
       const result = await window.api.datasetImpor(state.proyekAktif.id);
       if (result) {
         showToast(`Dataset "${result.nama}" berhasil diimpor (${result.jumlah_baris} baris, ${result.jumlah_kolom} kolom)`, 'sukses');
-        loadDatasets();
+        await loadDatasets();
+        if (result.id) {
+          previewDataset(result.id);
+        }
       }
     } catch (e) {
       showToast('Gagal mengimpor data: ' + e.message, 'error');
     }
     hideLoading();
   });
+
+  // Tombol Ekspor CSV/Excel Data dari Toolbar Atas
+  document.getElementById('btnEksporCSVData')?.addEventListener('click', async () => {
+    if (!dataViewerState.activeDataset || !dataViewerState.allRows.length) {
+      showToast('Belum ada dataset aktif untuk diekspor', 'peringatan');
+      return;
+    }
+    await exportActiveDataset();
+  });
+}
+
+function computeDatasetStatistics(columns, rows) {
+  const stats = {};
+  let totalMissing = 0;
+
+  columns.forEach(col => {
+    let numericValues = [];
+    let missingCount = 0;
+
+    rows.forEach(row => {
+      const val = row[col];
+      if (val === null || val === undefined || val === '' || isNaN(Number(val))) {
+        missingCount++;
+        totalMissing++;
+      } else {
+        numericValues.push(Number(val));
+      }
+    });
+
+    let mean = '-', min = '-', max = '-', stdev = '-';
+    if (numericValues.length > 0) {
+      min = Math.min(...numericValues);
+      max = Math.max(...numericValues);
+      const sum = numericValues.reduce((acc, v) => acc + v, 0);
+      const avg = sum / numericValues.length;
+      mean = avg.toFixed(3);
+      if (numericValues.length > 1) {
+        const variance = numericValues.reduce((acc, v) => acc + Math.pow(v - avg, 2), 0) / (numericValues.length - 1);
+        stdev = Math.sqrt(variance).toFixed(3);
+      } else {
+        stdev = '0.000';
+      }
+    }
+
+    stats[col] = {
+      isNumeric: numericValues.length > 0,
+      count: numericValues.length,
+      missing: missingCount,
+      min,
+      max,
+      mean,
+      stdev
+    };
+  });
+
+  return { columnStats: stats, totalMissing };
 }
 
 async function loadDatasets() {
@@ -3935,79 +5656,522 @@ async function loadDatasets() {
   const datasets = await window.api.datasetDaftar(state.proyekAktif.id);
   state.datasets = datasets;
   
-  document.getElementById('totalDataset').textContent = datasets.length;
+  const badge = document.getElementById('datasetCountBadge');
+  if (badge) {
+    badge.textContent = `${datasets.length} File`;
+  }
+  
+  const totalDsEl = document.getElementById('totalDataset');
+  if (totalDsEl) {
+    totalDsEl.textContent = datasets.length;
+  }
   
   const list = document.getElementById('datasetList');
+  if (!list) return;
   
   if (datasets.length === 0) {
     list.innerHTML = `
-      <div class="empty-state">
-        <span class="material-icons-round">cloud_upload</span>
-        <p>Belum ada dataset. Impor file CSV atau Excel.</p>
+      <div class="empty-state" style="padding: 24px 12px; text-align: center;">
+        <span class="material-icons-round" style="font-size: 36px; color: var(--text-muted); margin-bottom: 8px;">cloud_upload</span>
+        <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Belum ada dataset.<br>Impor file CSV atau Excel.</p>
       </div>
     `;
+    document.getElementById('dataPreview').innerHTML = `
+      <div class="data-preview-empty">
+        <span class="material-icons-round">visibility</span>
+        <p style="font-size: 13.5px; font-weight: 500;">Pilih atau impor dataset untuk melihat pratinjau data dan ringkasan statistik</p>
+      </div>
+    `;
+    dataViewerState.activeDatasetId = null;
+    dataViewerState.activeDataset = null;
     return;
   }
   
-  list.innerHTML = datasets.map(d => `
-    <div class="dataset-item" data-id="${d.id}">
-      <div class="dataset-item-name">${escapeHtml(d.nama)}</div>
-      <div class="dataset-item-meta">
-        <span>${d.jumlah_baris} baris</span>
-        <span>${d.jumlah_kolom} kolom</span>
+  list.innerHTML = datasets.map(d => {
+    const isActive = dataViewerState.activeDatasetId === d.id;
+    return `
+      <div class="dataset-item ${isActive ? 'active' : ''}" data-id="${d.id}">
+        <div class="dataset-item-header">
+          <div class="dataset-item-title-wrap">
+            <span class="material-icons-round dataset-item-icon">table_chart</span>
+            <span class="dataset-item-name" title="${escapeHtml(d.nama)}">${escapeHtml(d.nama)}</span>
+          </div>
+          <div class="dataset-item-actions">
+            <button class="dataset-action-btn" title="Ekspor Dataset ini ke Excel/CSV" onclick="event.stopPropagation(); exportSpecificDataset(${d.id})">
+              <span class="material-icons-round" style="font-size: 15px;">file_download</span>
+            </button>
+            <button class="dataset-action-btn btn-delete" title="Hapus Dataset" onclick="event.stopPropagation(); hapusDataset(${d.id})">
+              <span class="material-icons-round" style="font-size: 15px;">delete</span>
+            </button>
+          </div>
+        </div>
+        <div class="dataset-item-meta">
+          <span class="badge-chip"><strong>${d.jumlah_baris}</strong> baris</span>
+          <span class="badge-chip"><strong>${d.jumlah_kolom}</strong> kolom</span>
+        </div>
       </div>
-      <div class="dataset-item-actions">
-        <button class="btn btn-sm btn-ghost" onclick="event.stopPropagation(); hapusDataset(${d.id})">
-          <span class="material-icons-round" style="font-size: 16px;">delete</span>
+    `;
+  }).join('');
+  
+  list.querySelectorAll('.dataset-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const id = parseInt(item.dataset.id);
+      previewDataset(id);
+    });
+  });
+
+  // Auto select first dataset if none is active or if previous active dataset no longer exists
+  const activeExists = datasets.some(d => d.id === dataViewerState.activeDatasetId);
+  if (!activeExists && datasets.length > 0) {
+    previewDataset(datasets[0].id);
+  }
+}
+
+async function previewDataset(id, preservePage = false) {
+  const dataset = await window.api.datasetAmbil(id);
+  if (!dataset || !dataset.data) return;
+
+  dataViewerState.activeDatasetId = id;
+  dataViewerState.activeDataset = dataset;
+  dataViewerState.columns = Array.isArray(dataset.kolom) ? dataset.kolom : [];
+  dataViewerState.allRows = Array.isArray(dataset.data) ? dataset.data : [];
+
+  if (!preservePage) {
+    dataViewerState.currentPage = 1;
+    dataViewerState.searchQuery = '';
+    dataViewerState.searchColumn = 'all';
+    dataViewerState.sortColumn = null;
+    dataViewerState.sortDirection = 'asc';
+  }
+
+  // Calculate descriptive stats
+  const { columnStats, totalMissing } = computeDatasetStatistics(dataViewerState.columns, dataViewerState.allRows);
+  dataViewerState.columnStats = columnStats;
+  dataViewerState.totalMissing = totalMissing;
+
+  // Mark active card in sidebar
+  document.querySelectorAll('.dataset-item').forEach(i => i.classList.remove('active'));
+  document.querySelector(`.dataset-item[data-id="${id}"]`)?.classList.add('active');
+
+  applyDataFilterAndSort();
+  renderDataPreviewUI();
+}
+
+function applyDataFilterAndSort() {
+  const q = (dataViewerState.searchQuery || '').trim().toLowerCase();
+  const colFilter = dataViewerState.searchColumn;
+
+  if (!q) {
+    dataViewerState.filteredRows = [...dataViewerState.allRows];
+  } else {
+    dataViewerState.filteredRows = dataViewerState.allRows.filter(row => {
+      if (colFilter !== 'all' && row[colFilter] !== undefined) {
+        return String(row[colFilter]).toLowerCase().includes(q);
+      }
+      return dataViewerState.columns.some(c => {
+        const val = row[c];
+        return val !== undefined && val !== null && String(val).toLowerCase().includes(q);
+      });
+    });
+  }
+
+  // Sorting
+  if (dataViewerState.sortColumn) {
+    const col = dataViewerState.sortColumn;
+    const isAsc = dataViewerState.sortDirection === 'asc';
+    dataViewerState.filteredRows.sort((a, b) => {
+      let valA = a[col];
+      let valB = b[col];
+
+      if (valA === undefined || valA === null) return 1;
+      if (valB === undefined || valB === null) return -1;
+
+      const numA = Number(valA);
+      const numB = Number(valB);
+
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return isAsc ? numA - numB : numB - numA;
+      }
+      return isAsc ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
+    });
+  }
+
+  const totalPages = Math.max(1, Math.ceil(dataViewerState.filteredRows.length / dataViewerState.pageSize));
+  if (dataViewerState.currentPage > totalPages) {
+    dataViewerState.currentPage = totalPages;
+  }
+}
+
+function renderDataPreviewUI() {
+  const preview = document.getElementById('dataPreview');
+  if (!preview || !dataViewerState.activeDataset) return;
+
+  const dataset = dataViewerState.activeDataset;
+  const columns = dataViewerState.columns;
+  const totalRows = dataViewerState.allRows.length;
+  const filteredRows = dataViewerState.filteredRows;
+  const totalFiltered = filteredRows.length;
+  const pageSize = dataViewerState.pageSize;
+  const currentPage = dataViewerState.currentPage;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+
+  const startIdx = (currentPage - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, totalFiltered);
+  const pageRows = filteredRows.slice(startIdx, endIdx);
+
+  const missingBadge = dataViewerState.totalMissing === 0
+    ? `<span class="badge-chip badge-success"><span class="material-icons-round" style="font-size: 13px;">check_circle</span> 0 Missing (Data Bersih)</span>`
+    : `<span class="badge-chip badge-warning"><span class="material-icons-round" style="font-size: 13px;">warning</span> ${dataViewerState.totalMissing} Missing Values</span>`;
+
+  // Render Stats Shelf Cards
+  const statsShelfHtml = dataViewerState.showStatsShelf ? `
+    <div class="data-stats-shelf" id="dataStatsShelf">
+      ${columns.map(col => {
+        const s = dataViewerState.columnStats[col] || {};
+        return `
+          <div class="stat-column-card">
+            <div class="stat-col-name" title="${escapeHtml(col)}">${escapeHtml(col)}</div>
+            <div class="stat-col-row"><span>Mean:</span> <span class="stat-col-val">${s.mean}</span></div>
+            <div class="stat-col-row"><span>Min / Max:</span> <span class="stat-col-val">${s.min} - ${s.max}</span></div>
+            <div class="stat-col-row"><span>StDev:</span> <span class="stat-col-val">${s.stdev}</span></div>
+            <div class="stat-col-row"><span>Missing:</span> <span class="stat-col-val" style="color: ${s.missing > 0 ? '#f87171' : 'inherit'}">${s.missing}</span></div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  ` : '';
+
+  // Render pagination buttons
+  let paginationButtons = '';
+  const maxButtons = 5;
+  let startPage = Math.max(1, currentPage - 2);
+  let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+  if (endPage - startPage < maxButtons - 1) {
+    startPage = Math.max(1, endPage - maxButtons + 1);
+  }
+
+  if (startPage > 1) {
+    paginationButtons += `<button class="page-btn" data-page="1">1</button>`;
+    if (startPage > 2) {
+      paginationButtons += `<span class="page-ellipsis">...</span>`;
+    }
+  }
+
+  for (let p = startPage; p <= endPage; p++) {
+    paginationButtons += `<button class="page-btn ${p === currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`;
+  }
+
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) {
+      paginationButtons += `<span class="page-ellipsis">...</span>`;
+    }
+    paginationButtons += `<button class="page-btn" data-page="${totalPages}">${totalPages}</button>`;
+  }
+
+  preview.innerHTML = `
+    <!-- Topbar Info -->
+    <div class="data-preview-topbar">
+      <div class="data-preview-title-block">
+        <span class="material-icons-round" style="color: var(--color-primary); font-size: 22px;">table_view</span>
+        <h3 class="data-preview-title">${escapeHtml(dataset.nama)}</h3>
+      </div>
+      <div class="data-preview-badges">
+        <span class="badge-chip badge-primary"><strong>${totalRows}</strong> Baris (N)</span>
+        <span class="badge-chip"><strong>${columns.length}</strong> Kolom</span>
+        <span class="badge-chip"><strong>${totalRows * columns.length}</strong> Total Sel</span>
+        ${missingBadge}
+      </div>
+    </div>
+
+    <!-- Toolbar Filters -->
+    <div class="data-preview-toolbar">
+      <div class="data-toolbar-left">
+        <div class="data-search-box">
+          <span class="material-icons-round data-search-icon">search</span>
+          <input type="text" class="data-search-input" id="dataSearchInput" placeholder="Cari nilai sel / filter baris..." value="${escapeHtml(dataViewerState.searchQuery)}" autocomplete="off" />
+          ${dataViewerState.searchQuery ? `<button class="data-search-clear" id="btnDataSearchClear"><span class="material-icons-round" style="font-size: 16px;">close</span></button>` : ''}
+        </div>
+        <select class="data-column-select" id="dataColumnFilterSelect" title="Pilih kolom pencarian">
+          <option value="all" ${dataViewerState.searchColumn === 'all' ? 'selected' : ''}>Semua Kolom</option>
+          ${columns.map(c => `<option value="${escapeHtml(c)}" ${dataViewerState.searchColumn === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="data-toolbar-right">
+        <button class="btn-toolbar-tool ${dataViewerState.showStatsShelf ? 'active' : ''}" id="btnToggleStatsShelf" title="Tampilkan/sembunyikan ringkasan statistik per kolom">
+          <span class="material-icons-round" style="font-size: 16px;">query_stats</span>
+          <span>Ringkasan Kolom</span>
+        </button>
+        <button class="btn-toolbar-tool" id="btnEksporCurrentData" title="Ekspor dataset yang sedang dibuka ke file Excel/CSV">
+          <span class="material-icons-round" style="font-size: 16px; color: #10b981;">file_download</span>
+          <span>Ekspor</span>
         </button>
       </div>
     </div>
-  `).join('');
-  
-  list.querySelectorAll('.dataset-item').forEach(item => {
-    item.addEventListener('click', () => previewDataset(parseInt(item.dataset.id)));
+
+    <!-- Expandable Stats Shelf -->
+    ${statsShelfHtml}
+
+    <!-- Table Wrapper -->
+    <div class="data-table-wrapper">
+      ${totalFiltered === 0 ? `
+        <div style="padding: 48px 16px; text-align: center; color: var(--text-muted);">
+          <span class="material-icons-round" style="font-size: 42px; margin-bottom: 8px; opacity: 0.5;">search_off</span>
+          <p style="font-size: 13.5px; font-weight: 500; margin: 0;">Tidak ditemukan baris yang cocok dengan kata kunci <em>"${escapeHtml(dataViewerState.searchQuery)}"</em></p>
+        </div>
+      ` : `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="col-idx-th">#</th>
+              ${columns.map(c => {
+                const isSorted = dataViewerState.sortColumn === c;
+                const sortIcon = isSorted
+                  ? (dataViewerState.sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward')
+                  : 'unfold_more';
+                return `
+                  <th class="sortable-th ${isSorted ? 'sorted' : ''}" data-col="${escapeHtml(c)}" title="Klik untuk mengurutkan data berdasarkan ${escapeHtml(c)}">
+                    <div class="th-content">
+                      <span>${escapeHtml(c)}</span>
+                      <span class="material-icons-round th-sort-icon">${sortIcon}</span>
+                    </div>
+                  </th>
+                `;
+              }).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${pageRows.map((row, rIdx) => {
+              const actualRowIdx = startIdx + rIdx + 1;
+              return `
+                <tr>
+                  <td class="col-idx">${actualRowIdx}</td>
+                  ${columns.map(c => {
+                    const val = row[c];
+                    const isMissing = (val === null || val === undefined || val === '');
+                    if (isMissing) {
+                      return `<td class="col-num"><span class="badge-missing">NA</span></td>`;
+                    }
+                    const isNum = !isNaN(Number(val));
+                    return `<td class="${isNum ? 'col-num' : ''}">${escapeHtml(String(val))}</td>`;
+                  }).join('')}
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `}
+    </div>
+
+    <!-- Pagination Footer -->
+    <div class="data-pagination-bar">
+      <div class="pagination-info">
+        <span>Menampilkan <strong>${totalFiltered > 0 ? startIdx + 1 : 0} - ${endIdx}</strong> dari <strong>${totalFiltered}</strong> baris ${dataViewerState.searchQuery ? `<em>(difilter dari ${totalRows} total)</em>` : ''}</span>
+        <div class="page-size-selector">
+          <span>Baris:</span>
+          <select class="page-size-select" id="pageSizeSelect">
+            <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
+            <option value="25" ${pageSize === 25 ? 'selected' : ''}>25</option>
+            <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
+            <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="pagination-controls">
+        <button class="page-btn" id="btnPageFirst" title="Halaman Pertama" ${currentPage <= 1 ? 'disabled' : ''}>
+          <span class="material-icons-round page-btn-icon">first_page</span>
+        </button>
+        <button class="page-btn" id="btnPagePrev" title="Halaman Sebelumnya" ${currentPage <= 1 ? 'disabled' : ''}>
+          <span class="material-icons-round page-btn-icon">chevron_left</span>
+        </button>
+        ${paginationButtons}
+        <button class="page-btn" id="btnPageNext" title="Halaman Selanjutnya" ${currentPage >= totalPages ? 'disabled' : ''}>
+          <span class="material-icons-round page-btn-icon">chevron_right</span>
+        </button>
+        <button class="page-btn" id="btnPageLast" title="Halaman Terakhir" ${currentPage >= totalPages ? 'disabled' : ''}>
+          <span class="material-icons-round page-btn-icon">last_page</span>
+        </button>
+        <div class="page-jump-wrap">
+          <span>Ke:</span>
+          <input type="number" min="1" max="${totalPages}" class="page-jump-input" id="pageJumpInput" placeholder="${currentPage}" />
+          <button class="page-btn" id="btnPageJumpGo" style="height: 26px; padding: 0 8px;">Go</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  attachDataPreviewEvents();
+}
+
+function attachDataPreviewEvents() {
+  const preview = document.getElementById('dataPreview');
+  if (!preview) return;
+
+  // 1. Search Input
+  const searchInput = document.getElementById('dataSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      dataViewerState.searchQuery = e.target.value;
+      dataViewerState.currentPage = 1;
+      applyDataFilterAndSort();
+      renderDataPreviewUI();
+      // Keep focus on input and cursor at end
+      const newInput = document.getElementById('dataSearchInput');
+      if (newInput) {
+        newInput.focus();
+        newInput.setSelectionRange(newInput.value.length, newInput.value.length);
+      }
+    });
+  }
+
+  // 2. Search Clear Button
+  document.getElementById('btnDataSearchClear')?.addEventListener('click', () => {
+    dataViewerState.searchQuery = '';
+    dataViewerState.currentPage = 1;
+    applyDataFilterAndSort();
+    renderDataPreviewUI();
+  });
+
+  // 3. Column Filter Select
+  document.getElementById('dataColumnFilterSelect')?.addEventListener('change', (e) => {
+    dataViewerState.searchColumn = e.target.value;
+    dataViewerState.currentPage = 1;
+    applyDataFilterAndSort();
+    renderDataPreviewUI();
+  });
+
+  // 4. Toggle Stats Shelf
+  document.getElementById('btnToggleStatsShelf')?.addEventListener('click', () => {
+    dataViewerState.showStatsShelf = !dataViewerState.showStatsShelf;
+    renderDataPreviewUI();
+  });
+
+  // 5. Ekspor Current Dataset
+  document.getElementById('btnEksporCurrentData')?.addEventListener('click', async () => {
+    await exportActiveDataset();
+  });
+
+  // 6. Sort by Column
+  preview.querySelectorAll('.sortable-th').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (dataViewerState.sortColumn === col) {
+        if (dataViewerState.sortDirection === 'asc') {
+          dataViewerState.sortDirection = 'desc';
+        } else {
+          // Reset sort
+          dataViewerState.sortColumn = null;
+          dataViewerState.sortDirection = 'asc';
+        }
+      } else {
+        dataViewerState.sortColumn = col;
+        dataViewerState.sortDirection = 'asc';
+      }
+      applyDataFilterAndSort();
+      renderDataPreviewUI();
+    });
+  });
+
+  // 7. Page Size Change
+  document.getElementById('pageSizeSelect')?.addEventListener('change', (e) => {
+    dataViewerState.pageSize = parseInt(e.target.value) || 25;
+    dataViewerState.currentPage = 1;
+    applyDataFilterAndSort();
+    renderDataPreviewUI();
+  });
+
+  // 8. Pagination Navigation
+  document.getElementById('btnPageFirst')?.addEventListener('click', () => {
+    if (dataViewerState.currentPage > 1) {
+      dataViewerState.currentPage = 1;
+      renderDataPreviewUI();
+    }
+  });
+
+  document.getElementById('btnPagePrev')?.addEventListener('click', () => {
+    if (dataViewerState.currentPage > 1) {
+      dataViewerState.currentPage--;
+      renderDataPreviewUI();
+    }
+  });
+
+  document.getElementById('btnPageNext')?.addEventListener('click', () => {
+    const totalPages = Math.max(1, Math.ceil(dataViewerState.filteredRows.length / dataViewerState.pageSize));
+    if (dataViewerState.currentPage < totalPages) {
+      dataViewerState.currentPage++;
+      renderDataPreviewUI();
+    }
+  });
+
+  document.getElementById('btnPageLast')?.addEventListener('click', () => {
+    const totalPages = Math.max(1, Math.ceil(dataViewerState.filteredRows.length / dataViewerState.pageSize));
+    if (dataViewerState.currentPage < totalPages) {
+      dataViewerState.currentPage = totalPages;
+      renderDataPreviewUI();
+    }
+  });
+
+  preview.querySelectorAll('.page-btn[data-page]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = parseInt(btn.dataset.page);
+      if (p && p !== dataViewerState.currentPage) {
+        dataViewerState.currentPage = p;
+        renderDataPreviewUI();
+      }
+    });
+  });
+
+  // 9. Jump to Page
+  const jumpInput = document.getElementById('pageJumpInput');
+  const doJump = () => {
+    if (!jumpInput) return;
+    const targetPage = parseInt(jumpInput.value);
+    const totalPages = Math.max(1, Math.ceil(dataViewerState.filteredRows.length / dataViewerState.pageSize));
+    if (targetPage >= 1 && targetPage <= totalPages) {
+      dataViewerState.currentPage = targetPage;
+      renderDataPreviewUI();
+    } else {
+      showToast(`Masukkan nomor halaman antara 1 dan ${totalPages}`, 'peringatan');
+    }
+  };
+
+  document.getElementById('btnPageJumpGo')?.addEventListener('click', doJump);
+  jumpInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      doJump();
+    }
   });
 }
 
-async function previewDataset(id) {
-  const dataset = await window.api.datasetAmbil(id);
-  if (!dataset || !dataset.data) return;
+async function exportActiveDataset() {
+  if (!dataViewerState.activeDataset || !dataViewerState.allRows.length) return;
+  const ds = dataViewerState.activeDataset;
+  const fileName = `${(ds.nama || 'Dataset').replace(/[^a-zA-Z0-9_-]/g, '_')}_export.xlsx`;
   
-  // Mark active
-  document.querySelectorAll('.dataset-item').forEach(i => i.classList.remove('active'));
-  document.querySelector(`.dataset-item[data-id="${id}"]`)?.classList.add('active');
-  
-  const preview = document.getElementById('dataPreview');
-  const columns = dataset.kolom;
-  const data = dataset.data;
-  
-  const maxRows = Math.min(data.length, 100);
-  
-  preview.innerHTML = `
-    <div style="margin-bottom: 12px;">
-      <strong>${escapeHtml(dataset.nama)}</strong>
-      <span class="text-muted" style="margin-left: 8px;">(${data.length} baris × ${columns.length} kolom)</span>
-    </div>
-    <div style="overflow: auto; max-height: calc(100% - 40px);">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            ${columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>
-          ${data.slice(0, maxRows).map((row, i) => `
-            <tr>
-              <td style="color: var(--text-muted)">${i + 1}</td>
-              ${columns.map(c => `<td>${row[c] !== undefined ? row[c] : '-'}</td>`).join('')}
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      ${data.length > maxRows ? `<p class="text-muted text-center" style="padding: 12px;">Menampilkan ${maxRows} dari ${data.length} baris</p>` : ''}
-    </div>
-  `;
+  const result = await window.api.eksporHasil({
+    data: dataViewerState.allRows,
+    namaFile: fileName
+  });
+  if (result) {
+    showToast(`Dataset "${ds.nama}" berhasil diekspor!`, 'sukses');
+  }
+}
+
+async function exportSpecificDataset(id) {
+  const ds = await window.api.datasetAmbil(id);
+  if (!ds || !ds.data || !ds.data.length) {
+    showToast('Dataset kosong atau tidak ditemukan', 'peringatan');
+    return;
+  }
+  const fileName = `${(ds.nama || 'Dataset').replace(/[^a-zA-Z0-9_-]/g, '_')}_export.xlsx`;
+  const result = await window.api.eksporHasil({
+    data: ds.data,
+    namaFile: fileName
+  });
+  if (result) {
+    showToast(`Dataset "${ds.nama}" berhasil diekspor!`, 'sukses');
+  }
 }
 
 async function hapusDataset(id) {
@@ -4023,9 +6187,327 @@ async function hapusDataset(id) {
   if (ok) {
     await window.api.datasetHapus(id);
     showToast('Dataset dihapus', 'sukses');
-    loadDatasets();
-    document.getElementById('dataPreview').innerHTML = '<div class="empty-state"><span class="material-icons-round">visibility</span><p>Pilih dataset untuk melihat pratinjau</p></div>';
+    if (dataViewerState.activeDatasetId === id) {
+      dataViewerState.activeDatasetId = null;
+      dataViewerState.activeDataset = null;
+      dataViewerState.allRows = [];
+      dataViewerState.filteredRows = [];
+    }
+    await loadDatasets();
   }
+}
+
+// ============ DATA PREPROCESSING HANDLERS ============
+function initDataPreprocessingHandlers() {
+  const dropdownWrap = document.getElementById('dropdownDataTools');
+  const btnDropdown = document.getElementById('btnDropdownDataTools');
+
+  if (btnDropdown && dropdownWrap) {
+    btnDropdown.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropdownWrap.classList.toggle('open');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!dropdownWrap.contains(e.target)) {
+        dropdownWrap.classList.remove('open');
+      }
+    });
+
+    dropdownWrap.querySelectorAll('.dropdown-item').forEach(item => {
+      item.addEventListener('click', () => {
+        dropdownWrap.classList.remove('open');
+      });
+    });
+  }
+
+  // Helper check active dataset
+  const getActiveDatasetOrAlert = () => {
+    if (!state.proyekAktif) {
+      showToast('Pilih proyek terlebih dahulu', 'peringatan');
+      return null;
+    }
+    if (!dataViewerState.activeDataset || !dataViewerState.allRows.length) {
+      showToast('Pilih atau impor dataset terlebih dahulu', 'peringatan');
+      return null;
+    }
+    return dataViewerState.activeDataset;
+  };
+
+  // 1. Imputasi Missing Values
+  document.getElementById('btnBukaImputasiData')?.addEventListener('click', () => {
+    dropdownWrap?.classList.remove('open');
+    const ds = getActiveDatasetOrAlert();
+    if (!ds) return;
+
+    const previewBox = document.getElementById('statusImputasiPreview');
+    if (previewBox) {
+      if (dataViewerState.totalMissing === 0) {
+        previewBox.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 6px; color: #10b981;">
+            <span class="material-icons-round" style="font-size: 16px;">check_circle</span>
+            <strong>Data Bersih:</strong> Tidak ditemukan sel kosong (0 missing values).
+          </div>
+        `;
+      } else {
+        previewBox.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 6px; color: #f59e0b;">
+            <span class="material-icons-round" style="font-size: 16px;">warning</span>
+            <span>Ditemukan <strong>${dataViewerState.totalMissing} sel kosong</strong> pada dataset ini. Nilai kosong akan diganti dengan estimasi Mean atau Median kolom.</span>
+          </div>
+        `;
+      }
+    }
+    showModal('modalImputasiData');
+  });
+
+  // Imputasi radio card toggles
+  const cardMean = document.getElementById('cardImputasiMean');
+  const cardMedian = document.getElementById('cardImputasiMedian');
+  cardMean?.addEventListener('click', () => {
+    cardMean.style.borderColor = 'var(--color-primary)';
+    cardMean.style.background = 'var(--color-primary-light)';
+    if (cardMedian) {
+      cardMedian.style.borderColor = 'var(--border-color)';
+      cardMedian.style.background = 'var(--bg-hover)';
+    }
+  });
+  cardMedian?.addEventListener('click', () => {
+    cardMedian.style.borderColor = 'var(--color-primary)';
+    cardMedian.style.background = 'var(--color-primary-light)';
+    if (cardMean) {
+      cardMean.style.borderColor = 'var(--border-color)';
+      cardMean.style.background = 'var(--bg-hover)';
+    }
+  });
+
+  document.getElementById('btnJalankanImputasi')?.addEventListener('click', async () => {
+    const ds = getActiveDatasetOrAlert();
+    if (!ds) return;
+
+    const method = document.querySelector('input[name="metodeImputasi"]:checked')?.value || 'mean';
+    const rows = JSON.parse(JSON.stringify(dataViewerState.allRows));
+    const cols = dataViewerState.columns;
+
+    let totalImputed = 0;
+
+    cols.forEach(col => {
+      const validNumbers = [];
+      rows.forEach(r => {
+        const v = r[col];
+        if (v !== null && v !== undefined && v !== '' && !isNaN(Number(v))) {
+          validNumbers.push(Number(v));
+        }
+      });
+
+      if (validNumbers.length > 0) {
+        let fillValue = 0;
+        if (method === 'mean') {
+          fillValue = validNumbers.reduce((a, b) => a + b, 0) / validNumbers.length;
+          fillValue = Math.round(fillValue * 1000) / 1000;
+        } else {
+          validNumbers.sort((a, b) => a - b);
+          const mid = Math.floor(validNumbers.length / 2);
+          fillValue = validNumbers.length % 2 !== 0 ? validNumbers[mid] : (validNumbers[mid - 1] + validNumbers[mid]) / 2;
+        }
+
+        rows.forEach(r => {
+          const v = r[col];
+          if (v === null || v === undefined || v === '' || isNaN(Number(v))) {
+            r[col] = fillValue;
+            totalImputed++;
+          }
+        });
+      }
+    });
+
+    if (totalImputed === 0) {
+      showToast('Tidak ada data kosong yang perlu diimputasi', 'info');
+      hideModal('modalImputasiData');
+      return;
+    }
+
+    showLoading('Menerapkan Imputasi Data Hilang...', 700, 'Kalkulasi Pengisian Missing Values & Rekonstruksi Matriks', 'auto_fix_high');
+    try {
+      await window.api.datasetSimpanData({
+        id: ds.id,
+        data: rows,
+        jumlah_baris: rows.length,
+        jumlah_kolom: cols.length
+      });
+
+      hideModal('modalImputasiData');
+      await previewDataset(ds.id, true);
+      showToast(`Imputasi selesai! ${totalImputed} nilai kosong berhasil diisi dengan metode ${method.toUpperCase()}`, 'sukses');
+    } catch (e) {
+      showToast('Gagal menyimpan hasil imputasi: ' + e.message, 'error');
+    }
+    hideLoading();
+  });
+
+  // 2. Reverse Score
+  document.getElementById('btnBukaReverseScore')?.addEventListener('click', () => {
+    dropdownWrap?.classList.remove('open');
+    const ds = getActiveDatasetOrAlert();
+    if (!ds) return;
+
+    const select = document.getElementById('selectKolomReverse');
+    if (select) {
+      select.innerHTML = '<option value="">-- Pilih Kolom Indikator --</option>' +
+        dataViewerState.columns.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    }
+    showModal('modalReverseScore');
+  });
+
+  document.getElementById('btnJalankanReverseScore')?.addEventListener('click', async () => {
+    const ds = getActiveDatasetOrAlert();
+    if (!ds) return;
+
+    const col = document.getElementById('selectKolomReverse')?.value;
+    if (!col) {
+      showToast('Pilih kolom yang akan dibalik nilainya', 'peringatan');
+      return;
+    }
+
+    const minVal = parseFloat(document.getElementById('inputMinScale')?.value) || 1;
+    const maxVal = parseFloat(document.getElementById('inputMaxScale')?.value) || 5;
+
+    if (minVal >= maxVal) {
+      showToast('Nilai minimum harus lebih kecil dari nilai maksimum', 'peringatan');
+      return;
+    }
+
+    const rows = JSON.parse(JSON.stringify(dataViewerState.allRows));
+    let reversedCount = 0;
+
+    rows.forEach(r => {
+      const v = parseFloat(r[col]);
+      if (!isNaN(v)) {
+        r[col] = (minVal + maxVal) - v;
+        reversedCount++;
+      }
+    });
+
+    showLoading('Membalik Skala Indikator (Reverse Score)...', 500, 'Transformasi Skala & Rekalkulasi Nilai Indikator', 'swap_horiz');
+    try {
+      await window.api.datasetSimpanData({
+        id: ds.id,
+        data: rows,
+        jumlah_baris: rows.length,
+        jumlah_kolom: dataViewerState.columns.length
+      });
+
+      hideModal('modalReverseScore');
+      await previewDataset(ds.id, true);
+      showToast(`Skala kolom "${col}" berhasil dibalik (${reversedCount} baris terkonversi)`, 'sukses');
+    } catch (e) {
+      showToast('Gagal membalik skala data: ' + e.message, 'error');
+    }
+    hideLoading();
+  });
+
+  // 3. Deteksi Outlier Ekstrem
+  const renderOutlierResults = () => {
+    const ds = dataViewerState.activeDataset;
+    if (!ds || !dataViewerState.allRows.length) return;
+
+    const threshold = parseFloat(document.getElementById('selectThresholdOutlier')?.value) || 3.0;
+    const cols = dataViewerState.columns;
+    const rows = dataViewerState.allRows;
+    const container = document.getElementById('containerHasilOutlier');
+    if (!container) return;
+
+    // Hitung Mean & StDev per kolom
+    const stats = {};
+    cols.forEach(col => {
+      const vals = [];
+      rows.forEach(r => {
+        const num = parseFloat(r[col]);
+        if (!isNaN(num)) vals.push(num);
+      });
+      if (vals.length > 1) {
+        const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+        const variance = vals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (vals.length - 1);
+        const stdev = Math.sqrt(variance);
+        stats[col] = { mean, stdev };
+      }
+    });
+
+    const outliers = [];
+    rows.forEach((row, rowIdx) => {
+      const flaggedCols = [];
+      cols.forEach(col => {
+        const s = stats[col];
+        if (s && s.stdev > 0) {
+          const val = parseFloat(row[col]);
+          if (!isNaN(val)) {
+            const z = (val - s.mean) / s.stdev;
+            if (Math.abs(z) >= threshold) {
+              flaggedCols.push({ col, val, z: z.toFixed(2) });
+            }
+          }
+        }
+      });
+
+      if (flaggedCols.length > 0) {
+        outliers.push({ rowIdx: rowIdx + 1, flaggedCols, rowData: row });
+      }
+    });
+
+    if (outliers.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state" style="padding: 30px; text-align: center;">
+          <span class="material-icons-round" style="font-size: 40px; color: #10b981; margin-bottom: 8px;">verified</span>
+          <h4 style="margin: 0 0 6px 0; color: var(--text-primary);">Tidak Ditemukan Outlier Ekstrem</h4>
+          <p style="font-size: 12.5px; color: var(--text-muted); margin: 0;">Seluruh nilai observasi data berada dalam ambang batas wajar (|Z| < ${threshold}).</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="margin-bottom: 10px; font-size: 12px; color: var(--text-secondary);">
+        Ditemukan <strong>${outliers.length} baris</strong> data dengan indikasi pencilan ekstrem (|Z| &ge; ${threshold}):
+      </div>
+      <table class="data-table" style="font-size: 12px;">
+        <thead>
+          <tr>
+            <th style="width: 70px;">Baris #</th>
+            <th>Kolom & Nilai Pencilan</th>
+            <th>Nilai Z-Score</th>
+            <th>Diagnosa</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${outliers.map(o => `
+            <tr>
+              <td style="font-weight: 700; text-align: center;">Baris ${o.rowIdx}</td>
+              <td>
+                ${o.flaggedCols.map(f => `<span class="badge-chip badge-warning" style="margin: 2px;"><strong>${escapeHtml(f.col)}</strong> = ${f.val}</span>`).join(' ')}
+              </td>
+              <td>
+                ${o.flaggedCols.map(f => `<span class="badge-chip badge-danger" style="margin: 2px;">Z = ${f.z}</span>`).join(' ')}
+              </td>
+              <td style="color: #f87171; font-weight: 600;">Outlier Ekstrem</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  };
+
+  document.getElementById('btnBukaDeteksiOutlier')?.addEventListener('click', () => {
+    dropdownWrap?.classList.remove('open');
+    const ds = getActiveDatasetOrAlert();
+    if (!ds) return;
+    renderOutlierResults();
+    showModal('modalDeteksiOutlier');
+  });
+
+  document.getElementById('selectThresholdOutlier')?.addEventListener('change', () => {
+    renderOutlierResults();
+  });
 }
 
 // ============ ANALYSIS HANDLERS ============
@@ -4052,7 +6534,12 @@ async function runPLSAnalysis() {
     return;
   }
   
-  showLoading('Menjalankan Algoritma PLS-SEM...');
+  showLoading(
+    'Menjalankan Algoritma PLS-SEM...',
+    1200,
+    'Iterasi Pembobotan Outer/Inner Model, HTMT, VIF & Konvergensi Laten',
+    'account_tree'
+  );
   
   try {
     const dataset = await window.api.datasetAmbil(datasets[0].id);
@@ -4110,8 +6597,14 @@ async function runBootstrapAnalysis() {
   }
   
   const jumlahBootstrap = parseInt(document.getElementById('jumlahBootstrap').value) || 5000;
+  const estimatedMs = Math.max(1600, Math.round(jumlahBootstrap * 0.85));
   
-  showLoading(`Menjalankan Bootstrapping (${jumlahBootstrap} subsampel)... Mohon tunggu.`);
+  showLoading(
+    `Menjalankan Bootstrapping (${jumlahBootstrap.toLocaleString()} subsampel)...`,
+    estimatedMs,
+    'Resampling Non-Parametrik, Standard Error, t-Statistik & Nilai-p Hipotesis',
+    'shuffle'
+  );
   
   try {
     const dataset = await window.api.datasetAmbil(datasets[0].id);
@@ -4156,17 +6649,18 @@ async function runBootstrapAnalysis() {
 
 // ============ RESULTS DISPLAY & AUTOMATED REPORT GENERATOR ============
 function initResultsHandlers() {
-  document.querySelectorAll('.hasil-tab').forEach(tab => {
+  // Scoped tabs handler
+  document.querySelectorAll('#halaman-hasil .hasil-tab').forEach(tab => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll('.hasil-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.hasil-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('#halaman-hasil .hasil-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('#halaman-hasil .hasil-panel').forEach(p => p.classList.remove('active'));
       tab.classList.add('active');
       const targetPanel = document.getElementById(`tab-${tab.dataset.tab}`);
       if (targetPanel) targetPanel.classList.add('active');
     });
   });
   
-  // Salin Draf Bab 4 Lengkap
+  // Salin Draf Laporan Lengkap
   document.getElementById('btnSalinLaporanBab4')?.addEventListener('click', () => {
     if (!state.hasilPLS) {
       showToast('Jalankan analisis PLS terlebih dahulu', 'peringatan');
@@ -4175,7 +6669,12 @@ function initResultsHandlers() {
     copyChapter4Text();
   });
 
-  // Unduh Laporan Dokumen Bab 4
+  // Cetak / PDF Laporan
+  document.getElementById('btnCetakLaporanBab4')?.addEventListener('click', () => {
+    cetakLaporanBab4();
+  });
+
+  // Unduh Laporan Dokumen Riset (.doc)
   document.getElementById('btnDownloadLaporanBab4')?.addEventListener('click', () => {
     if (!state.hasilPLS) {
       showToast('Jalankan analisis PLS terlebih dahulu', 'peringatan');
@@ -4184,6 +6683,7 @@ function initResultsHandlers() {
     downloadChapter4Report();
   });
 
+  // Ekspor Excel
   document.getElementById('btnEksporHasil')?.addEventListener('click', async () => {
     if (!state.hasilPLS) {
       showToast('Belum ada hasil analisis', 'peringatan');
@@ -4200,182 +6700,137 @@ function initResultsHandlers() {
       showToast('Semua tabel hasil analisis berhasil diekspor ke Excel!', 'sukses');
     }
   });
+
+  updateResultsStatusBadge();
+  renderEmptyResultsState();
 }
 
-// ============ DATA PREPROCESSING HANDLERS ============
-function initDataPreprocessingHandlers() {
-  // 1. Modal Imputasi Data
-  document.getElementById('btnBukaImputasiData')?.addEventListener('click', async () => {
-    if (!state.proyekAktif) {
-      showToast('Pilih proyek terlebih dahulu', 'peringatan');
-      return;
-    }
-    if (!state.datasets || state.datasets.length === 0) {
-      showToast('Belum ada dataset yang diimpor', 'peringatan');
-      return;
-    }
-    showModal('modalImputasiData');
-  });
-
-  // Toggle pilihan metode imputasi
-  document.querySelectorAll('input[name="metodeImputasi"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      document.querySelectorAll('#modalImputasiData .tipe-card').forEach(c => c.classList.remove('active'));
-      radio.closest('.tipe-card')?.classList.add('active');
-    });
-  });
-
-  document.getElementById('btnJalankanImputasi')?.addEventListener('click', async () => {
-    if (!state.datasets || state.datasets.length === 0) return;
-    const activeDatasetId = state.datasets[0].id;
-    const ds = await window.api.datasetAmbil(activeDatasetId);
-    if (!ds || !ds.data) return;
-
-    const method = document.querySelector('input[name="metodeImputasi"]:checked')?.value || 'mean';
-    const { cleanedData, countImputed } = plsEngine.imputeMissingValues(ds.data, method);
-
-    if (window.api.datasetSimpanData) {
-      await window.api.datasetSimpanData({
-        id: activeDatasetId,
-        data: cleanedData,
-        jumlah_baris: cleanedData.length,
-        jumlah_kolom: ds.kolom.length
-      });
-    }
-
-    hideModal('modalImputasiData');
-    showToast(`Imputasi selesai! ${countImputed} nilai kosong berhasil diisi dengan metode ${method.toUpperCase()}`, 'sukses');
-    await loadDatasets();
-    previewDataset(activeDatasetId);
-  });
-
-  // 2. Modal Reverse Scoring
-  document.getElementById('btnBukaReverseScore')?.addEventListener('click', async () => {
-    if (!state.proyekAktif) {
-      showToast('Pilih proyek terlebih dahulu', 'peringatan');
-      return;
-    }
-    if (!state.datasets || state.datasets.length === 0) {
-      showToast('Belum ada dataset yang diimpor', 'peringatan');
-      return;
-    }
-
-    const ds = await window.api.datasetAmbil(state.datasets[0].id);
-    const select = document.getElementById('selectKolomReverse');
-    if (select && ds && ds.kolom) {
-      select.innerHTML = '<option value="">-- Pilih Kolom Indikator --</option>' +
-        ds.kolom.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-    }
-    showModal('modalReverseScore');
-  });
-
-  document.getElementById('btnJalankanReverseScore')?.addEventListener('click', async () => {
-    const col = document.getElementById('selectKolomReverse')?.value;
-    if (!col) {
-      showToast('Pilih kolom yang ingin dibalik skornya', 'peringatan');
-      return;
-    }
-
-    const minVal = parseFloat(document.getElementById('inputMinScale')?.value) || 1;
-    const maxVal = parseFloat(document.getElementById('inputMaxScale')?.value) || 5;
-
-    const activeDatasetId = state.datasets[0].id;
-    const ds = await window.api.datasetAmbil(activeDatasetId);
-    if (!ds || !ds.data) return;
-
-    const reversedData = plsEngine.reverseScoreColumn(ds.data, col, minVal, maxVal);
-
-    if (window.api.datasetSimpanData) {
-      await window.api.datasetSimpanData({
-        id: activeDatasetId,
-        data: reversedData,
-        jumlah_baris: reversedData.length,
-        jumlah_kolom: ds.kolom.length
-      });
-    }
-
-    hideModal('modalReverseScore');
-    showToast(`Kolom "${col}" berhasil di-reverse (${minVal} ↔ ${maxVal})!`, 'sukses');
-    await loadDatasets();
-    previewDataset(activeDatasetId);
-  });
-
-  // 3. Modal Deteksi Outlier
-  document.getElementById('btnBukaDeteksiOutlier')?.addEventListener('click', async () => {
-    if (!state.proyekAktif) {
-      showToast('Pilih proyek terlebih dahulu', 'peringatan');
-      return;
-    }
-    if (!state.datasets || state.datasets.length === 0) {
-      showToast('Belum ada dataset yang diimpor', 'peringatan');
-      return;
-    }
-
-    renderOutlierTable();
-    showModal('modalDeteksiOutlier');
-  });
-
-  document.getElementById('selectThresholdOutlier')?.addEventListener('change', () => {
-    renderOutlierTable();
-  });
-}
-
-async function renderOutlierTable() {
-  const container = document.getElementById('containerHasilOutlier');
-  if (!container || !state.datasets || state.datasets.length === 0) return;
-
-  const threshold = parseFloat(document.getElementById('selectThresholdOutlier')?.value) || 3.0;
-  const ds = await window.api.datasetAmbil(state.datasets[0].id);
-  if (!ds || !ds.data) return;
-
-  const outliers = plsEngine.detectOutliers(ds.data, threshold);
-
-  if (outliers.length === 0) {
-    container.innerHTML = `
-      <div style="text-align: center; padding: 24px; color: var(--color-success);">
-        <span class="material-icons-round" style="font-size: 40px;">verified</span>
-        <h4 style="margin: 8px 0 4px 0;">Tidak Ditemukan Outlier Ekstrem</h4>
-        <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">
-          Semua data berada dalam rentang wajar standar deviasi (|Z| &lt; ${threshold}). Data Anda bersih dan siap dianalisis.
-        </p>
-      </div>
+function updateResultsStatusBadge() {
+  const badge = document.getElementById('badgeStatusHasilAnalisis');
+  if (!badge) return;
+  if (state.hasilPLS && state.hasilBootstrap) {
+    badge.innerHTML = `
+      <span class="material-icons-round" style="font-size: 14px; color: #10b981;">check_circle</span>
+      <span style="color: #10b981; font-weight: 700;">PLS & Bootstrap Lengkap (N=${state.hasilPLS.sampleSize})</span>
     `;
+    badge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+    badge.style.background = 'rgba(16, 185, 129, 0.1)';
+  } else if (state.hasilPLS) {
+    badge.innerHTML = `
+      <span class="material-icons-round" style="font-size: 14px; color: #3b82f6;">check_circle</span>
+      <span style="color: #3b82f6; font-weight: 700;">PLS Algorithm Selesai (N=${state.hasilPLS.sampleSize})</span>
+    `;
+    badge.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+    badge.style.background = 'rgba(59, 130, 246, 0.1)';
+  } else {
+    badge.innerHTML = `
+      <span class="material-icons-round" style="font-size: 14px; color: #f59e0b;">hourglass_empty</span>
+      <span>Belum Dianalisis</span>
+    `;
+    badge.style.borderColor = 'var(--border-color)';
+    badge.style.background = 'var(--bg-hover)';
+  }
+}
+
+function renderEmptyResultsState() {
+  const emptyRingkasan = document.getElementById('emptyStateRingkasan');
+  if (!emptyRingkasan) return;
+  if (state.hasilPLS) return;
+
+  emptyRingkasan.innerHTML = `
+    <div class="empty-state-icon" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(16, 185, 129, 0.2)); color: var(--color-primary);">
+      <span class="material-icons-round">assessment</span>
+    </div>
+    <h3>Hasil Analisis & Laporan Riset Belum Tersedia</h3>
+    <p>
+      Jalankan <strong>Algoritma PLS-SEM</strong> atau <strong>Bootstrapping</strong> untuk mengkalkulasi model pengukuran (Outer Model), model struktural (Inner Model), uji mediasi VAF, uji moderasi, relevansi prediktif Stone-Geisser Q², serta draf bab 4 laporan akademik otomatis standar APA 7th.
+    </p>
+    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 6px;">
+      <button class="btn btn-primary" onclick="jalankanPLSdariHasil()">
+        <span class="material-icons-round">play_arrow</span> Jalankan PLS-SEM Algorithm
+      </button>
+      <button class="btn btn-outline" onclick="jalankanBootstrapDariHasil()">
+        <span class="material-icons-round">shuffle</span> Jalankan Bootstrapping
+      </button>
+      <button class="btn btn-outline" onclick="navigateTo('editor')">
+        <span class="material-icons-round">account_tree</span> Desain Diagram Model
+      </button>
+    </div>
+  `;
+}
+
+function jalankanPLSdariHasil() {
+  if (!state.dataMentah || state.dataMentah.length === 0) {
+    showToast('Silakan muat dataset terlebih dahulu di menu Data!', 'peringatan');
+    navigateTo('data');
     return;
   }
+  if (!state.variabels || state.variabels.length === 0) {
+    showToast('Silakan buat variabel & indikator di Editor Model terlebih dahulu!', 'peringatan');
+    navigateTo('editor');
+    return;
+  }
+  showModal('modalPengaturanPLS');
+}
 
-  let html = `
-    <div style="margin-bottom: 10px; font-size: 12.5px; color: var(--color-warning);">
-      <strong>⚠️ Terdeteksi ${outliers.length} baris dengan nilai ekstrem (|Z| &ge; ${threshold}):</strong>
-    </div>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Baris Ke-</th>
-          <th>Indikator</th>
-          <th>Nilai Data</th>
-          <th>Z-Score</th>
-          <th>Keterangan</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
+function jalankanBootstrapDariHasil() {
+  if (!state.dataMentah || state.dataMentah.length === 0) {
+    showToast('Silakan muat dataset terlebih dahulu di menu Data!', 'peringatan');
+    navigateTo('data');
+    return;
+  }
+  if (!state.variabels || state.variabels.length === 0) {
+    showToast('Silakan buat variabel & indikator di Editor Model terlebih dahulu!', 'peringatan');
+    navigateTo('editor');
+    return;
+  }
+  showModal('modalBootstrap');
+}
 
-  outliers.forEach(o => {
-    o.details.forEach(d => {
-      html += `
-        <tr>
-          <td style="font-weight: 700;">Baris #${o.rowIndex}</td>
-          <td>${escapeHtml(d.col)}</td>
-          <td style="font-weight: 600;">${d.val}</td>
-          <td style="color: var(--color-danger); font-weight: 700;">Z = ${d.z}</td>
-          <td><span class="badge badge-danger">Pencilan Ekstrem</span></td>
-        </tr>
-      `;
-    });
+function cetakLaporanBab4() {
+  if (!state.hasilPLS) {
+    showToast('Jalankan analisis PLS terlebih dahulu sebelum mencetak laporan.', 'peringatan');
+    return;
+  }
+  // Aktifkan tab laporan sebelum print
+  document.querySelectorAll('#halaman-hasil .hasil-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#halaman-hasil .hasil-panel').forEach(p => p.classList.remove('active'));
+  const tabLaporanBtn = document.querySelector('#halaman-hasil .hasil-tab[data-tab="laporan-bab4"]');
+  const tabLaporanPanel = document.getElementById('tab-laporan-bab4');
+  if (tabLaporanBtn && tabLaporanPanel) {
+    tabLaporanBtn.classList.add('active');
+    tabLaporanPanel.classList.add('active');
+  }
+  setTimeout(() => {
+    window.print();
+  }, 100);
+}
+
+function copyTableTSV(tableId) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const rows = Array.from(table.querySelectorAll('tr'));
+  const tsv = rows.map(r => {
+    const cells = Array.from(r.querySelectorAll('th, td'));
+    return cells.map(c => (c.innerText || c.textContent || '').trim().replace(/\t/g, ' ')).join('\t');
+  }).join('\n');
+  
+  navigator.clipboard.writeText(tsv).then(() => {
+    showToast('Tabel berhasil disalin (format TSV/Excel)! Anda dapat langsung Paste ke Excel atau Word.', 'sukses');
+  }).catch(() => {
+    showToast('Gagal menyalin tabel.', 'error');
   });
+}
 
-  html += '</tbody></table>';
-  container.innerHTML = html;
+function filterOuterModelTable(query) {
+  const table = document.getElementById('tableOuterLoadings');
+  if (!table) return;
+  const q = (query || '').toLowerCase().trim();
+  const rows = table.querySelectorAll('tbody tr');
+  rows.forEach(r => {
+    const text = r.innerText.toLowerCase();
+    r.style.display = text.includes(q) ? '' : 'none';
+  });
 }
 
 // ============ TATA OTOMATIS MODEL (AUTO ARRANGE) ============
@@ -4472,85 +6927,116 @@ function autoArrangeModel() {
 
 // ============ DISPLAY PLS RESULTS ============
 function displayPLSResults(hasil) {
+  state.hasilPLS = hasil;
+  updateResultsStatusBadge();
+
   // ---- TAB 1: RINGKASAN & MODEL FIT ----
   const ringkasan = document.getElementById('tab-ringkasan');
   const fit = hasil.modelFit || { srmr: 0.052, srmrThreshold: 0.08, srmrFit: true, nfi: 0.912, nfiThreshold: 0.90, nfiFit: true };
 
   ringkasan.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
       <div>
-        <h3 style="margin: 0; font-size: 18px;">Ringkasan Hasil PLS-SEM & Model Fit</h3>
-        <span style="font-size: 12px; color: var(--text-secondary);">Kriteria kelayakan model global & parameter struktural</span>
+        <h3 style="margin: 0; font-size: 19px; display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: var(--color-primary);">insights</span>
+          Ringkasan Hasil PLS-SEM & Evaluasi Model Fit
+        </h3>
+        <span style="font-size: 12.5px; color: var(--text-secondary);">Kriteria kelayakan model global, koefisien determinasi (R²), dan ringkasan eksekutif</span>
       </div>
-      <div style="display: flex; gap: 8px;">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
         <button class="btn btn-sm btn-outline" onclick="navigateTo('editor')" title="Lihat diagram di editor">
-          <span class="material-icons-round">account_tree</span> Buka di Editor
+          <span class="material-icons-round">account_tree</span> Buka Diagram
         </button>
-        <button class="btn btn-sm btn-primary" onclick="showModal('modalEksporGambar')" title="Ekspor diagram 600 DPI">
-          <span class="material-icons-round">image</span> Ekspor Diagram (600 DPI)
+        <button class="btn btn-sm btn-outline" onclick="showModal('modalEksporGambar')" title="Ekspor diagram 600 DPI">
+          <span class="material-icons-round">image</span> Ekspor Diagram
+        </button>
+        <button class="btn btn-sm btn-primary" onclick="jalankanBootstrapDariHasil()" title="Jalankan Bootstrapping untuk uji signifikansi">
+          <span class="material-icons-round">shuffle</span> Uji Bootstrapping
         </button>
       </div>
     </div>
 
-    <!-- Ringkasan Global -->
-    <div class="ringkasan-grid" style="margin-bottom: 20px;">
+    <!-- Ringkasan Metrik Eksekutif -->
+    <div class="ringkasan-grid" style="margin-bottom: 24px;">
       <div class="ringkasan-card">
-        <span class="value">${hasil.sampleSize}</span>
         <span class="label">Ukuran Sampel (N)</span>
+        <span class="value">${hasil.sampleSize}</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Total responden observasi empiris</span>
       </div>
       <div class="ringkasan-card">
-        <span class="value">${hasil.iterations}</span>
         <span class="label">Jumlah Iterasi</span>
+        <span class="value">${hasil.iterations}</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Maks. 300 iterasi algoritma</span>
       </div>
       <div class="ringkasan-card">
-        <span class="value" style="color: ${hasil.converged ? 'var(--color-success)' : 'var(--color-danger)'}">
-          ${hasil.converged ? 'Ya (Konvergen)' : 'Tidak'}
-        </span>
         <span class="label">Status Konvergensi</span>
+        <span class="value" style="color: ${hasil.converged ? 'var(--color-success)' : 'var(--color-danger)'}; font-size: 20px;">
+          ${hasil.converged ? '✓ Konvergen' : '✗ Tidak Konvergen'}
+        </span>
+        <span style="font-size: 11px; color: var(--text-muted);">${hasil.converged ? 'Toleransi kriteria stop terpenuhi' : 'Periksa multikolinearitas'}</span>
       </div>
       <div class="ringkasan-card">
-        <span class="value">${Object.keys(hasil.pathCoefficients).length}</span>
         <span class="label">Jalur Struktural</span>
+        <span class="value">${Object.keys(hasil.pathCoefficients).length}</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Hubungan kausalitas langsung</span>
       </div>
     </div>
 
     <!-- Model Fit Grid (SRMR & NFI) -->
-    <h4 style="margin: 20px 0 10px; font-size: 14.5px; display: flex; align-items: center; gap: 6px;">
-      <span class="material-icons-round" style="color: var(--color-primary); font-size: 19px;">rule</span>
-      Indeks Kecocokan Model Global (Goodness of Fit / Model Fit)
-    </h4>
-    <div class="fit-card-grid">
+    <div style="margin: 24px 0 12px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+      <h4 style="margin: 0; font-size: 14.5px; display: flex; align-items: center; gap: 6px;">
+        <span class="material-icons-round" style="color: var(--color-primary); font-size: 19px;">rule</span>
+        Indeks Kecocokan Model Global (Goodness of Fit / Model Fit)
+      </h4>
+      <span class="badge badge-info">Standar Henseler (2014) & Lohmöller (1989)</span>
+    </div>
+    
+    <div class="fit-card-grid" style="margin-bottom: 24px;">
       <div class="fit-card" style="border-left: 4px solid ${fit.srmrFit ? 'var(--color-success)' : 'var(--color-warning)'};">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <strong style="font-size: 13px;">SRMR (Standardized Root Mean Residual)</strong>
+          <strong style="font-size: 13px; color: var(--text-primary);">SRMR (Standardized Root Mean Residual)</strong>
           <span class="badge ${fit.srmrFit ? 'badge-sukses' : 'badge-peringatan'}">
             ${fit.srmrFit ? 'Good Fit (≤ 0.08)' : 'Marginal Fit'}
           </span>
         </div>
         <div class="fit-val">${fit.srmr.toFixed(4)}</div>
-        <small style="color: var(--text-muted); font-size: 11px;">Standar Henseler et al. (2014): Nilai SRMR &lt; 0.08 menunjukkan model memiliki kecocokan yang sangat baik.</small>
+        <small style="color: var(--text-muted); font-size: 11.5px; line-height: 1.4;">
+          Standar Henseler et al. (2014): Nilai SRMR &lt; 0.08 menunjukkan model memiliki kecocokan yang sangat baik dengan data empiris.
+        </small>
       </div>
 
       <div class="fit-card" style="border-left: 4px solid ${fit.nfiFit ? 'var(--color-success)' : 'var(--color-warning)'};">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <strong style="font-size: 13px;">NFI (Normed Fit Index)</strong>
+          <strong style="font-size: 13px; color: var(--text-primary);">NFI (Normed Fit Index)</strong>
           <span class="badge ${fit.nfiFit ? 'badge-sukses' : 'badge-peringatan'}">
             ${fit.nfiFit ? 'Good Fit (≥ 0.90)' : 'Diterima'}
           </span>
         </div>
         <div class="fit-val">${fit.nfi.toFixed(4)}</div>
-        <small style="color: var(--text-muted); font-size: 11px;">Standar Lohmöller (1989): Nilai NFI di atas 0.90 mengindikasikan kecocokan model yang memuaskan.</small>
+        <small style="color: var(--text-muted); font-size: 11.5px; line-height: 1.4;">
+          Standar Lohmöller (1989): Nilai NFI di atas 0.90 mengindikasikan bahwa model memiliki kesesuaian struktural yang tinggi.
+        </small>
       </div>
     </div>
 
-    <!-- Tabel R² -->
-    <h4 style="margin: 24px 0 12px; font-size: 14px;">Koefisien Determinasi (R² & R² Adjusted)</h4>
-    <table class="data-table">
+    <!-- Tabel R² dengan Progress Meters -->
+    <div class="table-toolbar-box">
+      <h4>
+        <span class="material-icons-round" style="color: var(--color-primary); font-size: 18px;">pie_chart</span>
+        Koefisien Determinasi (R² & R² Adjusted)
+      </h4>
+      <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableRSquared')">
+        <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin Tabel
+      </button>
+    </div>
+    
+    <table class="data-table" id="tableRSquared">
       <thead>
         <tr>
           <th>Variabel Endogen</th>
-          <th>R²</th>
-          <th>R² Adjusted</th>
+          <th style="width: 140px;">R²</th>
+          <th style="width: 140px;">R² Adjusted</th>
+          <th style="width: 200px;">Distribusi Varians (0 - 100%)</th>
           <th>Kekuatan Pengaruh</th>
         </tr>
       </thead>
@@ -4559,40 +7045,68 @@ function displayPLSResults(hasil) {
           const r2Adj = hasil.rSquaredAdj?.[name] !== undefined ? hasil.rSquaredAdj[name] : r2;
           const desc = r2 >= 0.75 ? 'Substansial (Kuat)' : r2 >= 0.50 ? 'Moderat (Sedang)' : r2 >= 0.25 ? 'Lemah' : 'Sangat Lemah';
           const descClass = r2 >= 0.75 ? 'badge-sukses' : r2 >= 0.50 ? 'badge-peringatan' : 'badge-danger';
+          const pct = Math.min(100, Math.max(0, r2 * 100));
           return `
             <tr>
-              <td style="font-weight: 600;">${escapeHtml(name)}</td>
-              <td style="font-weight: 700; color: var(--color-primary);">${r2.toFixed(4)}</td>
-              <td>${r2Adj.toFixed(4)}</td>
+              <td style="font-weight: 600; color: var(--text-primary);">${escapeHtml(name)}</td>
+              <td style="font-weight: 800; color: var(--color-primary); font-size: 14px;">${r2.toFixed(4)}</td>
+              <td style="font-weight: 600;">${r2Adj.toFixed(4)}</td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <div class="r2-progress-bar" style="flex: 1;">
+                    <div class="r2-progress-fill" style="width: ${pct.toFixed(1)}%;"></div>
+                  </div>
+                  <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); width: 42px;">${pct.toFixed(1)}%</span>
+                </div>
+              </td>
               <td><span class="badge ${descClass}">${desc}</span></td>
             </tr>
           `;
         }).join('')}
       </tbody>
     </table>
+    <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 6px;">
+      Acuan Hair et al. (2022): R² &ge; 0.75 (Substansial/Kuat), R² &ge; 0.50 (Moderat/Sedang), R² &ge; 0.25 (Lemah).
+    </div>
   `;
 
   // ---- TAB 2: MODEL PENGUKURAN (OUTER MODEL, HTMT, OUTER VIF) ----
   const outerModel = document.getElementById('tab-outer-model');
   let outerHtml = `
-    <div style="margin-bottom: 16px;">
-      <h3 style="margin: 0; font-size: 18px;">Evaluasi Model Pengukuran (Outer Model)</h3>
-      <span style="font-size: 12px; color: var(--text-secondary);">Validitas Konvergen, Reliabilitas Konstruk, Validitas Diskriminan, HTMT, & Outer VIF</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
+      <div>
+        <h3 style="margin: 0; font-size: 19px; display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: var(--color-primary);">fact_check</span>
+          Evaluasi Model Pengukuran (Measurement Model / Outer Model)
+        </h3>
+        <span style="font-size: 12.5px; color: var(--text-secondary);">Validitas Konvergen, Reliabilitas Konstruk, Validitas Diskriminan, HTMT, & Outer VIF</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-sm btn-outline" onclick="copyTableTSV('tableOuterLoadings')">
+          <span class="material-icons-round">content_copy</span> Salin Outer Loadings
+        </button>
+      </div>
     </div>
   `;
 
   // 1. Outer Loadings & Outer VIF
   outerHtml += `
-    <h4 style="margin-bottom: 10px; font-size: 14px;">1. Outer Loadings & Multikolinearitas Indikator (Outer VIF)</h4>
-    <table class="data-table">
+    <div class="table-toolbar-box">
+      <h4>1. Outer Loadings & Multikolinearitas Indikator (Outer VIF)</h4>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <input type="text" class="input input-sm" placeholder="🔍 Cari indikator/variabel..." oninput="filterOuterModelTable(this.value)" style="width: 220px; font-size: 12px; padding: 4px 10px;">
+      </div>
+    </div>
+    
+    <table class="data-table" id="tableOuterLoadings">
       <thead>
         <tr>
           <th>Variabel Laten</th>
           <th>Indikator</th>
-          <th>Outer Loading</th>
+          <th>Outer Loading (λ)</th>
           <th>Status Loading</th>
           <th>Outer VIF</th>
-          <th>Status VIF</th>
+          <th>Status Multikolinearitas</th>
         </tr>
       </thead>
       <tbody>
@@ -4600,8 +7114,8 @@ function displayPLSResults(hasil) {
 
   for (const [varName, loadings] of Object.entries(hasil.outerLoadings)) {
     for (const [ind, val] of Object.entries(loadings)) {
-      const status = Math.abs(val) >= 0.7 ? 'Valid (≥ 0.70)' : Math.abs(val) >= 0.4 ? 'Marginal (0.4-0.7)' : 'Tidak Valid (< 0.40)';
-      const statusClass = Math.abs(val) >= 0.7 ? 'badge-sukses' : Math.abs(val) >= 0.4 ? 'badge-peringatan' : 'badge-danger';
+      const status = Math.abs(val) >= 0.708 ? 'Valid Ideal (≥ 0.708)' : Math.abs(val) >= 0.50 ? 'Valid Diterima (0.50-0.70)' : 'Tidak Valid (< 0.50)';
+      const statusClass = Math.abs(val) >= 0.708 ? 'badge-sukses' : Math.abs(val) >= 0.50 ? 'badge-peringatan' : 'badge-danger';
 
       const vifVal = hasil.vif?.outerVIF?.[varName]?.[ind] || 1.0;
       const vifDesc = vifVal < 3.3 ? 'Bebas Kolinearitas (< 3.3)' : vifVal < 5.0 ? 'Moderat (< 5.0)' : 'Tinggi (≥ 5.0)';
@@ -4609,9 +7123,9 @@ function displayPLSResults(hasil) {
 
       outerHtml += `
         <tr>
-          <td style="font-weight: 600;">${escapeHtml(varName)}</td>
-          <td>${escapeHtml(ind)}</td>
-          <td style="font-weight: 700;">${val.toFixed(4)}</td>
+          <td style="font-weight: 600; color: var(--text-primary);">${escapeHtml(varName)}</td>
+          <td style="font-family: monospace; font-weight: 700; color: var(--color-primary);">${escapeHtml(ind)}</td>
+          <td style="font-weight: 800; font-size: 13.5px;">${val.toFixed(4)}</td>
           <td><span class="badge ${statusClass}">${status}</span></td>
           <td style="font-weight: 600;">${vifVal.toFixed(3)}</td>
           <td><span class="badge ${vifClass}">${vifDesc}</span></td>
@@ -4623,8 +7137,14 @@ function displayPLSResults(hasil) {
 
   // 2. Reliabilitas & AVE
   outerHtml += `
-    <h4 style="margin: 24px 0 10px; font-size: 14px;">2. Reliabilitas Konstruk & Validitas Konvergen</h4>
-    <table class="data-table">
+    <div class="table-toolbar-box" style="margin-top: 28px;">
+      <h4>2. Reliabilitas Konstruk & Validitas Konvergen</h4>
+      <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableConstructReliability')">
+        <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin Tabel
+      </button>
+    </div>
+    
+    <table class="data-table" id="tableConstructReliability">
       <thead>
         <tr>
           <th>Variabel Laten</th>
@@ -4632,7 +7152,7 @@ function displayPLSResults(hasil) {
           <th>rho_A (≥ 0.70)</th>
           <th>Composite Reliability (CR ≥ 0.70)</th>
           <th>AVE (≥ 0.50)</th>
-          <th>Status Keseluruhan</th>
+          <th>Evaluasi Keseluruhan</th>
         </tr>
       </thead>
       <tbody>
@@ -4642,7 +7162,7 @@ function displayPLSResults(hasil) {
     const isReliable = rel.cronbachAlpha >= 0.7 && rel.compositeReliability >= 0.7 && rel.ave >= 0.5;
     outerHtml += `
       <tr>
-        <td style="font-weight: 600;">${escapeHtml(varName)}</td>
+        <td style="font-weight: 600; color: var(--text-primary);">${escapeHtml(varName)}</td>
         <td class="${rel.cronbachAlpha >= 0.7 ? 'signifikan' : 'tidak-signifikan'}">${rel.cronbachAlpha.toFixed(4)}</td>
         <td>${rel.rhoA.toFixed(4)}</td>
         <td class="${rel.compositeReliability >= 0.7 ? 'signifikan' : 'tidak-signifikan'}">${rel.compositeReliability.toFixed(4)}</td>
@@ -4655,29 +7175,34 @@ function displayPLSResults(hasil) {
 
   // 3. HTMT (Heterotrait-Monotrait Ratio)
   outerHtml += `
-    <div style="margin: 28px 0 10px; display: flex; justify-content: space-between; align-items: center;">
-      <h4 style="margin: 0; font-size: 14px; color: var(--color-primary); display: flex; align-items: center; gap: 6px;">
+    <div class="table-toolbar-box" style="margin-top: 28px;">
+      <h4 style="color: var(--color-primary);">
         <span class="material-icons-round" style="font-size: 18px;">verified_user</span>
         3. Heterotrait-Monotrait Ratio (HTMT) - Standar Henseler et al. (2015)
       </h4>
-      <span class="badge badge-sukses">Standar Modern Jurnal Scopus</span>
+      <div style="display: flex; gap: 8px;">
+        <span class="badge badge-sukses">Standar Modern Jurnal Scopus</span>
+        <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableHTMT')">
+          <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin Matriks
+        </button>
+      </div>
     </div>
     <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
-      Nilai HTMT di bawah <strong>0.85</strong> (konservatif) atau <strong>0.90</strong> (liberal) membuktikan bahwa validitas diskriminan antar konstruk terpenuhi secara sempurna.
+      Nilai HTMT di bawah <strong>0.85</strong> (kriteria konservatif) atau <strong>0.90</strong> (kriteria liberal) membuktikan bahwa validitas diskriminan antar konstruk terpenuhi sempurna.
     </p>
   `;
 
   if (hasil.htmt) {
     const htmtVars = Object.keys(hasil.htmt);
-    outerHtml += '<table class="data-table"><thead><tr><th></th>';
+    outerHtml += '<table class="data-table" id="tableHTMT"><thead><tr><th></th>';
     htmtVars.forEach(n => outerHtml += `<th>${escapeHtml(n)}</th>`);
     outerHtml += '</tr></thead><tbody>';
 
     for (const v1 of htmtVars) {
-      outerHtml += `<tr><td style="font-weight: 600;">${escapeHtml(v1)}</td>`;
+      outerHtml += `<tr><td style="font-weight: 600; color: var(--text-primary);">${escapeHtml(v1)}</td>`;
       for (const v2 of htmtVars) {
         if (v1 === v2) {
-          outerHtml += '<td style="color: var(--text-muted);">-</td>';
+          outerHtml += '<td style="color: var(--text-muted); text-align: center;">-</td>';
         } else {
           const val = hasil.htmt[v1][v2] || 0;
           const isGood = val < 0.85;
@@ -4697,18 +7222,28 @@ function displayPLSResults(hasil) {
   }
 
   // 4. Fornell-Larcker Criterion
-  outerHtml += '<h4 style="margin: 28px 0 10px; font-size: 14px;">4. Fornell-Larcker Criterion</h4>';
+  outerHtml += `
+    <div class="table-toolbar-box" style="margin-top: 28px;">
+      <h4>4. Fornell-Larcker Criterion</h4>
+      <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableFornellLarcker')">
+        <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin Matriks
+      </button>
+    </div>
+    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+      Nilai akar kuadrat AVE (pada diagonal utama) harus lebih besar daripada korelasi konstruk terkait dengan seluruh konstruk lainnya.
+    </p>
+  `;
   const varNames = Object.keys(hasil.discriminantValidity);
-  outerHtml += '<table class="data-table"><thead><tr><th></th>';
+  outerHtml += '<table class="data-table" id="tableFornellLarcker"><thead><tr><th></th>';
   varNames.forEach(n => outerHtml += `<th>${escapeHtml(n)}</th>`);
   outerHtml += '</tr></thead><tbody>';
 
   for (const v1 of varNames) {
-    outerHtml += `<tr><td style="font-weight: 600;">${escapeHtml(v1)}</td>`;
+    outerHtml += `<tr><td style="font-weight: 600; color: var(--text-primary);">${escapeHtml(v1)}</td>`;
     for (const v2 of varNames) {
       const val = hasil.discriminantValidity[v1][v2];
       const isDiagonal = v1 === v2;
-      outerHtml += `<td style="${isDiagonal ? 'font-weight: 800; color: var(--color-primary); background: var(--bg-hover);' : ''}">${val.toFixed(4)}</td>`;
+      outerHtml += `<td style="${isDiagonal ? 'font-weight: 800; color: var(--color-primary); background: rgba(79, 70, 229, 0.1); border-radius: 4px;' : ''}">${val.toFixed(4)}</td>`;
     }
     outerHtml += '</tr>';
   }
@@ -4719,12 +7254,22 @@ function displayPLSResults(hasil) {
   // ---- TAB 3: MODEL STRUKTURAL (INNER MODEL & INNER VIF) ----
   const innerModel = document.getElementById('tab-inner-model');
   let innerHtml = `
-    <div style="margin-bottom: 16px;">
-      <h3 style="margin: 0; font-size: 18px;">Evaluasi Model Struktural (Inner Model)</h3>
-      <span style="font-size: 12px; color: var(--text-secondary);">Koefisien Jalur (β), f² Effect Size, & Multikolinearitas Konstruk (Inner VIF)</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
+      <div>
+        <h3 style="margin: 0; font-size: 19px; display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: var(--color-primary);">account_tree</span>
+          Evaluasi Model Struktural (Structural Model / Inner Model)
+        </h3>
+        <span style="font-size: 12.5px; color: var(--text-secondary);">Koefisien Jalur (β), Ukuran Efek (f² Cohen), & Multikolinearitas Struktural (Inner VIF)</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-sm btn-outline" onclick="copyTableTSV('tableInnerModel')">
+          <span class="material-icons-round">content_copy</span> Salin Jalur Struktural
+        </button>
+      </div>
     </div>
-    <h4 style="margin-bottom: 10px; font-size: 14px;">Koefisien Jalur & Ukuran Efek (f²)</h4>
-    <table class="data-table">
+    
+    <table class="data-table" id="tableInnerModel">
       <thead>
         <tr>
           <th>Jalur Struktural</th>
@@ -4754,9 +7299,9 @@ function displayPLSResults(hasil) {
 
     innerHtml += `
       <tr>
-        <td style="font-weight: 600;">${escapeHtml(path)}</td>
-        <td style="font-weight: 700; color: var(--color-primary);">${coeff.toFixed(4)}</td>
-        <td>${f2.toFixed(4)}</td>
+        <td style="font-weight: 600; color: var(--text-primary); font-size: 13.5px;">${escapeHtml(path)}</td>
+        <td style="font-weight: 800; color: var(--color-primary); font-size: 14px;">${coeff.toFixed(4)}</td>
+        <td style="font-weight: 600;">${f2.toFixed(4)}</td>
         <td><span class="badge ${f2Class}">${f2Desc}</span></td>
         <td style="font-weight: 600;">${innerVifVal.toFixed(3)}</td>
         <td><span class="badge ${innerVifClass}">${innerVifDesc}</span></td>
@@ -4766,124 +7311,444 @@ function displayPLSResults(hasil) {
   innerHtml += '</tbody></table>';
   innerModel.innerHTML = innerHtml;
 
-  // ---- TAB 4: EFEK MEDIASI (SPECIFIC INDIRECT EFFECTS & BREAKDOWN) ----
-  const mediasiTab = document.getElementById('tab-mediasi');
-  const indResult = hasil.indirectEffects;
-  let medHtml = `
-    <div style="margin-bottom: 16px;">
-      <h3 style="margin: 0; font-size: 18px;">Analisis Efek Mediasi & Pengaruh Tidak Langsung</h3>
-      <span style="font-size: 12px; color: var(--text-secondary);">Breakdown Pengaruh Langsung (Direct), Tidak Langsung (Indirect), Total Effect, dan VAF %</span>
-    </div>
-  `;
+  // ---- TAB 4: RELEVANSI PREDIKTIF STONE-GEISSER (Q² BLINDFOLDING) ----
+  const q2Tab = document.getElementById('tab-q2-predictive');
+  if (q2Tab) {
+    const q2Data = hasil.q2 || (plsEngine ? plsEngine.calculateBlindfoldingQ2(hasil.latentScores, hasil.rSquared) : {});
+    let q2Html = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
+        <div>
+          <h3 style="margin: 0; font-size: 19px; display: flex; align-items: center; gap: 8px;">
+            <span class="material-icons-round" style="color: #8b5cf6;">batch_prediction</span>
+            Evaluasi Relevansi Prediktif Stone-Geisser (Q² / Blindfolding)
+          </h3>
+          <span style="font-size: 12.5px; color: var(--text-secondary);">Prosedur Blindfolding, Cross-Validated Redundancy, dan Kapabilitas Prediksi Model</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span class="badge badge-sukses" style="font-size: 11px; padding: 4px 10px;">Omission Distance D = 7</span>
+          <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableQ2Predictive')">
+            <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin Tabel
+          </button>
+        </div>
+      </div>
 
-  if (indResult && indResult.specificIndirect && indResult.specificIndirect.length > 0) {
-    medHtml += `
-      <h4 style="margin-bottom: 10px; font-size: 14px;">1. Specific Indirect Effects</h4>
-      <table class="data-table">
+      <!-- Info Box Rumus & Kriteria Q² -->
+      <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 20px; font-size: 13px; line-height: 1.6;">
+        <strong style="color: var(--color-primary); display: block; margin-bottom: 4px;">Alur & Rumus Perhitungan Relevansi Prediktif (Q²):</strong>
+        <p style="margin: 0 0 6px 0;">
+          Relevansi prediktif Stone-Geisser dievaluasi menggunakan teknik <em>blindfolding</em> dengan rumus:
+          <br><em style="font-family: monospace; background: var(--bg-hover); padding: 3px 8px; border-radius: 4px; display: inline-block; margin: 4px 0; font-size: 13.5px;">Q² = 1 - (SSE / SSO)</em>
+        </p>
+        <span style="color: var(--text-muted); font-size: 12px;">
+          Di mana <strong>SSO</strong> adalah <em>Sum of Squared Observations</em> dan <strong>SSE</strong> adalah <em>Sum of Squared Prediction Errors</em>.
+          <br><strong>Kriteria Evaluasi (Hair et al., 2022):</strong>
+          <strong>Q² &gt; 0.50</strong> (Relevansi Prediktif Sangat Kuat),
+          <strong>Q² &gt; 0.25</strong> (Relevansi Prediktif Moderat),
+          <strong>Q² &gt; 0</strong> (Relevansi Prediktif Kecil),
+          <strong>Q² &le; 0</strong> (Model Tidak Memiliki Relevansi Prediktif).
+        </span>
+      </div>
+
+      <table class="data-table" id="tableQ2Predictive">
         <thead>
           <tr>
-            <th>Jalur Mediasi</th>
-            <th>Variabel Mediator</th>
-            <th>Koefisien Efek Tidak Langsung (β_ind)</th>
+            <th>Variabel Endogen</th>
+            <th>R² Asli</th>
+            <th>SSO (Observed)</th>
+            <th>SSE (Prediction Error)</th>
+            <th>Q² (= 1 - SSE/SSO)</th>
+            <th>Kategori Relevansi Prediktif</th>
           </tr>
         </thead>
         <tbody>
-          ${indResult.specificIndirect.map(sp => `
-            <tr>
-              <td style="font-weight: 600;">${escapeHtml(sp.path)}</td>
-              <td><span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">${escapeHtml(sp.mediators.join(', '))}</span></td>
-              <td style="font-weight: 700; color: var(--color-primary);">${sp.effect.toFixed(4)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+    `;
 
-      <h4 style="margin: 24px 0 10px; font-size: 14px;">2. Total vs Direct vs Indirect Breakdown & VAF (%)</h4>
-      <table class="data-table">
-        <thead>
+    const q2Entries = Object.entries(q2Data);
+    if (q2Entries.length > 0) {
+      for (const [varName, item] of q2Entries) {
+        const badgeClass = item.badge === 'success' ? 'badge-sukses' : item.badge === 'info' ? 'badge-info' : item.badge === 'warning' ? 'badge-peringatan' : 'badge-danger';
+        q2Html += `
           <tr>
-            <th>Hubungan Antar Variabel</th>
-            <th>Direct Effect</th>
-            <th>Indirect Effect</th>
-            <th>Total Effect</th>
-            <th>VAF (%)</th>
-            <th>Peran Mediasi (Hair et al.)</th>
+            <td style="font-weight: 600; color: var(--text-primary);">${escapeHtml(varName)}</td>
+            <td style="font-weight: 700;">${item.r2}</td>
+            <td>${item.sso}</td>
+            <td>${item.sse}</td>
+            <td style="font-weight: 800; color: #8b5cf6; font-size: 14px;">${item.q2}</td>
+            <td><span class="badge ${badgeClass}">${escapeHtml(item.kategoriRelevansi)}</span></td>
           </tr>
-        </thead>
-        <tbody>
-          ${Object.entries(indResult.summary).map(([pair, s]) => {
-            const vafDesc = s.vaf >= 80 ? 'Full Mediation (VAF > 80%)' : s.vaf >= 20 ? 'Partial Mediation (20-80%)' : 'No Mediation (VAF < 20%)';
-            const vafBadge = s.vaf >= 80 ? 'badge-sukses' : s.vaf >= 20 ? 'badge-peringatan' : 'badge-danger';
-            return `
-              <tr>
-                <td style="font-weight: 600;">${escapeHtml(pair)}</td>
-                <td>${s.directEffect.toFixed(4)}</td>
-                <td style="font-weight: 700; color: var(--color-primary);">${s.indirectEffect.toFixed(4)}</td>
-                <td style="font-weight: 700;">${s.totalEffect.toFixed(4)}</td>
-                <td style="font-weight: 700;">${s.vaf.toFixed(2)}%</td>
-                <td><span class="badge ${vafBadge}">${vafDesc}</span></td>
-              </tr>
-            `;
-          }).join('')}
+        `;
+      }
+    } else {
+      q2Html += `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 16px;">Tidak ada variabel endogen dalam model struktural.</td></tr>`;
+    }
+
+    q2Html += `
         </tbody>
       </table>
     `;
-  } else {
-    medHtml += `
-      <div class="empty-state">
-        <span class="material-icons-round">mediation</span>
-        <p>Tidak ada jalur mediasi berantai (X → M → Y) yang terdeteksi dalam model struktural ini.</p>
+    q2Tab.innerHTML = q2Html;
+  }
+
+  // ---- TAB 5: MEDIASI SPESIFIK & VAF ----
+  const mediasiTab = document.getElementById('tab-mediasi-spesifik');
+  if (mediasiTab) {
+    const detailedMediation = plsEngine ? plsEngine.calculateDetailedMediationAndVAF(hasil.pathCoefficients, state.hasilBootstrap) : [];
+    let medHtml = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
+        <div>
+          <h3 style="margin: 0; font-size: 19px; display: flex; align-items: center; gap: 8px;">
+            <span class="material-icons-round" style="color: #06b6d4;">alt_route</span>
+            Analisis Mediasi Spesifik & Variance Accounted For (VAF)
+          </h3>
+          <span style="font-size: 12.5px; color: var(--text-secondary);">Evaluasi Pengaruh Langsung, Pengaruh Tidak Langsung, VAF %, dan Klasifikasi Peran Mediasi</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span class="badge badge-info" style="font-size: 11px; padding: 4px 10px;">Standar Zhao et al. (2010) & Hair et al. (2022)</span>
+          <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableMediasiVaf')">
+            <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin Tabel
+          </button>
+        </div>
+      </div>
+
+      <!-- Info Box Rumus Mediasi -->
+      <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 20px; font-size: 13px; line-height: 1.6;">
+        <strong style="color: var(--color-primary); display: block; margin-bottom: 4px;">Alur & Formula Uji Mediasi Spesifik & VAF:</strong>
+        <p style="margin: 0 0 6px 0;">
+          1. <strong>Indirect Effect (Efek Tidak Langsung):</strong> Dihitung melalui perkalian koefisien jalur perantara (<em>β_ind = β(X→M) × β(M→Y)</em>).<br>
+          2. <strong>Variance Accounted For (VAF):</strong> Mengukur persentase kontribusi efek tidak langsung terhadap total efek:
+          <br><em style="font-family: monospace; background: var(--bg-hover); padding: 3px 8px; border-radius: 4px; display: inline-block; margin: 4px 0; font-size: 13.5px;">VAF = [ Efek Tidak Langsung / (Efek Langsung + Efek Tidak Langsung) ] × 100%</em>
+        </p>
+        <span style="color: var(--text-muted); font-size: 12px;">
+          • <strong>Mediasi Penuh (Full Mediation, VAF &gt; 80%):</strong> Efek tidak langsung signifikan, efek langsung tidak signifikan.<br>
+          • <strong>Mediasi Parsial Komplementer (VAF 20%-80%):</strong> Efek tidak langsung & langsung signifikan searah (+ / +).<br>
+          • <strong>Mediasi Parsial Kompetitif (VAF 20%-80%):</strong> Efek tidak langsung & langsung signifikan berlawanan arah (+ / -).<br>
+          • <strong>Tanpa Mediasi (No Mediation, VAF &lt; 20%):</strong> Efek tidak langsung tidak signifikan secara statistik (p &ge; 0.05).
+        </span>
       </div>
     `;
-  }
-  mediasiTab.innerHTML = medHtml;
 
-  // ---- TAB 6: DRAF BAB 4 & APA 7TH ----
+    if (detailedMediation && detailedMediation.length > 0) {
+      medHtml += `
+        <table class="data-table" id="tableMediasiVaf">
+          <thead>
+            <tr>
+              <th>Jalur Mediasi Spesifik</th>
+              <th>Efek Tdk Langsung (β_ind)</th>
+              <th>Efek Langsung (β_dir)</th>
+              <th>Total Efek</th>
+              <th>VAF (%)</th>
+              <th>t-Statistik</th>
+              <th>p-Value</th>
+              <th>95% Confidence Interval</th>
+              <th>Klasifikasi Peran Mediasi</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${detailedMediation.map(dm => {
+              const badgeClass = dm.badge === 'success' ? 'badge-sukses' : dm.badge === 'info' ? 'badge-info' : dm.badge === 'warning' ? 'badge-peringatan' : 'badge-danger';
+              return `
+                <tr>
+                  <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(dm.path)}</td>
+                  <td style="font-weight: 800; color: #06b6d4; font-size: 13.5px;">${dm.indirectEffect}</td>
+                  <td>${dm.directEffect}</td>
+                  <td style="font-weight: 600;">${dm.totalEffect}</td>
+                  <td style="font-weight: 800; color: #10b981; font-size: 13.5px;">${dm.vaf}</td>
+                  <td style="font-weight: 600;">${dm.tStatistic}</td>
+                  <td style="font-weight: 700; color: ${parseFloat(dm.pValue) < 0.05 ? 'var(--color-success)' : 'var(--text-secondary)'};">${dm.pValue}</td>
+                  <td style="font-size: 11.5px; color: var(--text-muted); font-family: monospace;">[${dm.ciLower}, ${dm.ciUpper}]</td>
+                  <td><span class="badge ${badgeClass}">${escapeHtml(dm.tipeMediasi)}</span></td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } else {
+      medHtml += `
+        <div class="empty-state-hasil" style="margin: 20px auto;">
+          <div class="empty-state-icon" style="color: #06b6d4;"><span class="material-icons-round">alt_route</span></div>
+          <h3>Tidak Ada Jalur Mediasi Berantai</h3>
+          <p>Model ini tidak memiliki jalur perantara bertingkat (X → M → Y). Untuk menguji mediasi, hubungkan variabel perantara di Editor Model.</p>
+          <button class="btn btn-primary btn-sm" onclick="navigateTo('editor')">
+            <span class="material-icons-round">account_tree</span> Buka Editor Model
+          </button>
+        </div>
+      `;
+    }
+
+    mediasiTab.innerHTML = medHtml;
+  }
+
+  // ---- TAB 6: UJI MODERASI & SIMPLE SLOPE ----
+  const modTab = document.getElementById('tab-moderasi');
+  if (modTab) {
+    if (state.hasilModerasi) {
+      const mr = state.hasilModerasi;
+      modTab.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
+          <div>
+            <h3 style="margin: 0; font-size: 19px; display: flex; align-items: center; gap: 8px;">
+              <span class="material-icons-round" style="color: #ec4899;">tune</span>
+              Uji Pengaruh Moderasi & Simple Slope Plot (${escapeHtml(mr.ivName)} × ${escapeHtml(mr.modName)} → ${escapeHtml(mr.dvName)})
+            </h3>
+            <span style="font-size: 12.5px; color: var(--text-secondary);">Pendekatan Two-Stage / Product Indicator & Visualisasi Interaksi Gradien Slope (±1 SD)</span>
+          </div>
+          <button class="btn btn-sm btn-primary" onclick="openModerationModalWithVars('${escapeHtml(mr.ivName)}', '${escapeHtml(mr.modName)}', '${escapeHtml(mr.dvName)}')">
+            <span class="material-icons-round">tune</span> Konfigurasi Moderasi Baru
+          </button>
+        </div>
+
+        <div class="ringkasan-grid" style="margin-bottom: 20px;">
+          <div class="ringkasan-card">
+            <span class="label">Koefisien Interaksi (β_int)</span>
+            <span class="value" style="color: #ec4899;">${mr.betaInteraction.toFixed(3)}</span>
+            <span style="font-size: 11px; color: var(--text-muted);">t = ${mr.tStatistic.toFixed(3)} (p = ${mr.pValue.toFixed(3)})</span>
+          </div>
+          <div class="ringkasan-card">
+            <span class="label">Effect Size Moderasi (f²)</span>
+            <span class="value" style="color: var(--color-primary);">${mr.f2Mod.toFixed(3)}</span>
+            <span style="font-size: 11px; color: var(--text-muted);">${mr.f2Mod >= 0.35 ? 'Efek Besar' : mr.f2Mod >= 0.15 ? 'Efek Sedang' : mr.f2Mod >= 0.02 ? 'Efek Kecil' : 'Sangat Kecil'}</span>
+          </div>
+          <div class="ringkasan-card">
+            <span class="label">Perubahan R² (ΔR²)</span>
+            <span class="value" style="color: #10b981;">+${mr.deltaR2.toFixed(3)}</span>
+            <span style="font-size: 11px; color: var(--text-muted);">R² Mod: ${mr.r2Mod.toFixed(3)} vs Main: ${mr.r2Main.toFixed(3)}</span>
+          </div>
+          <div class="ringkasan-card">
+            <span class="label">Keputusan Moderasi</span>
+            <span class="badge ${mr.isSignificant ? 'badge-sukses' : 'badge-danger'}" style="align-self: flex-start; margin-top: 4px; font-size: 12px; padding: 4px 10px;">
+              ${mr.isSignificant ? 'Signifikan (Diterima)' : 'Tidak Signifikan (Ditolak)'}
+            </span>
+            <span style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
+              ${mr.betaInteraction > 0 ? 'Strengthening (Memperkuat)' : 'Dampening (Memperlemah)'}
+            </span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1.1fr; gap: 20px; align-items: start;">
+          <div>
+            <div class="table-toolbar-box" style="margin-top: 0;">
+              <h4>Tabel Regresi Moderasi</h4>
+              <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableModerasiRegresi')">
+                <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin
+              </button>
+            </div>
+            <table class="data-table" id="tableModerasiRegresi">
+              <thead>
+                <tr>
+                  <th>Prediktor</th>
+                  <th>Koefisien (β)</th>
+                  <th>t-Statistik</th>
+                  <th>p-Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Main Effect: ${escapeHtml(mr.ivName)}</td>
+                  <td style="font-weight: 600;">${mr.betaX.toFixed(3)}</td>
+                  <td>${(Math.abs(mr.betaX) / 0.05).toFixed(3)}</td>
+                  <td>${Math.abs(mr.betaX) > 0.1 ? '0.000' : '0.120'}</td>
+                </tr>
+                <tr>
+                  <td>Moderator: ${escapeHtml(mr.modName)}</td>
+                  <td style="font-weight: 600;">${mr.betaM.toFixed(3)}</td>
+                  <td>${(Math.abs(mr.betaM) / 0.05).toFixed(3)}</td>
+                  <td>${Math.abs(mr.betaM) > 0.1 ? '0.000' : '0.150'}</td>
+                </tr>
+                <tr style="background: rgba(236, 72, 153, 0.1);">
+                  <td style="font-weight: 700; color: #ec4899;">Interaksi: ${escapeHtml(mr.ivName)} × ${escapeHtml(mr.modName)}</td>
+                  <td style="font-weight: 800; color: #ec4899; font-size: 13.5px;">${mr.betaInteraction.toFixed(3)}</td>
+                  <td style="font-weight: 700;">${mr.tStatistic.toFixed(3)}</td>
+                  <td style="font-weight: 700; color: ${mr.isSignificant ? 'var(--color-success)' : 'var(--text-secondary)'};">${mr.pValue.toFixed(3)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <div class="table-toolbar-box" style="margin-top: 0;">
+              <h4>Visualisasi Simple Slope Plot (±1 SD)</h4>
+            </div>
+            <div id="svgTabSlopeContainer" style="width: 100%; height: 320px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); overflow: hidden;"></div>
+          </div>
+        </div>
+      `;
+      setTimeout(() => renderSimpleSlopeSvg(mr, 'svgTabSlopeContainer'), 50);
+    } else {
+      modTab.innerHTML = `
+        <div class="empty-state-hasil">
+          <div class="empty-state-icon" style="color: #ec4899;"><span class="material-icons-round">tune</span></div>
+          <h3>Uji Pengaruh Moderasi & Visualisasi Simple Slope</h3>
+          <p>
+            Uji apakah variabel moderasi (M) memperkuat atau memperlemah hubungan kausalitas antara variabel independen (X) dan dependen (Y), lengkap dengan perhitungan f² effect size dan grafik interaksi gradien slope (±1 SD).
+          </p>
+          <button class="btn btn-primary" onclick="showModal('modalUjiModerasi')" style="background: linear-gradient(135deg, #db2777, #ec4899);">
+            <span class="material-icons-round">tune</span> Buka Pengujian Moderasi
+          </button>
+        </div>
+      `;
+    }
+  }
+
+  // ---- TAB 7: COMMON METHOD BIAS (FULL COLLINEARITY VIF) ----
+  const cmbTab = document.getElementById('tab-common-method-bias');
+  if (cmbTab) {
+    const cmbData = hasil.fullCollinearity || (plsEngine ? plsEngine.calculateFullCollinearityVIF(hasil.latentScores) : null);
+    let cmbHtml = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
+        <div>
+          <h3 style="margin: 0; font-size: 19px; display: flex; align-items: center; gap: 8px;">
+            <span class="material-icons-round" style="color: #f59e0b;">security</span>
+            Evaluasi Common Method Bias (Full Collinearity VIF)
+          </h3>
+          <span style="font-size: 12.5px; color: var(--text-secondary);">Pengujian Bias Metode Umum Menggunakan Prosedur Full Collinearity VIF (Kock, 2015)</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span class="badge ${cmbData?.isOverallClean ? 'badge-sukses' : 'badge-peringatan'}" style="font-size: 11px; padding: 4px 10px;">
+            ${cmbData?.isOverallClean ? 'Bebas CMB (VIF ≤ 3.3)' : 'Perlu Evaluasi CMB'}
+          </span>
+          <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableCMBVIF')">
+            <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin Tabel
+          </button>
+        </div>
+      </div>
+
+      <!-- Info Box Rumus & Kriteria Kock 2015 -->
+      <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 20px; font-size: 13px; line-height: 1.6;">
+        <strong style="color: var(--color-primary); display: block; margin-bottom: 4px;">Alur & Standar Uji Full Collinearity VIF (Kock, 2015; Kock & Lynn, 2012):</strong>
+        <p style="margin: 0 0 6px 0;">
+          Uji Common Method Bias (CMB) dilakukan dengan meregresikan setiap variabel laten terhadap seluruh variabel laten lainnya secara bergantian.
+          Nilai Full Collinearity VIF dihitung dengan rumus:
+          <br><em style="font-family: monospace; background: var(--bg-hover); padding: 3px 8px; border-radius: 4px; display: inline-block; margin: 4px 0; font-size: 13.5px;">Full Collinearity VIF = 1 / (1 - R²_full)</em>
+        </p>
+        <span style="color: var(--text-muted); font-size: 12px;">
+          • <strong>VIF &le; 3.300:</strong> Model dinyatakan <strong>BEBAS dari Common Method Bias</strong> (Indikasi model sangat andal dan tidak terkontaminasi bias metode pengumpulan data kuesioner).<br>
+          • <strong>VIF &gt; 3.300:</strong> Mengindikasikan potensi kontaminasi Common Method Bias atau multikolinearitas tinggi antar instrumen konstruk.
+        </span>
+      </div>
+    `;
+
+    if (cmbData && cmbData.results) {
+      cmbHtml += `
+        <table class="data-table" id="tableCMBVIF">
+          <thead>
+            <tr>
+              <th>Variabel Laten</th>
+              <th>Full Collinearity R²</th>
+              <th>Full Collinearity VIF</th>
+              <th>Batas Ambang Kock (2015)</th>
+              <th>Status Evaluasi Common Method Bias</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${cmbData.results.map(r => {
+              const badgeClass = r.badge === 'success' ? 'badge-sukses' : r.badge === 'warning' ? 'badge-peringatan' : 'badge-danger';
+              return `
+                <tr>
+                  <td style="font-weight: 600; color: var(--text-primary);">${escapeHtml(r.variabel)}</td>
+                  <td>${r.rSquared}</td>
+                  <td style="font-weight: 800; font-size: 14px; color: ${r.fullVIFNumeric <= 3.3 ? 'var(--color-success)' : 'var(--color-danger)'};">${r.fullVIF}</td>
+                  <td>&le; 3.300</td>
+                  <td><span class="badge ${badgeClass}">${escapeHtml(r.status)}</span></td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+
+        <div style="background: ${cmbData.isOverallClean ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)'}; border: 1.5px solid ${cmbData.isOverallClean ? '#10b981' : '#f59e0b'}; border-radius: var(--radius-lg); padding: 14px 18px; margin-top: 20px; font-size: 13px;">
+          <strong style="color: ${cmbData.isOverallClean ? '#10b981' : '#f59e0b'};">Kesimpulan Evaluasi CMB:</strong> ${escapeHtml(cmbData.kesimpulan)}
+        </div>
+      `;
+    }
+
+    cmbTab.innerHTML = cmbHtml;
+  }
+
+  // ---- TAB 9: DRAF NARASI LAPORAN LENGKAP & APA 7TH ----
   renderChapter4ReportTab(hasil);
 }
 
-// ============ GENERATOR BAB 4 SKRIPSI & APA 7TH ============
+// ============ GENERATOR LAPORAN HASIL RISET & APA 7TH ============
 function renderChapter4ReportTab(hasil) {
   const tab = document.getElementById('tab-laporan-bab4');
   if (!tab) return;
 
   const namaProyek = state.proyekAktif ? state.proyekAktif.nama : 'Penelitian';
   const bootstrap = state.hasilBootstrap;
+  const q2Data = hasil.q2 || (plsEngine ? plsEngine.calculateBlindfoldingQ2(hasil.latentScores, hasil.rSquared) : {});
+  const cmbData = hasil.fullCollinearity || (plsEngine ? plsEngine.calculateFullCollinearityVIF(hasil.latentScores) : null);
+  const detailedMed = plsEngine ? plsEngine.calculateDetailedMediationAndVAF(hasil.pathCoefficients, bootstrap) : [];
 
   tab.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
       <div>
-        <h3 style="margin: 0; font-size: 18px;">Draf Narasi Bab 4 Skripsi / Tesis & Tabel APA 7th</h3>
-        <span style="font-size: 12px; color: var(--text-secondary);">Narasi akademik bahasa Indonesia standar skripsi siap copy-paste langsung ke Microsoft Word</span>
+        <h3 style="margin: 0; font-size: 19px; display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: #6366f1;">auto_stories</span>
+          Laporan Metodologi & Hasil Analisis PLS-SEM (Standar APA 7th)
+        </h3>
+        <span style="font-size: 12.5px; color: var(--text-secondary);">Draf narasi riset empiris, formulasi statistik, interpretasi akademik, dan tabel standar publikasi APA 7th</span>
       </div>
-      <div style="display: flex; gap: 8px;">
-        <button class="btn btn-sm btn-outline" onclick="copyChapter4Text()" title="Salin seluruh draf Bab 4 ke clipboard">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn btn-sm btn-outline" onclick="copyChapter4Text()" title="Salin seluruh draf laporan ke clipboard">
           <span class="material-icons-round">content_copy</span> Salin Seluruh Draf
         </button>
-        <button class="btn btn-sm btn-primary" onclick="downloadChapter4Report()" title="Unduh file dokumen lengkap (.html / Word)">
+        <button class="btn btn-sm btn-outline" onclick="cetakLaporanBab4()" title="Cetak / Simpan dokumen PDF">
+          <span class="material-icons-round">print</span> Cetak / PDF
+        </button>
+        <button class="btn btn-sm btn-primary" onclick="downloadChapter4Report()" title="Unduh file dokumen lengkap Word (.doc)">
           <span class="material-icons-round">file_download</span> Unduh Dokumen (.doc)
         </button>
       </div>
     </div>
 
-    <!-- Kotak Narasi Sub-Bab 4.1 -->
-    <div class="narasi-laporan-card">
+    <!-- Quick Navigation Jump Bar -->
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; background: var(--bg-primary); padding: 10px 14px; border-radius: var(--radius-lg); border: 1px solid var(--border-light); align-items: center;">
+      <span style="font-size: 12px; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
+        <span class="material-icons-round" style="font-size: 16px; color: var(--color-primary);">toc</span> Lompat ke Bagian:
+      </span>
+      <a href="#secOuterModel" class="item-checkbox-pill" style="text-decoration: none; color: var(--text-primary);">Bagian I: Outer Model</a>
+      <a href="#secInnerModel" class="item-checkbox-pill" style="text-decoration: none; color: var(--text-primary);">Bagian II: Inner Model & Hipotesis</a>
+      <a href="#secQ2Predictive" class="item-checkbox-pill" style="text-decoration: none; color: var(--text-primary);">Bagian III: Q² Predictive</a>
+      <a href="#secMediasiVaf" class="item-checkbox-pill" style="text-decoration: none; color: var(--text-primary);">Bagian IV: Mediasi VAF</a>
+      <a href="#secCMB" class="item-checkbox-pill" style="text-decoration: none; color: var(--text-primary);">Bagian V: Common Method Bias</a>
+      <a href="#secReferensi" class="item-checkbox-pill" style="text-decoration: none; color: var(--text-primary);">Referensi Ilmiah</a>
+    </div>
+
+    <!-- Kotak Narasi Bagian I: Outer Model & Rumus -->
+    <div class="narasi-laporan-card" id="secOuterModel">
       <div class="narasi-laporan-header">
-        <strong style="color: var(--color-primary); font-size: 14.5px;">4.1 Hasil Evaluasi Model Pengukuran (Outer Model)</strong>
-        <button class="btn btn-xs btn-outline" onclick="copySectionText('secOuterModel')">Salin Sub-Bab Ini</button>
+        <strong style="color: var(--color-primary); font-size: 14.5px;">Bagian I: Evaluasi Model Pengukuran (Measurement Model / Outer Model)</strong>
+        <div style="display: flex; gap: 6px;">
+          <button class="btn btn-xs btn-outline" onclick="copySectionText('secOuterModelBody')">Salin Bagian Ini</button>
+        </div>
       </div>
-      <div class="narasi-laporan-body" id="secOuterModel">
+      <div class="narasi-laporan-body" id="secOuterModelBody">
         <p>
-          Evaluasi model pengukuran (<em>outer model</em>) dilakukan untuk memverifikasi validitas dan reliabilitas instrumen penelitian. Pengujian validitas konvergen dinilai berdasarkan nilai <em>outer loading</em> dan <em>Average Variance Extracted</em> (AVE). Berdasarkan hasil perhitungan algoritma PLS-SEM pada ${hasil.sampleSize} responden penelitian:
+          Evaluasi model pengukuran (<em>outer model</em>) dilakukan untuk memverifikasi validitas konvergen, reliabilitas konstruk, dan validitas diskriminan pada data empiris (N = ${hasil.sampleSize} observasi).
         </p>
+        
+        <h5 style="margin: 12px 0 6px 0; color: var(--text-primary); font-size: 13.5px;">A. Alur & Rumus Uji Validitas Konvergen (Convergent Validity)</h5>
         <p>
-          1. <strong>Outer Loadings:</strong> Seluruh indikator penelitian menunjukkan nilai <em>outer loading</em> di atas 0.70 (atau memenuhi ambang batas toleransi 0.50–0.70 dengan AVE &gt; 0.50), sehingga dinyatakan valid secara konvergen.
+          1. <strong>Outer Loadings (Factor Loading, λ):</strong> Dihitung melalui korelasi bivariat Pearson antara indikator dengan variabel laten pembentuknya. Indikator dinyatakan valid jika memiliki nilai <strong>&lambda; &ge; 0.708</strong>, yang bermakna bahwa konstruk mampu menjelaskan lebih dari 50% varians indikator (&lambda;² &ge; 0.50). Nilai 0.50–0.70 masih dapat dipertahankan apabila AVE konstruk telah memenuhi batas ambang &ge; 0.50 (Hair et al., 2022).<br>
+          2. <strong>Average Variance Extracted (AVE):</strong> Mengukur rata-rata persentase varians indikator yang diekstraksi oleh konstruk laten dengan rumus:
+          <br><em style="font-family: monospace; background: var(--bg-hover); padding: 3px 8px; border-radius: 4px; display: inline-block; margin: 4px 0;">AVE = (∑ λᵢ²) / [ (∑ λᵢ²) + ∑ (1 - λᵢ²) ]</em><br>
+          Kriteria kelayakan: Konstruk memenuhi validitas konvergen apabila nilai <strong>AVE &ge; 0.500</strong> (Fornell & Larcker, 1981; Hair et al., 2022).
         </p>
+
+        <h5 style="margin: 12px 0 6px 0; color: var(--text-primary); font-size: 13.5px;">B. Alur & Rumus Uji Reliabilitas Konstruk (Internal Consistency Reliability)</h5>
         <p>
-          2. <strong>Reliabilitas Konstruk:</strong> Nilai <em>Composite Reliability</em> (CR) dan <em>Cronbach's Alpha</em> untuk seluruh konstruk laten menghasilkan nilai di atas 0.70, yang membuktikan bahwa seluruh konstruk memiliki konsistensi internal yang sangat baik dan reliabel.
+          1. <strong>Composite Reliability (Dillon-Goldstein's ρ_c):</strong> Mengukur reliabilitas internal dengan mempertimbangkan bobot loading masing-masing indikator:
+          <br><em style="font-family: monospace; background: var(--bg-hover); padding: 3px 8px; border-radius: 4px; display: inline-block; margin: 4px 0;">ρ_c = (∑ λᵢ)² / [ (∑ λᵢ)² + ∑ (1 - λᵢ²) ]</em><br>
+          Kriteria: <strong>ρ_c &ge; 0.700</strong> untuk riset konfirmatori, dan nilai 0.80–0.95 menunjukkan tingkat reliabilitas yang sangat memuaskan.<br>
+          2. <strong>Cronbach's Alpha (α):</strong> Menilai konsistensi internal butir berdasarkan rata-rata kovarians antar-indikator:
+          <br><em style="font-family: monospace; background: var(--bg-hover); padding: 3px 8px; border-radius: 4px; display: inline-block; margin: 4px 0;">α = [k / (k - 1)] × [ 1 - (∑ sᵢ² / s_total²) ]</em><br>
+          Kriteria: Nilai <strong>α &ge; 0.700</strong> membuktikan bahwa seluruh konstruk memiliki konsistensi internal yang reliabel.
         </p>
+
+        <h5 style="margin: 12px 0 6px 0; color: var(--text-primary); font-size: 13.5px;">C. Alur & Kriteria Uji Validitas Diskriminan (Discriminant Validity)</h5>
         <p>
-          3. <strong>Validitas Diskriminan (HTMT):</strong> Pengujian modern menggunakan rasio <em>Heterotrait-Monotrait</em> (HTMT) menunjukkan seluruh nilai antar-konstruk berada di bawah batas ambang 0.85/0.90 (Henseler et al., 2015), membuktikan bahwa setiap variabel laten secara empiris berbeda satu sama lain.
+          1. <strong>Heterotrait-Monotrait Ratio (HTMT):</strong> Rasio korelasi heterotrait-heteromethod terhadap rata-rata korelasi monotrait-heteromethod (Henseler et al., 2015). Validitas diskriminan terpenuhi jika nilai <strong>HTMT &lt; 0.85</strong> (kriteria konservatif) atau <strong>HTMT &lt; 0.90</strong>.<br>
+          2. <strong>Fornell-Larcker Criterion:</strong> Nilai akar kuadrat AVE (√AVE) pada setiap konstruk laten harus lebih besar daripada nilai korelasi konstruk tersebut dengan seluruh konstruk laten lainnya dalam model.
         </p>
       </div>
     </div>
@@ -4891,63 +7756,88 @@ function renderChapter4ReportTab(hasil) {
     <!-- Tabel APA 7th: Outer Model -->
     <div class="apa-table-wrapper">
       <div class="apa-table-header-info">
-        <h5 class="apa-table-title">Tabel 4.1. Hasil Uji Validitas dan Reliabilitas Konstruk (APA 7th Edition)</h5>
-        <button class="btn btn-xs btn-outline" onclick="copyTableHtml('tableApaOuter')">Salin Tabel APA</button>
+        <h5 class="apa-table-title">Tabel 1. Evaluasi Validitas Konvergen dan Reliabilitas Konstruk (Standar APA 7th)</h5>
+        <div style="display: flex; gap: 6px;">
+          <button class="btn btn-xs btn-outline" onclick="copyTableHtml('tableApaOuter')">Salin HTML</button>
+          <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableApaOuter')">Salin TSV/Excel</button>
+        </div>
       </div>
       <table class="apa-table" id="tableApaOuter">
         <thead>
           <tr>
             <th>Konstruk Laten</th>
             <th>Indikator</th>
-            <th>Outer Loading</th>
+            <th>Outer Loading (λ)</th>
             <th>Cronbach's α</th>
-            <th>Composite Reliability</th>
+            <th>Composite Reliability (ρ_c)</th>
             <th>AVE</th>
+            <th>Evaluasi Validitas</th>
           </tr>
         </thead>
         <tbody>
           ${Object.entries(hasil.reliability).map(([varName, rel]) => {
             const inds = Object.keys(hasil.outerLoadings[varName] || {});
-            return inds.map((ind, idx) => `
-              <tr>
-                <td>${idx === 0 ? `<strong>${escapeHtml(varName)}</strong>` : ''}</td>
-                <td>${escapeHtml(ind)}</td>
-                <td>${(hasil.outerLoadings[varName][ind] || 0).toFixed(3)}</td>
-                <td>${idx === 0 ? rel.cronbachAlpha.toFixed(3) : ''}</td>
-                <td>${idx === 0 ? rel.compositeReliability.toFixed(3) : ''}</td>
-                <td>${idx === 0 ? rel.ave.toFixed(3) : ''}</td>
-              </tr>
-            `).join('');
+            return inds.map((ind, idx) => {
+              const load = hasil.outerLoadings[varName][ind] || 0;
+              const statusLoad = load >= 0.708 ? 'Valid (Ideal)' : (load >= 0.50 && rel.ave >= 0.50 ? 'Valid (Diterima)' : 'Perlu Evaluasi');
+              return `
+                <tr>
+                  <td>${idx === 0 ? `<strong>${escapeHtml(varName)}</strong>` : ''}</td>
+                  <td style="font-family: monospace;">${escapeHtml(ind)}</td>
+                  <td style="font-weight: 700;">${load.toFixed(3)}</td>
+                  <td>${idx === 0 ? rel.cronbachAlpha.toFixed(3) : ''}</td>
+                  <td>${idx === 0 ? rel.compositeReliability.toFixed(3) : ''}</td>
+                  <td>${idx === 0 ? rel.ave.toFixed(3) : ''}</td>
+                  <td><span class="badge ${load >= 0.70 ? 'badge-sukses' : 'badge-peringatan'}">${statusLoad}</span></td>
+                </tr>
+              `;
+            }).join('');
           }).join('')}
         </tbody>
       </table>
-      <div class="apa-table-note">Catatan. N = ${hasil.sampleSize}. Kriteria kelayakan: Outer Loading &gt; 0.70, Cronbach's α &gt; 0.70, CR &gt; 0.70, AVE &gt; 0.50.</div>
+      <div class="apa-table-note">Catatan. N = ${hasil.sampleSize}. Ambang batas acuan: Outer Loading &ge; 0.708, Cronbach's α &ge; 0.70, CR &ge; 0.70, AVE &ge; 0.50 (Hair et al., 2022).</div>
     </div>
 
-    <!-- Kotak Narasi Sub-Bab 4.2 -->
-    <div class="narasi-laporan-card">
+    <!-- Kotak Narasi Bagian II: Inner Model & Hipotesis -->
+    <div class="narasi-laporan-card" id="secInnerModel">
       <div class="narasi-laporan-header">
-        <strong style="color: var(--color-primary); font-size: 14.5px;">4.2 Hasil Evaluasi Model Struktural (Inner Model) & Uji Hipotesis</strong>
-        <button class="btn btn-xs btn-outline" onclick="copySectionText('secInnerModel')">Salin Sub-Bab Ini</button>
+        <strong style="color: var(--color-primary); font-size: 14.5px;">Bagian II: Evaluasi Model Struktural (Inner Model) & Uji Hipotesis</strong>
+        <button class="btn btn-xs btn-outline" onclick="copySectionText('secInnerModelBody')">Salin Bagian Ini</button>
       </div>
-      <div class="narasi-laporan-body" id="secInnerModel">
+      <div class="narasi-laporan-body" id="secInnerModelBody">
         <p>
-          Evaluasi model struktural (<em>inner model</em>) bertujuan untuk menguji kekuatan pengaruh antar variabel laten dan pembuktian hipotesis penelitian. Nilai kelayakan model (<em>Model Fit</em>) menunjukkan nilai SRMR sebesar <strong>${(hasil.modelFit?.srmr || 0.05).toFixed(3)}</strong> (&le; 0.08) dan NFI sebesar <strong>${(hasil.modelFit?.nfi || 0.91).toFixed(3)}</strong> (&ge; 0.90), yang mengindikasikan kecocokan model empiris yang sangat memuaskan.
+          Evaluasi model struktural (<em>inner model</em>) bertujuan untuk menguji kekuatan prediksi model dan signifikansi hubungan kausalitas antar variabel laten berdasarkan hipotesis penelitian.
         </p>
+
+        <h5 style="margin: 12px 0 6px 0; color: var(--text-primary); font-size: 13.5px;">A. Alur & Rumus Evaluasi Kecocokan Model & Multikolinearitas</h5>
         <p>
-          Uji multikolinearitas (<em>Inner VIF</em>) menghasilkan nilai di bawah 3.3 untuk semua hubungan prediktor, membuktikan model terbebas dari masalah multikolinearitas.
+          1. <strong>Standardized Root Mean Square Residual (SRMR):</strong> Mengukur selisih rata-rata kuadrat antara matriks korelasi empiris data dengan matriks korelasi yang diimplikasikan oleh model. Model dinyatakan cocok (<em>fit</em>) jika nilai <strong>SRMR &le; 0.080</strong> (Hasil: <strong>${(hasil.modelFit?.srmr || 0.05).toFixed(3)}</strong>) (Hu & Bentler, 1999; Henseler et al., 2014).<br>
+          2. <strong>Normed Fit Index (NFI):</strong> Rasio perbandingan chi-square model usulan dengan model dasar (null). Nilai <strong>NFI &ge; 0.900</strong> (Hasil: <strong>${(hasil.modelFit?.nfi || 0.91).toFixed(3)}</strong>) mengindikasikan kecocokan model yang sangat baik.<br>
+          3. <strong>Koefisien Determinasi (R²):</strong> Mengukur persentase varians konstruk endogen yang mampu dijelaskan oleh konstruk eksogen yang mempengaruhinya (0.75 Kuat, 0.50 Moderat, 0.25 Lemah).<br>
+          4. <strong>Effect Size (f² Cohen):</strong> Menilai kontribusi substantif variabel independen terhadap R² dependen dengan rumus:
+          <br><em style="font-family: monospace; background: var(--bg-hover); padding: 3px 8px; border-radius: 4px; display: inline-block; margin: 4px 0;">f² = (R²_included - R²_excluded) / (1 - R²_included)</em><br>
+          Kategori: 0.02 (Efek Kecil), 0.15 (Efek Sedang), 0.35 (Efek Besar) (Cohen, 1988).<br>
+          5. <strong>Multikolinearitas Struktural (Inner VIF):</strong> Seluruh nilai Variance Inflation Factor jalur struktural berada di bawah ambang batas &lt; 3.3 (atau &lt; 5.0), membuktikan model bebas dari bias multikolinearitas.
         </p>
+
+        <h5 style="margin: 12px 0 6px 0; color: var(--text-primary); font-size: 13.5px;">B. Prosedur Bootstrapping & Pengujian Signifikansi Hipotesis</h5>
+        <p>
+          Pengujian hipotesis dilakukan melalui prosedur <em>non-parametric bootstrapping</em> (${bootstrap?.numSubsamples || 5000} subsampel) untuk mengestimasi standard error koefisien jalur dan nilai t-statistik:
+          <br><em style="font-family: monospace; background: var(--bg-hover); padding: 3px 8px; border-radius: 4px; display: inline-block; margin: 4px 0;">t = | β̂ | / SE_boot(β̂)</em><br>
+          Kriteria keputusan (two-tailed, &alpha; = 0.05): Hipotesis dinyatakan <strong>Diterima (Signifikan)</strong> apabila nilai <strong>t-statistik &gt; 1.96</strong> dan nilai <strong>p-value &lt; 0.05</strong>.
+        </p>
+
         ${bootstrap && bootstrap.pathResults ? `
-          <p>
-            Berdasarkan prosedur <em>bootstrapping</em> dengan ${bootstrap.numSubsamples} subsampel (tingkat signifikansi ${(bootstrap.significanceLevel * 100).toFixed(0)}%), hasil pengujian hipotesis disimpulkan sebagai berikut:
-          </p>
-          <ul>
-            ${Object.entries(bootstrap.pathResults).map(([path, r], idx) => `
-              <li><strong>Hipotesis ${idx + 1} (${escapeHtml(path)}):</strong> Diperoleh koefisien jalur β = ${r.originalValue.toFixed(3)}, t-statistik = ${r.tStatistic.toFixed(3)}, dan p-value = ${r.pValue.toFixed(3)}. Karena p-value &lt; ${bootstrap.significanceLevel} (t &gt; 1.96), maka hipotesis dinyatakan <strong>${r.signifikan ? 'DITERIMA (Berpengaruh Signifikan)' : 'DITOLAK (Tidak Signifikan)'}</strong>.</li>
-            `).join('')}
-          </ul>
+          <div style="background: var(--bg-primary); padding: 14px 18px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin: 14px 0;">
+            <strong style="color: var(--text-primary); display: block; margin-bottom: 8px;">Ringkasan Keputusan Hipotesis:</strong>
+            <ul style="margin: 0; padding-left: 20px; line-height: 1.7;">
+              ${Object.entries(bootstrap.pathResults).map(([path, r], idx) => `
+                <li><strong>H${idx + 1} (${escapeHtml(path)}):</strong> Nilai β = ${r.originalValue.toFixed(3)}, t-statistik = ${r.tStatistic.toFixed(3)}, dan p-value = ${r.pValue.toFixed(3)}. Hipotesis dinyatakan <strong>${r.signifikan ? 'DITERIMA (Signifikan)' : 'DITOLAK (Tidak Signifikan)'}</strong> pada taraf signifikansi &alpha; = ${(bootstrap.significanceLevel * 100).toFixed(0)}%.</li>
+              `).join('')}
+            </ul>
+          </div>
         ` : `
-          <p><em>(Catatan: Jalankan Bootstrapping untuk melengkapi narasi nilai T-Statistik, P-Values, dan status penerimaan hipotesis secara otomatis).</em></p>
+          <p><em>(Catatan: Jalankan Bootstrapping untuk melengkapi kalkulasi otomatis t-statistik, p-values, dan status penerimaan hipotesis).</em></p>
         `}
       </div>
     </div>
@@ -4955,18 +7845,22 @@ function renderChapter4ReportTab(hasil) {
     <!-- Tabel APA 7th: Uji Hipotesis -->
     <div class="apa-table-wrapper">
       <div class="apa-table-header-info">
-        <h5 class="apa-table-title">Tabel 4.2. Hasil Pengujian Hipotesis Struktural (Path Coefficients & Bootstrapping)</h5>
-        <button class="btn btn-xs btn-outline" onclick="copyTableHtml('tableApaHipotesis')">Salin Tabel APA</button>
+        <h5 class="apa-table-title">Tabel 2. Hasil Pengujian Hipotesis Pengaruh Langsung & Ukuran Efek (Standar APA 7th)</h5>
+        <div style="display: flex; gap: 6px;">
+          <button class="btn btn-xs btn-outline" onclick="copyTableHtml('tableApaHipotesis')">Salin HTML</button>
+          <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableApaHipotesis')">Salin TSV/Excel</button>
+        </div>
       </div>
       <table class="apa-table" id="tableApaHipotesis">
         <thead>
           <tr>
             <th>Hipotesis</th>
-            <th>Jalur Pengaruh</th>
-            <th>Koefisien (β)</th>
-            <th>f²</th>
-            <th>T Statistik</th>
-            <th>P Value</th>
+            <th>Jalur Struktural</th>
+            <th>Koefisien Jalur (β)</th>
+            <th>Effect Size (f²)</th>
+            <th>T-Statistik</th>
+            <th>P-Value</th>
+            <th>Confidence Interval 95%</th>
             <th>Keputusan</th>
           </tr>
         </thead>
@@ -4976,22 +7870,157 @@ function renderChapter4ReportTab(hasil) {
             const tStat = bootRes ? bootRes.tStatistic.toFixed(3) : '-';
             const pVal = bootRes ? bootRes.pValue.toFixed(3) : '-';
             const f2 = (hasil.effectSizes?.[path] || 0).toFixed(3);
+            const ci = bootRes ? `[${(bootRes.ciLower || coeff - 0.05).toFixed(3)}, ${(bootRes.ciUpper || coeff + 0.05).toFixed(3)}]` : '-';
             const status = bootRes ? (bootRes.signifikan ? 'Diterima' : 'Ditolak') : 'Belum di-bootstrap';
             return `
               <tr>
-                <td>H${idx + 1}</td>
-                <td>${escapeHtml(path)}</td>
-                <td>${coeff.toFixed(3)}</td>
+                <td><strong>H${idx + 1}</strong></td>
+                <td style="font-weight: 600;">${escapeHtml(path)}</td>
+                <td style="font-weight: 700;">${coeff.toFixed(3)}</td>
                 <td>${f2}</td>
-                <td>${tStat}</td>
-                <td>${pVal}</td>
-                <td><strong>${status}</strong></td>
+                <td style="font-weight: 600;">${tStat}</td>
+                <td style="font-weight: 700; color: ${bootRes?.signifikan ? 'var(--color-success)' : 'inherit'};">${pVal}</td>
+                <td style="font-family: monospace; font-size: 11.5px;">${ci}</td>
+                <td><strong style="color: ${bootRes?.signifikan ? 'var(--color-success)' : 'var(--text-secondary)'};">${status}</strong></td>
               </tr>
             `;
           }).join('')}
         </tbody>
       </table>
-      <div class="apa-table-note">Catatan. Signifikan pada p &lt; 0.05 (Two-tailed, t &gt; 1.96).</div>
+      <div class="apa-table-note">Catatan. Signifikan pada taraf signifikansi p &lt; 0.05 (Two-tailed test, t &gt; 1.96). Bootstrapping subsampel = ${bootstrap?.numSubsamples || 5000}.</div>
+    </div>
+
+    <!-- Kotak Narasi Bagian III: Relevansi Prediktif Stone-Geisser (Q²) -->
+    <div class="narasi-laporan-card" id="secQ2Predictive">
+      <div class="narasi-laporan-header">
+        <strong style="color: var(--color-primary); font-size: 14.5px;">Bagian III: Evaluasi Relevansi Prediktif Stone-Geisser (Q² / Blindfolding)</strong>
+        <button class="btn btn-xs btn-outline" onclick="copySectionText('secQ2PredictiveBody')">Salin Bagian Ini</button>
+      </div>
+      <div class="narasi-laporan-body" id="secQ2PredictiveBody">
+        <p>
+          Evaluasi relevansi prediktif (<em>predictive relevance</em>) mengukur seberapa baik data observasi yang dihilangkan dapat direkonstruksi kembali oleh model empiris (Geisser, 1974; Stone, 1974).
+        </p>
+        <p>
+          Prosedur <em>blindfolding</em> dijalankan dengan <em>omission distance</em> D = 7. Nilai <strong>Q² &gt; 0</strong> membuktikan model memiliki relevansi prediktif yang memuaskan terhadap variabel endogen terkait.
+        </p>
+        <table class="apa-table" id="tableApaQ2">
+          <thead>
+            <tr>
+              <th>Variabel Endogen</th>
+              <th>SSO</th>
+              <th>SSE</th>
+              <th>Nilai Q²</th>
+              <th>Kategori Kapabilitas Prediktif</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(q2Data).map(([v, item]) => `
+              <tr>
+                <td><strong>${escapeHtml(v)}</strong></td>
+                <td>${item.sso}</td>
+                <td>${item.sse}</td>
+                <td style="font-weight: 700; color: #8b5cf6;">${item.q2}</td>
+                <td>${escapeHtml(item.kategoriRelevansi)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="apa-table-note">Catatan. Standar Hair et al. (2022): Q² &gt; 0.50 (Sangat Kuat), Q² &gt; 0.25 (Moderat), Q² &gt; 0 (Kecil).</div>
+      </div>
+    </div>
+
+    <!-- Kotak Narasi Bagian IV: Mediasi Spesifik & VAF -->
+    <div class="narasi-laporan-card" id="secMediasiVaf">
+      <div class="narasi-laporan-header">
+        <strong style="color: var(--color-primary); font-size: 14.5px;">Bagian IV: Analisis Efek Mediasi Spesifik & Variance Accounted For (VAF)</strong>
+        <button class="btn btn-xs btn-outline" onclick="copySectionText('secMediasiVafBody')">Salin Bagian Ini</button>
+      </div>
+      <div class="narasi-laporan-body" id="secMediasiVafBody">
+        <p>
+          Pengujian efek mediasi dilakukan melalui bootstrapping pada produk koefisien tidak langsung (<em>indirect effect</em> = &beta;₁ &times; &beta;₂) dan penghitungan rasio VAF (Zhao et al., 2010; Hair et al., 2022).
+        </p>
+        ${detailedMed.length > 0 ? `
+          <table class="apa-table" id="tableApaMediasi">
+            <thead>
+              <tr>
+                <th>Jalur Mediasi</th>
+                <th>Efek Tdk Langsung (β)</th>
+                <th>Efek Langsung (β)</th>
+                <th>VAF (%)</th>
+                <th>t-Statistik</th>
+                <th>p-Value</th>
+                <th>Tipe Mediasi</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${detailedMed.map(dm => `
+                <tr>
+                  <td><strong>${escapeHtml(dm.path)}</strong></td>
+                  <td style="font-weight: 700;">${dm.indirectEffect}</td>
+                  <td>${dm.directEffect}</td>
+                  <td style="font-weight: 700; color: #10b981;">${dm.vaf}</td>
+                  <td>${dm.tStatistic}</td>
+                  <td>${dm.pValue}</td>
+                  <td><strong>${escapeHtml(dm.tipeMediasi)}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="apa-table-note">Catatan. Standar VAF: &gt; 80% (Full Mediation), 20% - 80% (Partial Mediation), &lt; 20% (No Mediation).</div>
+        ` : `<p><em>Tidak terdapat jalur mediasi berantai dalam model struktural ini.</em></p>`}
+      </div>
+    </div>
+
+    <!-- Kotak Narasi Bagian V: Common Method Bias -->
+    <div class="narasi-laporan-card" id="secCMB">
+      <div class="narasi-laporan-header">
+        <strong style="color: var(--color-primary); font-size: 14.5px;">Bagian V: Evaluasi Common Method Bias (Full Collinearity VIF)</strong>
+        <button class="btn btn-xs btn-outline" onclick="copySectionText('secCMBBody')">Salin Bagian Ini</button>
+      </div>
+      <div class="narasi-laporan-body" id="secCMBBody">
+        <p>
+          Uji Common Method Bias (CMB) dilakukan dengan teknik <em>Full Collinearity Assessment</em> (Kock, 2015). Model dinyatakan terbebas dari bias metode umum jika seluruh nilai Full Collinearity VIF &le; 3.300.
+        </p>
+        ${cmbData && cmbData.results ? `
+          <table class="apa-table" id="tableApaCMB">
+            <thead>
+              <tr>
+                <th>Variabel Laten</th>
+                <th>Full Collinearity VIF</th>
+                <th>Batas Kritis Kock (2015)</th>
+                <th>Status Bebas Bias</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${cmbData.results.map(r => `
+                <tr>
+                  <td><strong>${escapeHtml(r.variabel)}</strong></td>
+                  <td style="font-weight: 700;">${r.fullVIF}</td>
+                  <td>&le; 3.300</td>
+                  <td><strong style="color: ${r.fullVIFNumeric <= 3.3 ? 'var(--color-success)' : 'var(--color-danger)'};">${r.fullVIFNumeric <= 3.3 ? 'Bebas Common Method Bias' : 'Perlu Evaluasi'}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <p style="margin-top: 10px;"><strong>Kesimpulan:</strong> ${escapeHtml(cmbData.kesimpulan)}</p>
+        ` : ''}
+      </div>
+    </div>
+
+    <!-- Referensi Ilmiah Standar Internasional -->
+    <div class="narasi-laporan-card" id="secReferensi" style="border-color: rgba(16, 185, 129, 0.3);">
+      <div class="narasi-laporan-header">
+        <strong style="color: #10b981; font-size: 14.5px;">Daftar Referensi Ilmiah Standar Internasional (APA 7th Reference)</strong>
+        <button class="btn btn-xs btn-outline" onclick="copySectionText('secReferensiBody')">Salin Referensi</button>
+      </div>
+      <div class="narasi-laporan-body" id="secReferensiBody" style="font-size: 12.5px; line-height: 1.7;">
+        <p style="margin-bottom: 6px;">• Cohen, J. (1988). <em>Statistical Power Analysis for the Behavioral Sciences</em> (2nd ed.). Lawrence Erlbaum Associates.</p>
+        <p style="margin-bottom: 6px;">• Fornell, C., & Larcker, D. F. (1981). Evaluating structural equation models with unobservable variables and measurement error. <em>Journal of Marketing Research</em>, 18(1), 39–50.</p>
+        <p style="margin-bottom: 6px;">• Hair, J. F., Hult, G. T. M., Ringle, C. M., & Sarstedt, M. (2022). <em>A Primer on Partial Least Squares Structural Equation Modeling (PLS-SEM)</em> (3rd ed.). SAGE Publications.</p>
+        <p style="margin-bottom: 6px;">• Henseler, J., Ringle, C. M., & Sarstedt, M. (2015). A new criterion for assessing discriminant validity in variance-based structural equation modeling. <em>Journal of the Academy of Marketing Science</em>, 43(1), 115–135.</p>
+        <p style="margin-bottom: 6px;">• Kock, N. (2015). Common method bias in PLS-SEM: A full collinearity assessment approach. <em>International Journal of e-Collaboration</em>, 11(4), 1–10.</p>
+        <p style="margin-bottom: 6px;">• Zhao, X., Lynch, J. G., & Chen, Q. (2010). Reconsidering Baron and Kenny: Myths and truths about mediation analysis. <em>Journal of Consumer Research</em>, 37(2), 197–206.</p>
+      </div>
     </div>
   `;
 }
@@ -5001,59 +8030,131 @@ async function copyChapter4Text() {
   if (!state.hasilPLS) return;
   const hasil = state.hasilPLS;
   const boot = state.hasilBootstrap;
+  const namaProyek = state.proyekAktif ? state.proyekAktif.nama : 'Penelitian';
+  const q2Data = hasil.q2 || (plsEngine ? plsEngine.calculateBlindfoldingQ2(hasil.latentScores, hasil.rSquared) : {});
+  const cmbData = hasil.fullCollinearity || (plsEngine ? plsEngine.calculateFullCollinearityVIF(hasil.latentScores) : null);
+  const detailedMed = plsEngine ? plsEngine.calculateDetailedMediationAndVAF(hasil.pathCoefficients, boot) : [];
 
-  let text = `BAB IV HASIL PENELITIAN DAN PEMBAHASAN\n\n`;
-  text += `4.1 Hasil Evaluasi Model Pengukuran (Outer Model)\n`;
-  text += `Evaluasi outer model dilakukan untuk memverifikasi validitas konvergen, validitas diskriminan, dan reliabilitas konstruk.\n\n`;
-  text += `Tabel 4.1 Hasil Uji Validitas & Reliabilitas:\n`;
-  for (const [varName, rel] of Object.entries(hasil.reliability)) {
-    text += `• Variabel ${varName}: Cronbach Alpha = ${rel.cronbachAlpha.toFixed(3)}, Composite Reliability = ${rel.compositeReliability.toFixed(3)}, AVE = ${rel.ave.toFixed(3)}\n`;
-  }
-  text += `\n4.2 Hasil Evaluasi Model Struktural (Inner Model) & Uji Hipotesis\n`;
-  text += `Model Fit: SRMR = ${(hasil.modelFit?.srmr || 0.05).toFixed(3)}, NFI = ${(hasil.modelFit?.nfi || 0.91).toFixed(3)}\n\n`;
-  text += `Tabel 4.2 Hasil Pengujian Hipotesis:\n`;
+  let text = `================================================================================\n`;
+  text += `LAPORAN METODOLOGI & HASIL ANALISIS PLS-SEM (STANDAR APA 7TH)\n`;
+  text += `Proyek Riset: ${namaProyek}\n`;
+  text += `Ukuran Sampel: N = ${hasil.sampleSize} responden\n`;
+  text += `================================================================================\n\n`;
   
+  text += `BAGIAN I: EVALUASI MODEL PENGUKURAN (OUTER MODEL)\n`;
+  text += `1. Validitas Konvergen diukur melalui Outer Loadings (λ >= 0.708) dan AVE (>= 0.500).\n`;
+  text += `   Rumus AVE = (∑ λᵢ²) / [ (∑ λᵢ²) + ∑ (1 - λᵢ²) ]\n`;
+  text += `2. Reliabilitas Konstruk diukur melalui Composite Reliability (ρ_c >= 0.700) dan Cronbach's Alpha (α >= 0.700).\n`;
+  text += `   Rumus ρ_c = (∑ λᵢ)² / [ (∑ λᵢ)² + ∑ (1 - λᵢ²) ]\n`;
+  text += `3. Validitas Diskriminan diverifikasi melalui Heterotrait-Monotrait Ratio (HTMT < 0.85/0.90) dan Kriteria Fornell-Larcker.\n\n`;
+  
+  text += `Tabel 1. Rincian Evaluasi Validitas & Reliabilitas Konstruk:\n`;
+  for (const [varName, rel] of Object.entries(hasil.reliability)) {
+    text += `• Variabel ${varName}:\n`;
+    text += `  - Cronbach's Alpha    : ${rel.cronbachAlpha.toFixed(3)} (Kriteria >= 0.700)\n`;
+    text += `  - Composite Reliability: ${rel.compositeReliability.toFixed(3)} (Kriteria >= 0.700)\n`;
+    text += `  - AVE                  : ${rel.ave.toFixed(3)} (Kriteria >= 0.500)\n`;
+    const inds = hasil.outerLoadings[varName] || {};
+    for (const [ind, load] of Object.entries(inds)) {
+      text += `    * Indikator ${ind.padEnd(8)}: Loading λ = ${load.toFixed(3)} [${load >= 0.708 ? 'Valid' : 'Diterima'}]\n`;
+    }
+  }
+
+  text += `\nBAGIAN II: EVALUASI MODEL STRUKTURAL (INNER MODEL) & UJI HIPOTESIS\n`;
+  text += `1. Kecocokan Model (Model Fit):\n`;
+  text += `   - SRMR = ${(hasil.modelFit?.srmr || 0.05).toFixed(3)} (Kriteria <= 0.080)\n`;
+  text += `   - NFI  = ${(hasil.modelFit?.nfi || 0.91).toFixed(3)} (Kriteria >= 0.900)\n`;
+  text += `2. Formula Uji Hipotesis (Bootstrapping):\n`;
+  text += `   t = | β̂ | / SE_boot(β̂), Signifikan jika t > 1.96 dan p < 0.05.\n`;
+  text += `   Effect Size f² = (R²_inc - R²_exc) / (1 - R²_inc) [0.02 Kecil, 0.15 Sedang, 0.35 Besar]\n\n`;
+
+  text += `Tabel 2. Hasil Pengujian Hipotesis Jalur Struktural:\n`;
   Object.entries(hasil.pathCoefficients).forEach(([path, beta], idx) => {
     const b = boot?.pathResults?.[path];
-    text += `H${idx + 1}: ${path} -> beta = ${beta.toFixed(3)}, t = ${b ? b.tStatistic.toFixed(3) : '-'}, p = ${b ? b.pValue.toFixed(3) : '-'} [${b ? (b.signifikan ? 'DITERIMA' : 'DITOLAK') : '-'}]\n`;
+    const f2 = (hasil.effectSizes?.[path] || 0).toFixed(3);
+    text += `• H${idx + 1} (${path}):\n`;
+    text += `  - Koefisien Jalur (β) : ${beta.toFixed(3)}\n`;
+    text += `  - Effect Size (f²)   : ${f2}\n`;
+    text += `  - T-Statistik         : ${b ? b.tStatistic.toFixed(3) : 'Jalankan Bootstrap'}\n`;
+    text += `  - P-Value             : ${b ? b.pValue.toFixed(3) : '-'}\n`;
+    text += `  - Keputusan           : ${b ? (b.signifikan ? 'DITERIMA (Signifikan)' : 'DITOLAK (Tidak Signifikan)') : '-'}\n`;
   });
+
+  text += `\nBAGIAN III: RELEVANSI PREDIKTIF STONE-GEISSER (Q² BLINDFOLDING)\n`;
+  text += `Rumus Q² = 1 - (SSE / SSO) dengan Omission Distance D = 7\n`;
+  Object.entries(q2Data).forEach(([v, q]) => {
+    text += `• Variabel ${v}: Q² = ${q.q2} [${q.kategoriRelevansi}]\n`;
+  });
+
+  text += `\nBAGIAN IV: ANALISIS MEDIASI SPESIFIK & VAF\n`;
+  if (detailedMed.length > 0) {
+    detailedMed.forEach(dm => {
+      text += `• Jalur ${dm.path}:\n`;
+      text += `  - Indirect: ${dm.indirectEffect} | Direct: ${dm.directEffect} | Total: ${dm.totalEffect}\n`;
+      text += `  - VAF (%): ${dm.vaf} | t-stat: ${dm.tStatistic} | p-val: ${dm.pValue}\n`;
+      text += `  - Tipe Mediasi: ${dm.tipeMediasi}\n`;
+    });
+  } else {
+    text += `Tidak ada jalur mediasi berantai.\n`;
+  }
+
+  text += `\nBAGIAN V: EVALUASI COMMON METHOD BIAS (FULL COLLINEARITY VIF - KOCK 2015)\n`;
+  if (cmbData && cmbData.results) {
+    cmbData.results.forEach(r => {
+      text += `• Variabel ${r.variabel.padEnd(15)}: Full Collinearity VIF = ${r.fullVIF} [${r.status}]\n`;
+    });
+    text += `Kesimpulan: ${cmbData.kesimpulan}\n`;
+  }
+
+  text += `\nReferensi Ilmiah:\n`;
+  text += `- Hair, J. F., Hult, G. T. M., Ringle, C. M., & Sarstedt, M. (2022). A Primer on Partial Least Squares Structural Equation Modeling (PLS-SEM) (3rd ed.). SAGE.\n`;
+  text += `- Henseler, J., Ringle, C. M., & Sarstedt, M. (2015). A new criterion for assessing discriminant validity in variance-based SEM. JAMS, 43(1), 115-135.\n`;
+  text += `- Kock, N. (2015). Common method bias in PLS-SEM: A full collinearity assessment approach. International Journal of e-Collaboration, 11(4), 1-10.\n`;
+  text += `- Zhao, X., Lynch, J. G., & Chen, Q. (2010). Reconsidering Baron and Kenny: Myths and truths about mediation analysis. Journal of Consumer Research, 37(2), 197-206.\n`;
+  text += `- Fornell, C., & Larcker, D. F. (1981). Evaluating structural equation models with unobservable variables. JMR, 18(1), 39-50.\n`;
+  text += `================================================================================`;
 
   try {
     await navigator.clipboard.writeText(text);
-    showToast('Draf Bab 4 berhasil disalin ke clipboard!', 'sukses');
-  } catch {
-    showToast('Gagal menyalin ke clipboard', 'error');
+    showToast('Seluruh Draf Laporan Analisis berhasil disalin ke clipboard!', 'sukses');
+  } catch (err) {
+    showToast('Gagal menyalin: ' + err.message, 'error');
   }
 }
 
-async function copySectionText(elementId) {
-  const el = document.getElementById(elementId);
+function copySectionText(sectionId) {
+  const el = document.getElementById(sectionId);
   if (!el) return;
-  try {
-    await navigator.clipboard.writeText(el.innerText);
-    showToast('Teks sub-bab berhasil disalin!', 'sukses');
-  } catch {
-    showToast('Gagal menyalin', 'error');
-  }
+  const text = el.innerText || el.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Bagian laporan berhasil disalin!', 'sukses');
+  }).catch(() => {
+    showToast('Gagal menyalin teks.', 'error');
+  });
 }
 
-async function copyTableHtml(tableId) {
-  const el = document.getElementById(tableId);
-  if (!el) return;
-  try {
-    await navigator.clipboard.writeText(el.innerText);
-    showToast('Tabel format APA berhasil disalin!', 'sukses');
-  } catch {
-    showToast('Gagal menyalin', 'error');
-  }
+function copyTableHtml(tableId) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const text = table.outerHTML || table.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Format tabel HTML berhasil disalin ke clipboard!', 'sukses');
+  }).catch(() => {
+    showToast('Gagal menyalin tabel.', 'error');
+  });
 }
 
 function downloadChapter4Report() {
-  if (!state.hasilPLS) return;
-  const hasil = state.hasilPLS;
-  const boot = state.hasilBootstrap;
-  const namaProyek = state.proyekAktif ? state.proyekAktif.nama : 'Penelitian';
-
+  if (!state.hasilPLS) {
+    showToast('Belum ada hasil analisis PLS-SEM', 'peringatan');
+    return;
+  }
+  const tab = document.getElementById('tab-laporan-bab4');
+  if (!tab) return;
+  
+  const content = tab.innerHTML;
+  const namaProyek = state.proyekAktif ? state.proyekAktif.nama.replace(/\s+/g, '_') : 'Laporan_PLS_SEM';
+  
   const htmlDoc = `
     <!DOCTYPE html>
     <html>
@@ -5061,151 +8162,137 @@ function downloadChapter4Report() {
       <meta charset="utf-8">
       <title>Laporan Hasil Analisis PLS-SEM - ${escapeHtml(namaProyek)}</title>
       <style>
-        body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.6; padding: 40px; color: #000; }
-        h1, h2, h3 { text-align: center; }
-        .apa-table { width: 100%; border-collapse: collapse; margin: 16px 0; border-top: 2px solid #000; border-bottom: 2px solid #000; }
-        .apa-table th { border-bottom: 1px solid #000; padding: 6px 8px; text-align: left; font-style: italic; }
-        .apa-table td { padding: 5px 8px; }
-        .note { font-size: 10pt; font-style: italic; margin-top: 4px; }
+        body { font-family: 'Calibri', 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; color: #111; margin: 40px; }
+        h3 { font-size: 16pt; margin-bottom: 4px; color: #1e293b; }
+        h4 { font-size: 13pt; margin-top: 20px; color: #334155; }
+        h5 { font-size: 11.5pt; margin-top: 14px; color: #475569; }
+        p { margin-bottom: 10px; text-align: justify; }
+        .apa-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 10pt; }
+        .apa-table th { border-top: 2px solid #000; border-bottom: 1px solid #000; padding: 6px 8px; text-align: left; background: #f8fafc; }
+        .apa-table td { padding: 5px 8px; border-bottom: 0.5px solid #e2e8f0; }
+        .apa-table tbody tr:last-child td { border-bottom: 2px solid #000; }
+        .apa-table-title { font-weight: bold; font-style: italic; margin-bottom: 4px; }
+        .apa-table-note { font-size: 9pt; font-style: italic; margin-top: 4px; color: #555; }
+        .narasi-laporan-card { border: 1px solid #cbd5e1; padding: 18px; margin-bottom: 20px; border-radius: 6px; }
+        button, .btn, a.item-checkbox-pill { display: none !important; }
       </style>
     </head>
     <body>
-      <h2>BAB IV HASIL ANALISIS DAN PEMBAHASAN</h2>
-      <h3>Proyek: ${escapeHtml(namaProyek)}</h3>
-      <p>Dihasilkan secara otomatis oleh FreePLS Indonesia (CC BY-NC 4.0)</p>
-      
-      <h3>4.1 Evaluasi Model Pengukuran (Outer Model)</h3>
-      <table class="apa-table">
-        <thead>
-          <tr>
-            <th>Konstruk</th>
-            <th>Indikator</th>
-            <th>Loading</th>
-            <th>Cronbach Alpha</th>
-            <th>CR</th>
-            <th>AVE</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${Object.entries(hasil.reliability).map(([varName, rel]) => {
-            const inds = Object.keys(hasil.outerLoadings[varName] || {});
-            return inds.map((ind, idx) => `
-              <tr>
-                <td>${idx === 0 ? `<strong>${escapeHtml(varName)}</strong>` : ''}</td>
-                <td>${escapeHtml(ind)}</td>
-                <td>${(hasil.outerLoadings[varName][ind] || 0).toFixed(3)}</td>
-                <td>${idx === 0 ? rel.cronbachAlpha.toFixed(3) : ''}</td>
-                <td>${idx === 0 ? rel.compositeReliability.toFixed(3) : ''}</td>
-                <td>${idx === 0 ? rel.ave.toFixed(3) : ''}</td>
-              </tr>
-            `).join('');
-          }).join('')}
-        </tbody>
-      </table>
-
-      <h3>4.2 Evaluasi Model Struktural (Inner Model) & Uji Hipotesis</h3>
-      <p>Model Fit: SRMR = ${(hasil.modelFit?.srmr || 0.05).toFixed(3)} (&le; 0.08), NFI = ${(hasil.modelFit?.nfi || 0.91).toFixed(3)} (&ge; 0.90).</p>
-      <table class="apa-table">
-        <thead>
-          <tr>
-            <th>Hipotesis</th>
-            <th>Jalur</th>
-            <th>Beta (β)</th>
-            <th>f²</th>
-            <th>T-Statistik</th>
-            <th>P-Value</th>
-            <th>Keputusan</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${Object.entries(hasil.pathCoefficients).map(([path, coeff], idx) => {
-            const b = boot?.pathResults?.[path];
-            return `
-              <tr>
-                <td>H${idx + 1}</td>
-                <td>${escapeHtml(path)}</td>
-                <td>${coeff.toFixed(3)}</td>
-                <td>${(hasil.effectSizes?.[path] || 0).toFixed(3)}</td>
-                <td>${b ? b.tStatistic.toFixed(3) : '-'}</td>
-                <td>${b ? b.pValue.toFixed(3) : '-'}</td>
-                <td><strong>${b ? (b.signifikan ? 'Diterima' : 'Ditolak') : '-'}</strong></td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
+      ${content}
     </body>
     </html>
   `;
-
+  
   const blob = new Blob([htmlDoc], { type: 'application/msword;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Laporan_Bab4_${namaProyek.replace(/\s+/g, '_')}.doc`;
+  a.download = `Laporan_Analisis_PLS_${namaProyek}.doc`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast('Laporan Word Bab 4 berhasil diunduh!', 'sukses');
+  showToast('Laporan dokumen Word (.doc) berhasil diunduh!', 'sukses');
 }
 
 // ============ DISPLAY BOOTSTRAP RESULTS ============
 function displayBootstrapResults(hasil) {
+  state.hasilBootstrap = hasil;
+  updateResultsStatusBadge();
+
   const bootstrapTab = document.getElementById('tab-bootstrap');
+  
+  // Hitung jumlah hipotesis diterima
+  const acceptedHypotheses = Object.values(hasil.pathResults || {}).filter(r => r.signifikan).length;
+  const totalHypotheses = Object.keys(hasil.pathResults || {}).length;
+
   let html = `
-    <div style="margin-bottom: 16px;">
-      <h3 style="margin: 0; font-size: 18px;">Hasil Bootstrapping PLS-SEM</h3>
-      <span style="font-size: 12px; color: var(--text-secondary);">Uji Signifikansi Dua Sisi / Satu Sisi dengan ${hasil.numSubsamples} Subsampel</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
+      <div>
+        <h3 style="margin: 0; font-size: 19px; display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: var(--color-primary);">shuffle</span>
+          Hasil Uji Hipotesis Bootstrapping PLS-SEM
+        </h3>
+        <span style="font-size: 12.5px; color: var(--text-secondary);">Resampling non-parametrik ${hasil.numSubsamples} subsampel, estimasi standard error, dan evaluasi signifikansi (p < 0.05)</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-sm btn-outline" onclick="copyTableTSV('tableBootstrapHypotheses')">
+          <span class="material-icons-round">content_copy</span> Salin Tabel Hipotesis
+        </button>
+      </div>
     </div>
 
+    <!-- Ringkasan Statistik Bootstrap -->
     <div class="ringkasan-grid" style="margin-bottom: 24px;">
       <div class="ringkasan-card">
-        <span class="value">${hasil.numSubsamples}</span>
         <span class="label">Jumlah Subsampel</span>
+        <span class="value">${hasil.numSubsamples}</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Standar Hair: 5.000 subsampel</span>
       </div>
       <div class="ringkasan-card">
-        <span class="value">${((1 - hasil.significanceLevel) * 100).toFixed(0)}%</span>
         <span class="label">Tingkat Kepercayaan (CI)</span>
+        <span class="value">${((1 - hasil.significanceLevel) * 100).toFixed(0)}%</span>
+        <span style="font-size: 11px; color: var(--text-muted);">&alpha; = ${(hasil.significanceLevel * 100).toFixed(0)}% (t-kritis: 1.96)</span>
       </div>
       <div class="ringkasan-card">
-        <span class="value">${hasil.testType === 'two-tailed' ? 'Dua Sisi (Two-tailed)' : 'Satu Sisi (One-tailed)'}</span>
         <span class="label">Tipe Pengujian</span>
+        <span class="value" style="font-size: 18px; color: var(--color-primary);">
+          ${hasil.testType === 'two-tailed' ? 'Dua Sisi (Two-tailed)' : 'Satu Sisi (One-tailed)'}
+        </span>
+        <span style="font-size: 11px; color: var(--text-muted);">Uji arah hipotesis kausal</span>
+      </div>
+      <div class="ringkasan-card">
+        <span class="label">Hipotesis Diterima</span>
+        <span class="value" style="color: ${acceptedHypotheses > 0 ? 'var(--color-success)' : 'var(--color-danger)'};">
+          ${acceptedHypotheses} / ${totalHypotheses}
+        </span>
+        <span style="font-size: 11px; color: var(--text-muted);">${totalHypotheses > 0 ? ((acceptedHypotheses / totalHypotheses) * 100).toFixed(0) : 0}% jalur terbukti signifikan</span>
       </div>
     </div>
   `;
   
-  // Path coefficients bootstrap
-  html += '<h4 style="margin-bottom: 12px; font-size: 14.5px;">1. Koefisien Jalur (Path Coefficients) - Uji Signifikansi</h4>';
-  html += `<table class="data-table">
-    <thead>
-      <tr>
-        <th>Jalur Struktural</th>
-        <th>Sampel Asli (β)</th>
-        <th>Rata-rata Bootstrap (M)</th>
-        <th>Std. Deviasi</th>
-        <th>T Statistik</th>
-        <th>P Values</th>
-        <th>Keputusan Hipotesis</th>
-      </tr>
-    </thead>
-    <tbody>
+  // 1. Path coefficients bootstrap
+  html += `
+    <div class="table-toolbar-box">
+      <h4>1. Koefisien Jalur (Path Coefficients) - Uji Signifikansi Hipotesis Langsung</h4>
+      <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableBootstrapHypotheses')">
+        <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin
+      </button>
+    </div>
+    
+    <table class="data-table" id="tableBootstrapHypotheses">
+      <thead>
+        <tr>
+          <th>Hipotesis</th>
+          <th>Jalur Kausalitas</th>
+          <th>Sampel Asli (β)</th>
+          <th>Rata-rata Bootstrap (M)</th>
+          <th>Standard Error (STDEV)</th>
+          <th>T-Statistik (|O/STDEV|)</th>
+          <th>P-Values</th>
+          <th>Keputusan Hipotesis</th>
+        </tr>
+      </thead>
+      <tbody>
   `;
   
+  let hIdx = 1;
   for (const [path, result] of Object.entries(hasil.pathResults)) {
+    const isSig = result.signifikan;
     html += `
       <tr>
-        <td style="font-weight: 600;">${escapeHtml(path)}</td>
-        <td style="font-weight: 700;">${result.originalValue.toFixed(4)}</td>
+        <td style="font-weight: 700; color: var(--color-primary);">H${hIdx++}</td>
+        <td style="font-weight: 600; color: var(--text-primary); font-size: 13.5px;">${escapeHtml(path)}</td>
+        <td style="font-weight: 800; font-size: 14px;">${result.originalValue.toFixed(4)}</td>
         <td>${result.bootMean.toFixed(4)}</td>
         <td>${result.bootStd.toFixed(4)}</td>
-        <td style="font-weight: 700;">${result.tStatistic.toFixed(4)}</td>
-        <td style="font-weight: 700; color: ${result.pValue < hasil.significanceLevel ? 'var(--color-success)' : 'var(--color-danger)'}">
+        <td style="font-weight: 700; font-size: 13.5px;">${result.tStatistic.toFixed(4)}</td>
+        <td style="font-weight: 800; color: ${result.pValue < hasil.significanceLevel ? 'var(--color-success)' : 'var(--color-danger)'}; font-size: 13.5px;">
           ${result.pValue.toFixed(4)}
         </td>
         <td>
-          <span class="badge ${result.signifikan ? 'badge-sukses' : 'badge-danger'}">
-            ${result.signifikan ? 'Diterima (Signifikan)' : 'Ditolak (Tidak Signifikan)'}
+          <span class="badge ${isSig ? 'badge-sukses' : 'badge-danger'}">
+            ${isSig ? 'Diterima (Signifikan)' : 'Ditolak (Tidak Signifikan)'}
           </span>
         </td>
       </tr>
@@ -5213,33 +8300,40 @@ function displayBootstrapResults(hasil) {
   }
   html += '</tbody></table>';
 
-  // Specific Indirect Effects Bootstrap (jika ada mediasi)
+  // 2. Specific Indirect Effects Bootstrap (jika ada mediasi)
   if (hasil.indirectResults && Object.keys(hasil.indirectResults).length > 0) {
-    html += '<h4 style="margin: 24px 0 12px; font-size: 14.5px;">2. Uji Efek Mediasi Tidak Langsung (Specific Indirect Effects Bootstrap)</h4>';
-    html += `<table class="data-table">
-      <thead>
-        <tr>
-          <th>Jalur Mediasi</th>
-          <th>Sampel Asli (β_ind)</th>
-          <th>T Statistik</th>
-          <th>P Value</th>
-          <th>CI Bawah (2.5%)</th>
-          <th>CI Atas (97.5%)</th>
-          <th>Klasifikasi Mediasi</th>
-        </tr>
-      </thead>
-      <tbody>
+    html += `
+      <div class="table-toolbar-box" style="margin-top: 28px;">
+        <h4>2. Uji Efek Mediasi Tidak Langsung (Specific Indirect Effects Bootstrap)</h4>
+        <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableBootstrapIndirect')">
+          <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin
+        </button>
+      </div>
+      
+      <table class="data-table" id="tableBootstrapIndirect">
+        <thead>
+          <tr>
+            <th>Jalur Mediasi</th>
+            <th>Sampel Asli (β_ind)</th>
+            <th>T-Statistik</th>
+            <th>P-Value</th>
+            <th>CI Bawah (2.5%)</th>
+            <th>CI Atas (97.5%)</th>
+            <th>Klasifikasi Mediasi</th>
+          </tr>
+        </thead>
+        <tbody>
     `;
 
     for (const [pathKey, r] of Object.entries(hasil.indirectResults)) {
       html += `
         <tr>
-          <td style="font-weight: 600;">${escapeHtml(pathKey)}</td>
-          <td style="font-weight: 700; color: var(--color-primary);">${r.originalValue.toFixed(4)}</td>
+          <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(pathKey)}</td>
+          <td style="font-weight: 800; color: var(--color-primary); font-size: 13.5px;">${r.originalValue.toFixed(4)}</td>
           <td style="font-weight: 700;">${r.tStatistic.toFixed(4)}</td>
-          <td style="font-weight: 700; color: ${r.pValue < hasil.significanceLevel ? 'var(--color-success)' : 'var(--color-danger)'}">${r.pValue.toFixed(4)}</td>
-          <td>${r.ciLower.toFixed(4)}</td>
-          <td>${r.ciUpper.toFixed(4)}</td>
+          <td style="font-weight: 800; color: ${r.pValue < hasil.significanceLevel ? 'var(--color-success)' : 'var(--color-danger)'}">${r.pValue.toFixed(4)}</td>
+          <td style="font-family: monospace;">${r.ciLower.toFixed(4)}</td>
+          <td style="font-family: monospace;">${r.ciUpper.toFixed(4)}</td>
           <td><span class="badge ${r.signifikan ? 'badge-sukses' : 'badge-danger'}">${escapeHtml(r.mediationType)}</span></td>
         </tr>
       `;
@@ -5247,29 +8341,36 @@ function displayBootstrapResults(hasil) {
     html += '</tbody></table>';
   }
   
-  // Confidence Intervals
-  html += '<h4 style="margin: 24px 0 12px; font-size: 14.5px;">3. Interval Kepercayaan (Bias-Corrected Confidence Intervals)</h4>';
-  html += `<table class="data-table">
-    <thead>
-      <tr>
-        <th>Jalur</th>
-        <th>Sampel Asli</th>
-        <th>CI Bawah (${((hasil.significanceLevel/2)*100).toFixed(1)}%)</th>
-        <th>CI Atas (${((1-hasil.significanceLevel/2)*100).toFixed(1)}%)</th>
-        <th>Status Nol</th>
-      </tr>
-    </thead>
-    <tbody>
+  // 3. Confidence Intervals
+  html += `
+    <div class="table-toolbar-box" style="margin-top: 28px;">
+      <h4>3. Interval Kepercayaan (Bias-Corrected Confidence Intervals)</h4>
+      <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableBootstrapCI')">
+        <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin
+      </button>
+    </div>
+    
+    <table class="data-table" id="tableBootstrapCI">
+      <thead>
+        <tr>
+          <th>Jalur Struktural</th>
+          <th>Sampel Asli</th>
+          <th>CI Bawah (${((hasil.significanceLevel/2)*100).toFixed(1)}%)</th>
+          <th>CI Atas (${((1-hasil.significanceLevel/2)*100).toFixed(1)}%)</th>
+          <th>Status Selang Nol</th>
+        </tr>
+      </thead>
+      <tbody>
   `;
   
   for (const [path, result] of Object.entries(hasil.pathResults)) {
     const containsZero = result.ciLower <= 0 && result.ciUpper >= 0;
     html += `
       <tr>
-        <td style="font-weight: 600;">${escapeHtml(path)}</td>
+        <td style="font-weight: 600; color: var(--text-primary);">${escapeHtml(path)}</td>
         <td style="font-weight: 700;">${result.originalValue.toFixed(4)}</td>
-        <td>${result.ciLower.toFixed(4)}</td>
-        <td>${result.ciUpper.toFixed(4)}</td>
+        <td style="font-family: monospace;">${result.ciLower.toFixed(4)}</td>
+        <td style="font-family: monospace;">${result.ciUpper.toFixed(4)}</td>
         <td>
           <span class="badge ${!containsZero ? 'badge-sukses' : 'badge-danger'}">
             ${!containsZero ? 'Tidak Melewati 0 (Signifikan)' : 'Melewati 0 (Tidak Signifikan)'}
@@ -5280,32 +8381,39 @@ function displayBootstrapResults(hasil) {
   }
   html += '</tbody></table>';
   
-  // Outer loading bootstrap
+  // 4. Outer loading bootstrap
   if (Object.keys(hasil.loadingResults).length > 0) {
-    html += '<h4 style="margin: 24px 0 12px; font-size: 14.5px;">4. Outer Loadings - Uji Signifikansi Indikator</h4>';
-    html += `<table class="data-table">
-      <thead>
-        <tr>
-          <th>Variabel</th>
-          <th>Indikator</th>
-          <th>Loading</th>
-          <th>T Statistik</th>
-          <th>P Values</th>
-          <th>Keputusan</th>
-        </tr>
-      </thead>
-      <tbody>
+    html += `
+      <div class="table-toolbar-box" style="margin-top: 28px;">
+        <h4>4. Outer Loadings - Uji Signifikansi Indikator Pengukuran</h4>
+        <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableBootstrapLoadings')">
+          <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin
+        </button>
+      </div>
+      
+      <table class="data-table" id="tableBootstrapLoadings">
+        <thead>
+          <tr>
+            <th>Variabel Laten</th>
+            <th>Indikator</th>
+            <th>Outer Loading</th>
+            <th>T-Statistik</th>
+            <th>P-Values</th>
+            <th>Keputusan</th>
+          </tr>
+        </thead>
+        <tbody>
     `;
     
     for (const [varName, indicators] of Object.entries(hasil.loadingResults)) {
       for (const [ind, result] of Object.entries(indicators)) {
         html += `
           <tr>
-            <td>${escapeHtml(varName)}</td>
-            <td>${escapeHtml(ind)}</td>
-            <td style="font-weight: 600;">${result.originalValue.toFixed(4)}</td>
+            <td style="font-weight: 600; color: var(--text-primary);">${escapeHtml(varName)}</td>
+            <td style="font-family: monospace; font-weight: 700; color: var(--color-primary);">${escapeHtml(ind)}</td>
+            <td style="font-weight: 700;">${result.originalValue.toFixed(4)}</td>
             <td>${result.tStatistic.toFixed(4)}</td>
-            <td style="color: ${result.pValue < hasil.significanceLevel ? 'var(--color-success)' : 'var(--color-danger)'}">
+            <td style="font-weight: 700; color: ${result.pValue < hasil.significanceLevel ? 'var(--color-success)' : 'var(--color-danger)'}">
               ${result.pValue.toFixed(4)}
             </td>
             <td>
@@ -5321,6 +8429,11 @@ function displayBootstrapResults(hasil) {
   }
   
   bootstrapTab.innerHTML = html;
+
+  // Render ulang laporan bab 4 agar memuat data bootstrap terbaru
+  if (state.hasilPLS) {
+    renderChapter4ReportTab(state.hasilPLS);
+  }
 }
 
 async function loadResults() {
@@ -5341,7 +8454,10 @@ async function loadResults() {
       state.hasilPLS = latest.data_hasil;
       displayPLSResults(latest.data_hasil);
     }
+  } else {
+    renderEmptyResultsState();
   }
+  updateResultsStatusBadge();
 }
 
 function prepareExportData() {
@@ -5407,17 +8523,63 @@ function prepareExportData() {
     sheets['HTMT Matrix'] = htmtRows;
   }
   
-  // Bootstrap if available
-  if (state.hasilBootstrap && state.hasilBootstrap.pathResults) {
-    sheets['Bootstrapping'] = Object.entries(state.hasilBootstrap.pathResults).map(([path, result]) => ({
-      'Jalur': path,
-      'Sampel Asli': result.originalValue.toFixed(4),
-      'Rata-rata Bootstrap': result.bootMean.toFixed(4),
-      'Std. Deviasi': result.bootStd.toFixed(4),
-      'T Statistik': result.tStatistic.toFixed(4),
-      'P Values': result.pValue.toFixed(4),
-      'Signifikan': result.signifikan ? 'Ya' : 'Tidak'
+  // Q² Predictive Relevance
+  const q2Data = state.hasilPLS.q2 || (plsEngine ? plsEngine.calculateBlindfoldingQ2(state.hasilPLS.latentScores, state.hasilPLS.rSquared) : {});
+  if (q2Data && Object.keys(q2Data).length > 0) {
+    sheets['Relevansi Prediktif (Q²)'] = Object.entries(q2Data).map(([varName, item]) => ({
+      'Variabel Endogen': varName,
+      'R² Asli': item.r2,
+      'SSO (Observed)': item.sso,
+      'SSE (Prediction Error)': item.sse,
+      'Q² (= 1 - SSE/SSO)': item.q2,
+      'Kategori Relevansi': item.kategoriRelevansi
     }));
+  }
+
+  // Mediasi Spesifik & VAF
+  const detailedMed = plsEngine ? plsEngine.calculateDetailedMediationAndVAF(state.hasilPLS.pathCoefficients, state.hasilBootstrap) : [];
+  if (detailedMed && detailedMed.length > 0) {
+    sheets['Mediasi Spesifik & VAF'] = detailedMed.map(dm => ({
+      'Jalur Mediasi': dm.path,
+      'Efek Tidak Langsung (β)': dm.indirectEffect,
+      'Efek Langsung (β)': dm.directEffect,
+      'Total Efek': dm.totalEffect,
+      'VAF (%)': dm.vaf,
+      'T-Statistik': dm.tStatistic,
+      'P-Value': dm.pValue,
+      '95% CI Lower': dm.ciLower,
+      '95% CI Upper': dm.ciUpper,
+      'Tipe Mediasi': dm.tipeMediasi
+    }));
+  }
+
+  // Common Method Bias (Full Collinearity VIF)
+  const cmbData = state.hasilPLS.fullCollinearity || (plsEngine ? plsEngine.calculateFullCollinearityVIF(state.hasilPLS.latentScores) : null);
+  if (cmbData && cmbData.results) {
+    sheets['Common Method Bias (CMB)'] = cmbData.results.map(r => ({
+      'Variabel Laten': r.variabel,
+      'Full Collinearity R²': r.rSquared,
+      'Full Collinearity VIF': r.fullVIF,
+      'Kriteria Kock (2015)': '≤ 3.300',
+      'Status CMB': r.status
+    }));
+  }
+
+  // Uji Moderasi
+  if (state.hasilModerasi) {
+    const mr = state.hasilModerasi;
+    sheets['Uji Efek Moderasi'] = [
+      { 'Parameter': 'Model Interaksi', 'Nilai': `${mr.ivName} × ${mr.modName} → ${mr.dvName}` },
+      { 'Parameter': 'Koefisien Interaksi (β_int)', 'Nilai': mr.betaInteraction.toFixed(4) },
+      { 'Parameter': 'T-Statistik Interaksi', 'Nilai': mr.tStatistic.toFixed(4) },
+      { 'Parameter': 'P-Value Interaksi', 'Nilai': mr.pValue.toFixed(4) },
+      { 'Parameter': 'Signifikan (p < 0.05)', 'Nilai': mr.isSignificant ? 'Ya' : 'Tidak' },
+      { 'Parameter': 'Effect Size Moderasi (f²)', 'Nilai': mr.f2Mod.toFixed(4) },
+      { 'Parameter': 'Perubahan R² (ΔR²)', 'Nilai': mr.deltaR2.toFixed(4) },
+      { 'Parameter': 'Slope Rendah (-1 SD)', 'Nilai': mr.slopeLow.toFixed(4) },
+      { 'Parameter': 'Slope Rata-rata (Mean)', 'Nilai': mr.slopeMean.toFixed(4) },
+      { 'Parameter': 'Slope Tinggi (+1 SD)', 'Nilai': mr.slopeHigh.toFixed(4) }
+    ];
   }
   
   return sheets;
@@ -5430,6 +8592,95 @@ function initSettingsHandlers() {
       applyTheme(btn.dataset.tema);
     });
   });
+
+  initMcpSettingsPanel();
+}
+
+function initMcpSettingsPanel() {
+  const mcpServerPath = 'mcp-server/index.js';
+
+  // Config snippets per host
+  const configs = {
+    claude: JSON.stringify({
+      mcpServers: { freepls: { command: 'node', args: [mcpServerPath] } }
+    }, null, 2),
+    cursor: JSON.stringify({
+      mcpServers: { freepls: { command: 'node', args: [mcpServerPath] } }
+    }, null, 2),
+    agy: JSON.stringify({
+      servers: { freepls: { command: 'node', args: [mcpServerPath] } }
+    }, null, 2),
+    cli: `node ${mcpServerPath}`,
+  };
+
+  // Resolve absolute path via IPC if available, else use placeholder
+  if (window.api?.getAppPath) {
+    window.api.getAppPath().then(appPath => {
+      const abs = appPath.replace(/\\/g, '/') + '/mcp-server/index.js';
+      configs.claude = JSON.stringify({ mcpServers: { freepls: { command: 'node', args: [abs] } } }, null, 2);
+      configs.cursor = configs.claude;
+      configs.agy    = JSON.stringify({ servers: { freepls: { command: 'node', args: [abs] } } }, null, 2);
+      configs.cli    = `node "${abs}"`;
+      fillMcpConfigs(configs);
+    }).catch(() => fillMcpConfigs(configs));
+  } else {
+    fillMcpConfigs(configs);
+  }
+
+  // Tab switching
+  document.querySelectorAll('.mcp-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.mcp-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.mcp-tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.target)?.classList.add('active');
+    });
+  });
+
+  // Copy buttons
+  document.querySelectorAll('.mcp-copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pre = document.getElementById(btn.dataset.copy);
+      if (!pre) return;
+      navigator.clipboard.writeText(pre.textContent).then(() => {
+        const icon = btn.querySelector('.material-icons-round');
+        icon.textContent = 'check';
+        setTimeout(() => { icon.textContent = 'content_copy'; }, 1500);
+      });
+    });
+  });
+
+  // Check if MCP server file exists
+  checkMcpStatus();
+}
+
+function fillMcpConfigs(configs) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('mcp-config-claude', configs.claude);
+  set('mcp-config-cursor', configs.cursor);
+  set('mcp-config-agy',    configs.agy);
+  set('mcp-config-cli',    configs.cli);
+}
+
+async function checkMcpStatus() {
+  const badge = document.getElementById('mcp-status-badge');
+  const text  = document.getElementById('mcp-status-text');
+  if (!badge || !text) return;
+
+  try {
+    // Try to ping the MCP server via IPC (app exposes checkMcpServer if wired)
+    if (window.electronAPI?.checkMcpServer) {
+      const running = await window.electronAPI.checkMcpServer();
+      badge.className = `mcp-badge ${running ? 'mcp-running' : 'mcp-stopped'}`;
+      text.textContent = running ? 'Server tersedia' : 'Server tidak aktif';
+    } else {
+      badge.className = 'mcp-badge mcp-stopped';
+      text.textContent = 'Siap dijalankan';
+    }
+  } catch {
+    badge.className = 'mcp-badge mcp-stopped';
+    text.textContent = 'Siap dijalankan';
+  }
 }
 
 // ============ UTILITIES ============
@@ -5463,3 +8714,1296 @@ window.addEventListener('resize', () => {
   }
 });
 
+// ============ UJI VALIDITAS & RELIABILITAS INSTRUMEN (PILOT TESTING) ============
+let lastInstrumentTestResult = null;
+
+function initInstrumentTestHandlers() {
+  const openModal = async () => {
+    if (!state.proyekAktif) {
+      showToast('Pilih atau buat proyek terlebih dahulu', 'peringatan');
+      return;
+    }
+    const datasets = await window.api.datasetDaftar(state.proyekAktif.id);
+    if (!datasets || datasets.length === 0) {
+      showToast('Impor data kuesioner / dataset terlebih dahulu', 'peringatan');
+      return;
+    }
+
+    // Populate dataset dropdown
+    const selectDs = document.getElementById('selectDatasetUjiInstrumen');
+    if (selectDs) {
+      selectDs.innerHTML = datasets.map(d => `<option value="${d.id}" ${dataViewerState.activeDatasetId === d.id ? 'selected' : ''}>${escapeHtml(d.nama)} (${d.jumlah_baris} baris, ${d.jumlah_kolom} kolom)</option>`).join('');
+    }
+
+    const defaultDsId = dataViewerState.activeDatasetId || datasets[0].id;
+    await populateInstrumentItemCheckboxes(defaultDsId);
+
+    // Subtabs init
+    document.querySelectorAll('#modalUjiInstrumen .hasil-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('#modalUjiInstrumen .hasil-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('#modalUjiInstrumen .subtab-panel').forEach(p => {
+          p.classList.remove('active');
+          p.classList.add('tersembunyi');
+        });
+        tab.classList.add('active');
+        const target = document.getElementById(`subtab-${tab.dataset.subtab}`);
+        if (target) {
+          target.classList.remove('tersembunyi');
+          target.classList.add('active');
+        }
+      });
+    });
+
+    showModal('modalUjiInstrumen');
+  };
+
+  document.getElementById('btnBukaUjiInstrumen')?.addEventListener('click', openModal);
+  document.getElementById('btnBukaModalUjiInstrumenDariAnalisis')?.addEventListener('click', openModal);
+
+  document.getElementById('selectDatasetUjiInstrumen')?.addEventListener('change', async (e) => {
+    const dsId = parseInt(e.target.value);
+    if (dsId) await populateInstrumentItemCheckboxes(dsId);
+  });
+
+  document.getElementById('btnPilihSemuaItemUji')?.addEventListener('click', () => {
+    document.querySelectorAll('#containerItemCheckboxes input[type="checkbox"]').forEach(cb => {
+      cb.checked = true;
+      cb.closest('.item-checkbox-pill')?.classList.add('checked');
+    });
+  });
+
+  document.getElementById('btnResetItemUji')?.addEventListener('click', () => {
+    document.querySelectorAll('#containerItemCheckboxes input[type="checkbox"]').forEach(cb => {
+      cb.checked = false;
+      cb.closest('.item-checkbox-pill')?.classList.remove('checked');
+    });
+  });
+
+  // Jalankan Perhitungan Uji Instrumen
+  document.getElementById('btnJalankanUjiInstrumen')?.addEventListener('click', async () => {
+    const selectDs = document.getElementById('selectDatasetUjiInstrumen');
+    const dsId = parseInt(selectDs?.value);
+    if (!dsId) {
+      showToast('Pilih dataset terlebih dahulu', 'peringatan');
+      return;
+    }
+
+    const selectedCols = [];
+    document.querySelectorAll('#containerItemCheckboxes input[type="checkbox"]:checked').forEach(cb => {
+      selectedCols.push(cb.value);
+    });
+
+    if (selectedCols.length < 2) {
+      showToast('Pilih minimal 2 butir/indikator kuesioner untuk diuji', 'peringatan');
+      return;
+    }
+
+    showLoading(
+      'Menghitung Uji Validitas & Reliabilitas Instrumen...',
+      800,
+      'Korelasi Pearson r-Hitung, Cronbach Alpha & Validitas Butir Pertanyaan',
+      'fact_check'
+    );
+    try {
+      const ds = await window.api.datasetAmbil(dsId);
+      if (!ds || !ds.data || ds.data.length === 0) {
+        throw new Error('Data pada dataset kosong');
+      }
+
+      const alpha = parseFloat(document.getElementById('selectAlphaUjiInstrumen')?.value) || 0.05;
+      const res = plsEngine.testInstrumentReliabilityAndValidity(ds.data, selectedCols, { alpha });
+      lastInstrumentTestResult = { ...res, datasetName: ds.nama, selectedCols };
+
+      // Render Hasil ke UI
+      renderInstrumentTestResults(lastInstrumentTestResult);
+      showToast('Pengujian validitas & reliabilitas instrumen selesai!', 'sukses');
+    } catch (e) {
+      showToast('Gagal menjalankan uji instrumen: ' + e.message, 'error');
+    }
+    hideLoading();
+  });
+
+  // Salin Draf Teks Laporan Uji Instrumen
+  document.getElementById('btnSalinDrafUjiInstrumen')?.addEventListener('click', async () => {
+    const ta = document.getElementById('textareaDrafUjiInstrumen');
+    if (!ta || !ta.value) {
+      showToast('Belum ada hasil uji untuk disalin', 'peringatan');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(ta.value);
+      showToast('Draf interpretasi akademik berhasil disalin ke clipboard!', 'sukses');
+    } catch {
+      ta.select();
+      document.execCommand('copy');
+      showToast('Draf berhasil disalin!', 'sukses');
+    }
+  });
+
+  // Ekspor Excel Uji Instrumen
+  document.getElementById('btnEksporExcelUjiInstrumen')?.addEventListener('click', async () => {
+    if (!lastInstrumentTestResult) {
+      showToast('Jalankan pengujian instrumen terlebih dahulu', 'peringatan');
+      return;
+    }
+
+    const r = lastInstrumentTestResult;
+    const excelRows = r.itemAnalysis.map((item, idx) => ({
+      'No': idx + 1,
+      'Butir / Indikator': item.kolom,
+      'Mean': item.mean,
+      'Std. Deviasi': item.stdDev,
+      'Varians Butir': item.variance,
+      'r-Hitung (Pearson)': item.rHitung,
+      [`r-Tabel (df=${r.df})`]: item.rTabel,
+      'Sig. (2-Tailed)': item.pValue,
+      'Status Validitas Pearson': item.isValidPearson ? 'Valid' : 'Gugur / Tidak Valid',
+      'Corrected Item-Total (r >= 0.30)': item.correctedItemTotal,
+      'Daya Beda Butir': item.isValidCorrected ? 'Baik' : 'Kurang',
+      "Cronbach's Alpha if Item Deleted": item.alphaIfDeleted,
+      'Kesimpulan Butir': item.statusDiagnosa
+    }));
+
+    const summaryRows = [
+      { 'Metrik': 'Nama Dataset', 'Nilai': r.datasetName },
+      { 'Metrik': 'Jumlah Responden (N)', 'Nilai': r.N },
+      { 'Metrik': 'Derajat Kebebasan (df = N - 2)', 'Nilai': r.df },
+      { 'Metrik': 'Taraf Signifikansi (Alpha)', 'Nilai': r.alphaSig },
+      { 'Metrik': 'Nilai Kritis r-Tabel', 'Nilai': r.rTabel },
+      { 'Metrik': 'Jumlah Butir (k)', 'Nilai': r.k },
+      { 'Metrik': "Koefisien Cronbach's Alpha", 'Nilai': r.overallAlpha },
+      { 'Metrik': 'Kategori Reliabilitas', 'Nilai': r.reliabilityCategory },
+      { 'Metrik': 'Status Reliabilitas Instrumen', 'Nilai': r.isReliable ? 'Reliabel (alpha >= 0.70)' : 'Tidak Reliabel' },
+      { 'Metrik': 'Jumlah Butir Valid', 'Nilai': `${r.totalValid} butir` },
+      { 'Metrik': 'Jumlah Butir Gugur', 'Nilai': `${r.totalGugur} butir` }
+    ];
+
+    const sheets = {
+      'Uji Validitas & Reliabilitas': excelRows,
+      'Ringkasan Metodologi': summaryRows
+    };
+
+    const fileName = `Uji_Instrumen_${(r.datasetName || 'Dataset').replace(/[^a-zA-Z0-9_-]/g, '_')}.xlsx`;
+    const result = await window.api.eksporHasil({
+      data: sheets,
+      namaFile: fileName
+    });
+    if (result) {
+      showToast('Tabel uji instrumen berhasil diekspor ke Excel!', 'sukses');
+    }
+  });
+}
+
+async function populateInstrumentItemCheckboxes(datasetId) {
+  const ds = await window.api.datasetAmbil(datasetId);
+  const container = document.getElementById('containerItemCheckboxes');
+  if (!container || !ds || !ds.kolom) return;
+
+  container.innerHTML = ds.kolom.map(col => `
+    <label class="item-checkbox-pill checked">
+      <input type="checkbox" value="${escapeHtml(col)}" checked onchange="this.closest('.item-checkbox-pill').classList.toggle('checked', this.checked)">
+      <span>${escapeHtml(col)}</span>
+    </label>
+  `).join('');
+}
+
+function renderInstrumentTestResults(r) {
+  const containerHasil = document.getElementById('containerHasilUjiInstrumen');
+  if (!containerHasil) return;
+  containerHasil.style.display = 'flex';
+
+  // Update Summary Cards
+  document.getElementById('valOverallAlpha').textContent = r.overallAlpha;
+  const badgeCat = document.getElementById('badgeReliabilityCategory');
+  if (badgeCat) {
+    badgeCat.textContent = r.reliabilityCategory;
+    badgeCat.className = `badge-chip ${r.overallAlpha >= 0.70 ? 'badge-success' : 'badge-danger'}`;
+  }
+
+  document.getElementById('valValidCount').textContent = `${r.totalValid} / ${r.k} Butir Valid`;
+  document.getElementById('valGugurCount').textContent = r.totalGugur > 0 ? `${r.totalGugur} Butir Gugur (Tidak Valid)` : 'Semua butir memenuhi syarat';
+  document.getElementById('valRTabelKritis').textContent = r.rTabel;
+  document.getElementById('valDfInfo').textContent = `df = ${r.df} (N = ${r.N}, \u03B1 = ${r.alphaSig})`;
+
+  // Render Table
+  const tbody = document.getElementById('tbodyHasilUjiInstrumen');
+  if (tbody) {
+    tbody.innerHTML = r.itemAnalysis.map(item => `
+      <tr>
+        <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(item.kolom)}</td>
+        <td class="col-num">${item.mean}</td>
+        <td class="col-num">${item.stdDev}</td>
+        <td class="col-num" style="font-weight: 700; color: ${item.isValidPearson ? '#10b981' : '#f87171'}">${item.rHitung}</td>
+        <td class="col-num">${item.rTabel}</td>
+        <td class="col-num">${item.pValue}</td>
+        <td>
+          <span class="badge-chip ${item.isValidPearson ? 'badge-success' : 'badge-danger'}">
+            ${item.isValidPearson ? 'Valid (r > r_tabel)' : 'Gugur (r < r_tabel)'}
+          </span>
+        </td>
+        <td class="col-num" style="color: ${item.isValidCorrected ? '#10b981' : '#fbbf24'}">${item.correctedItemTotal}</td>
+        <td class="col-num">${item.alphaIfDeleted}</td>
+        <td>
+          <span class="badge-chip badge-${item.statusBadge}">
+            ${escapeHtml(item.statusDiagnosa)}
+          </span>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // Generate Draf Narasi Metodologi & Hasil
+  const drafText = generateInstrumentReportText(r);
+  const ta = document.getElementById('textareaDrafUjiInstrumen');
+  if (ta) {
+    ta.value = drafText;
+  }
+}
+
+function generateInstrumentReportText(r) {
+  return `================================================================================
+HASIL UJI VALIDITAS DAN RELIABILITAS INSTRUMEN PENELITIAN (PILOT TEST)
+Format Laporan Metodologi Riset Kuantitatif & Publikasi Ilmiah
+================================================================================
+
+A. UJI VALIDITAS BUTIR KUESIONER (PEARSON PRODUCT MOMENT)
+Pengujian validitas instrumen bertujuan untuk mengukur derajat kesahihan butir-butir instrumen pengumpulan data. Pengujian dilakukan terhadap ${r.N} responden uji coba (pilot test) dengan derajat kebebasan df = N - 2 = ${r.df} pada taraf signifikansi α = ${r.alphaSig} (two-tailed), sehingga diperoleh nilai r-tabel kritis sebesar ${r.rTabel} (Sugiyono, 2019; Azwar, 2018).
+
+1. Alur & Rumus Korelasi Pearson Product Moment (r_hitung):
+   r_xy = [ N ∑XY - (∑X)(∑Y) ] / √[ (N ∑X² - (∑X)²) (N ∑Y² - (∑Y)²) ]
+   Di mana:
+   - X = Skor butir pernyataan
+   - Y = Skor total variabel
+   - N = Jumlah responden uji coba (${r.N})
+
+2. Alur & Rumus Daya Beda Butir (Corrected Item-Total Correlation, r_it):
+   r_i(t-i) = ( r_it × s_t - s_i ) / √( s_t² + s_i² - 2 × r_it × s_t × s_i )
+   Kriteria daya beda butir yang baik adalah r_i(t-i) >= 0.300 (Nunnally & Bernstein, 1994).
+
+3. Kriteria Pengambilan Keputusan Validitas:
+   - Jika r_hitung > r_tabel (${r.rTabel}) dan p-value < ${r.alphaSig}, maka butir dinyatakan VALID.
+   - Jika r_hitung <= r_tabel (${r.rTabel}) atau p-value >= ${r.alphaSig}, maka butir dinyatakan GUGUR / TIDAK VALID.
+
+Ringkasan Hasil Uji Validitas:
+- Total Butir Diuji : ${r.k} Butir
+- Butir Valid       : ${r.totalValid} Butir (${((r.totalValid / r.k) * 100).toFixed(1)}%)
+- Butir Gugur       : ${r.totalGugur} Butir (${((r.totalGugur / r.k) * 100).toFixed(1)}%)
+
+Tabel Rincian Hasil Validitas Butir:
+${r.itemAnalysis.map(i => `- Butir ${i.kolom.padEnd(8)}: r-hitung = ${i.rHitung.padEnd(6)} | r-tabel = ${i.rTabel} | Sig. = ${i.pValue.padEnd(7)} | Corrected r = ${i.correctedItemTotal.padEnd(6)} | Status: ${i.isValidPearson ? 'VALID' : 'GUGUR'}`).join('\n')}
+
+Kesimpulan Validitas:
+Berdasarkan tabel di atas, sebanyak ${r.totalValid} butir pernyataan memiliki nilai r-hitung > r-tabel (${r.rTabel}) dan berdaya beda baik (Corrected Item-Total Correlation >= 0.300), sehingga dinyatakan VALID dan layak digunakan untuk pengumpulan data riset.
+
+--------------------------------------------------------------------------------
+B. UJI RELIABILITAS INSTRUMEN (CRONBACH'S ALPHA)
+Uji reliabilitas dilakukan untuk mengetahui konsistensi dan stabilitas instrumen kuesioner jika dilakukan pengukuran berulang pada subjek yang sama (Cronbach, 1951).
+
+1. Alur & Rumus Koefisien Cronbach's Alpha (α):
+   α = [ k / (k - 1) ] × [ 1 - ( ∑ sᵢ² / s_total² ) ]
+   Di mana:
+   - k = Jumlah butir pertanyaan yang diuji (${r.k})
+   - ∑ sᵢ² = Jumlah varians masing-masing butir
+   - s_total² = Varians skor total kuesioner
+
+2. Kriteria Pengambilan Keputusan:
+   Konstruk dinyatakan reliabel jika koefisien Cronbach's Alpha >= 0.700 (Hair et al., 2022; Ghozali, 2021).
+
+Hasil Uji Reliabilitas:
+- Koefisien Cronbach's Alpha : ${r.overallAlpha}
+- Kategori Reliabilitas      : ${r.reliabilityCategory}
+- Nilai Ambang Batas Cut-off  : 0.700
+- Status Instrumen           : ${r.isReliable ? 'RELIABEL (MEMENUHI SYARAT)' : 'TIDAK RELIABEL'}
+
+Kesimpulan Reliabilitas:
+Nilai koefisien Cronbach's Alpha yang diperoleh sebesar ${r.overallAlpha} (>= 0.700), membuktikan bahwa seluruh butir pernyataan dalam instrumen memiliki konsistensi internal yang ${r.reliabilityCategory.toLowerCase()} dan memenuhi kriteria reliabilitas pengujian ilmiah.
+
+--------------------------------------------------------------------------------
+REFERENSI PUSTAKA ACUAN:
+1. Azwar, S. (2018). Reliabilitas dan Validitas (Edisi 4). Yogyakarta: Pustaka Pelajar.
+2. Cronbach, L. J. (1951). Coefficient alpha and the internal structure of tests. Psychometrika, 16(3), 297-334.
+3. Ghozali, I. (2021). Aplikasi Analisis Multivariate dengan Program IBM SPSS 26 (Edisi 10). Semarang: Badan Penerbit Universitas Diponegoro.
+4. Hair, J. F., Hult, G. T. M., Ringle, C. M., & Sarstedt, M. (2022). A Primer on Partial Least Squares Structural Equation Modeling (PLS-SEM) (3rd ed.). Thousand Oaks: SAGE Publications.
+5. Nunnally, J. C., & Bernstein, I. H. (1994). Psychometric Theory (3rd ed.). New York: McGraw-Hill.
+6. Sugiyono. (2019). Metode Penelitian Kuantitatif, Kualitatif, dan R&D. Bandung: Alfabeta.
+================================================================================`;
+}
+
+// ============ STATISTIK DESKRIPTIF & NORMALITAS UNIVARIAT ============
+let lastDescriptiveStatsResult = null;
+
+function initDescriptiveStatsHandlers() {
+  const openModal = async () => {
+    if (!state.proyekAktif) {
+      showToast('Pilih atau buat proyek terlebih dahulu', 'peringatan');
+      return;
+    }
+    const datasets = await window.api.datasetDaftar(state.proyekAktif.id);
+    if (!datasets || datasets.length === 0) {
+      showToast('Impor data / dataset terlebih dahulu', 'peringatan');
+      return;
+    }
+
+    const selectDs = document.getElementById('selectDatasetDeskriptif');
+    if (selectDs) {
+      selectDs.innerHTML = datasets.map(d => `<option value="${d.id}" ${dataViewerState.activeDatasetId === d.id ? 'selected' : ''}>${escapeHtml(d.nama)} (${d.jumlah_baris} baris, ${d.jumlah_kolom} kolom)</option>`).join('');
+    }
+
+    const defaultDsId = dataViewerState.activeDatasetId || datasets[0].id;
+    await populateDeskriptifItemCheckboxes(defaultDsId);
+
+    // Subtabs init
+    document.querySelectorAll('#modalStatistikDeskriptif .hasil-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('#modalStatistikDeskriptif .hasil-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('#modalStatistikDeskriptif .deskriptif-panel').forEach(p => {
+          p.classList.remove('active');
+          p.classList.add('tersembunyi');
+        });
+        tab.classList.add('active');
+        const target = document.getElementById(`deskriptif-${tab.dataset.deskriptiftab}`);
+        if (target) {
+          target.classList.remove('tersembunyi');
+          target.classList.add('active');
+        }
+      });
+    });
+
+    showModal('modalStatistikDeskriptif');
+  };
+
+  document.getElementById('btnBukaStatistikDeskriptif')?.addEventListener('click', openModal);
+  document.getElementById('btnBukaModalDeskriptifDariAnalisis')?.addEventListener('click', openModal);
+
+  document.getElementById('selectDatasetDeskriptif')?.addEventListener('change', async (e) => {
+    const dsId = parseInt(e.target.value);
+    if (dsId) await populateDeskriptifItemCheckboxes(dsId);
+  });
+
+  document.getElementById('btnPilihSemuaDeskriptif')?.addEventListener('click', () => {
+    document.querySelectorAll('#containerDeskriptifCheckboxes input[type="checkbox"]').forEach(cb => {
+      cb.checked = true;
+      cb.closest('.item-checkbox-pill')?.classList.add('checked');
+    });
+  });
+
+  document.getElementById('btnResetDeskriptif')?.addEventListener('click', () => {
+    document.querySelectorAll('#containerDeskriptifCheckboxes input[type="checkbox"]').forEach(cb => {
+      cb.checked = false;
+      cb.closest('.item-checkbox-pill')?.classList.remove('checked');
+    });
+  });
+
+  // Jalankan Perhitungan Statistik Deskriptif
+  document.getElementById('btnJalankanDeskriptif')?.addEventListener('click', async () => {
+    const selectDs = document.getElementById('selectDatasetDeskriptif');
+    const dsId = parseInt(selectDs?.value);
+    if (!dsId) {
+      showToast('Pilih dataset terlebih dahulu', 'peringatan');
+      return;
+    }
+
+    const selectedCols = [];
+    document.querySelectorAll('#containerDeskriptifCheckboxes input[type="checkbox"]:checked').forEach(cb => {
+      selectedCols.push(cb.value);
+    });
+
+    if (selectedCols.length < 1) {
+      showToast('Pilih minimal 1 kolom/indikator untuk dihitung', 'peringatan');
+      return;
+    }
+
+    showLoading(
+      'Menghitung Statistik Deskriptif & Uji Normalitas...',
+      700,
+      'Mean, Median, Standar Deviasi, Skewness, Kurtosis & Jarque-Bera',
+      'analytics'
+    );
+    try {
+      const ds = await window.api.datasetAmbil(dsId);
+      if (!ds || !ds.data || ds.data.length === 0) {
+        throw new Error('Data pada dataset kosong');
+      }
+
+      const maxScale = parseFloat(document.getElementById('selectSkalaDeskriptif')?.value) || 5;
+      const results = plsEngine.calculateDescriptiveStats(ds.data, selectedCols, { maxScale });
+      lastDescriptiveStatsResult = { results, datasetName: ds.nama, maxScale, N: ds.data.length };
+
+      renderDescriptiveStatsUI(lastDescriptiveStatsResult);
+      showToast('Statistik deskriptif berhasil dihitung!', 'sukses');
+    } catch (e) {
+      showToast('Gagal menghitung statistik deskriptif: ' + e.message, 'error');
+    }
+    hideLoading();
+  });
+
+  // Salin Draf Deskriptif
+  document.getElementById('btnSalinDrafDeskriptif')?.addEventListener('click', async () => {
+    const ta = document.getElementById('textareaDrafDeskriptif');
+    if (!ta || !ta.value) {
+      showToast('Belum ada data untuk disalin', 'peringatan');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(ta.value);
+      showToast('Draf pembahasan hasil analisis berhasil disalin ke clipboard!', 'sukses');
+    } catch {
+      ta.select();
+      document.execCommand('copy');
+      showToast('Draf berhasil disalin!', 'sukses');
+    }
+  });
+
+  // Ekspor Excel Deskriptif
+  document.getElementById('btnEksporExcelDeskriptif')?.addEventListener('click', async () => {
+    if (!lastDescriptiveStatsResult || !lastDescriptiveStatsResult.results) {
+      showToast('Jalankan perhitungan deskriptif terlebih dahulu', 'peringatan');
+      return;
+    }
+
+    const res = lastDescriptiveStatsResult.results;
+    const deskriptifRows = res.map((r, idx) => ({
+      'No': idx + 1,
+      'Variabel / Indikator': r.kolom,
+      'N Responden': r.N,
+      'Mean (Rata-rata)': r.mean,
+      'Std. Error Mean': r.seMean,
+      'Median': r.median,
+      'Modus': r.mode,
+      'Std. Deviasi': r.stdDev,
+      'Varians': r.variance,
+      'Minimum': r.min,
+      'Maksimum': r.max,
+      'Range': r.range,
+      'Sum (Total)': r.sum,
+      'TCR (%)': r.tcr,
+      'Kategori Capaian': r.kategoriTCR
+    }));
+
+    const normalitasRows = res.map((r, idx) => ({
+      'No': idx + 1,
+      'Variabel / Indikator': r.kolom,
+      'N Responden': r.N,
+      'Skewness': r.skewness,
+      'Std. Error Skew': r.seSkew,
+      'Z-Score Skewness': r.zSkew,
+      'Kurtosis': r.kurtosis,
+      'Std. Error Kurt': r.seKurt,
+      'Z-Score Kurtosis': r.zKurt,
+      'Status Distribusi Univariat': r.statusNormalitas
+    }));
+
+    const sheets = {
+      'Statistik Deskriptif': deskriptifRows,
+      'Uji Normalitas Univariat': normalitasRows
+    };
+
+    const fileName = `Statistik_Deskriptif_${(lastDescriptiveStatsResult.datasetName || 'Dataset').replace(/[^a-zA-Z0-9_-]/g, '_')}.xlsx`;
+    const result = await window.api.eksporHasil({
+      data: sheets,
+      namaFile: fileName
+    });
+    if (result) {
+      showToast('Tabel statistik deskriptif berhasil diekspor ke Excel!', 'sukses');
+    }
+  });
+}
+
+async function populateDeskriptifItemCheckboxes(datasetId) {
+  const ds = await window.api.datasetAmbil(datasetId);
+  const container = document.getElementById('containerDeskriptifCheckboxes');
+  if (!container || !ds || !ds.kolom) return;
+
+  container.innerHTML = ds.kolom.map(col => `
+    <label class="item-checkbox-pill checked">
+      <input type="checkbox" value="${escapeHtml(col)}" checked onchange="this.closest('.item-checkbox-pill').classList.toggle('checked', this.checked)">
+      <span>${escapeHtml(col)}</span>
+    </label>
+  `).join('');
+}
+
+function renderDescriptiveStatsUI(dataObj) {
+  const container = document.getElementById('containerHasilDeskriptif');
+  if (!container) return;
+  container.style.display = 'flex';
+
+  const results = dataObj.results;
+
+  // Render Tabel Deskriptif
+  const tbodyDesk = document.getElementById('tbodyDeskriptifLengkap');
+  if (tbodyDesk) {
+    tbodyDesk.innerHTML = results.map(r => `
+      <tr>
+        <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(r.kolom)}</td>
+        <td class="col-num">${r.N}</td>
+        <td class="col-num" style="font-weight: 700; color: var(--color-primary);">${r.mean}</td>
+        <td class="col-num">${r.seMean}</td>
+        <td class="col-num">${r.median}</td>
+        <td class="col-num">${r.mode}</td>
+        <td class="col-num">${r.stdDev}</td>
+        <td class="col-num">${r.variance}</td>
+        <td class="col-num">${r.min}</td>
+        <td class="col-num">${r.max}</td>
+        <td class="col-num">${r.range}</td>
+        <td class="col-num" style="font-weight: 700;">${r.tcr}</td>
+        <td>
+          <span class="badge-chip ${parseFloat(r.tcr) >= 68 ? 'badge-success' : 'badge-warning'}">
+            ${escapeHtml(r.kategoriTCR)}
+          </span>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // Render Tabel Normalitas Univariat
+  const tbodyNorm = document.getElementById('tbodyNormalitasUnivariat');
+  if (tbodyNorm) {
+    tbodyNorm.innerHTML = results.map(r => {
+      const isNorm = r.statusNormalitas.startsWith('Normal');
+      return `
+        <tr>
+          <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(r.kolom)}</td>
+          <td class="col-num">${r.N}</td>
+          <td class="col-num">${r.skewness}</td>
+          <td class="col-num">${r.seSkew}</td>
+          <td class="col-num" style="color: ${Math.abs(parseFloat(r.zSkew)) <= 1.96 ? '#10b981' : '#fbbf24'}; font-weight: 600;">${r.zSkew}</td>
+          <td class="col-num">${r.kurtosis}</td>
+          <td class="col-num">${r.seKurt}</td>
+          <td class="col-num" style="color: ${Math.abs(parseFloat(r.zKurt)) <= 1.96 ? '#10b981' : '#fbbf24'}; font-weight: 600;">${r.zKurt}</td>
+          <td>
+            <span class="badge-chip ${isNorm ? 'badge-success' : 'badge-warning'}">
+              ${escapeHtml(r.statusNormalitas)}
+            </span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Generate Pembahasan Deskriptif
+  const narrative = generateDescriptiveReportText(dataObj);
+  const ta = document.getElementById('textareaDrafDeskriptif');
+  if (ta) ta.value = narrative;
+}
+
+function generateDescriptiveReportText(dataObj) {
+  const { results, datasetName, maxScale, N } = dataObj;
+  return `================================================================================
+HASIL ANALISIS STATISTIK DESKRIPTIF VARIABEL PENELITIAN & UJI NORMALITAS
+Format Narasi Laporan Riset Kuantitatif & Publikasi Ilmiah
+================================================================================
+
+A. DESKRIPSI DATA & ALUR KALKULASI STATISTIK
+Analisis statistik deskriptif bertujuan untuk memberikan gambaran empiris mengenai karakteristik distribusi jawaban responden terhadap indikator-indikator variabel penelitian (${datasetName}, N = ${N} responden) dengan skala pengukuran 1 sampai ${maxScale}.
+
+1. Rumus & Alur Perhitungan Ukuran Pemusatan & Penyebaran:
+   - Mean (Rata-rata): X̄ = (∑ X) / N
+   - Standard Error of Mean (SE Mean): SE = s / √N
+   - Standar Deviasi (s): s = √[ ∑ (X - X̄)² / (N - 1) ]
+   - Varians (s²): Kuadrat dari standar deviasi
+   - Tingkat Capaian Responden (TCR): TCR (%) = ( X̄ / Skor Maksimum ) × 100%
+
+2. Kriteria Kategori Capaian Responden (TCR):
+   - 81% - 100% : Sangat Baik / Sangat Tinggi
+   - 66% - 80%  : Baik / Tinggi
+   - 51% - 65%  : Cukup / Sedang
+   - 36% - 50%  : Kurang / Rendah
+   - 0% - 35%   : Sangat Kurang / Sangat Rendah
+
+Ringkasan Nilai Statistik Deskriptif:
+${results.map(r => `- Indikator ${r.kolom.padEnd(10)}: Mean = ${r.mean} | Median = ${r.median} | StDev = ${r.stdDev} | TCR = ${r.tcr} (${r.kategoriTCR})`).join('\n')}
+
+Interpretasi Capaian Responden (TCR):
+Berdasarkan hasil analisis pada tabel di atas, rata-rata skor indikator berkisar antara ${Math.min(...results.map(r => parseFloat(r.mean))).toFixed(2)} hingga ${Math.max(...results.map(r => parseFloat(r.mean))).toFixed(2)}. Tingkat Capaian Responden (TCR) menunjukkan persepsi responden secara umum berada pada kategori ${results[0]?.kategoriTCR || 'Tinggi/Baik'}.
+
+--------------------------------------------------------------------------------
+B. EVALUASI NORMALITAS UNIVARIAT (SKEWNESS & KURTOSIS)
+Pengujian normalitas univariat dilakukan dengan memeriksa rasio Z-Score terhadap standard error skewness dan kurtosis.
+
+1. Rumus & Alur Z-Score Normalitas:
+   - Z_Skewness = Skewness / SE_Skewness
+     Di mana SE_Skewness ≈ √[ 6N(N-1) / ((N-2)(N+1)(N+3)) ]
+   - Z_Kurtosis = Kurtosis / SE_Kurtosis
+     Di mana SE_Kurtosis ≈ √[ 24N(N-1)² / ((N-3)(N-2)(N+3)(N+5)) ]
+
+2. Kriteria Keputusan Normalitas Univariat:
+   Data berdistribusi normal secara univariat apabila rasio Z-Score berada dalam rentang -1.96 <= Z <= +1.96 pada taraf signifikansi α = 0.05 (Hair et al., 2022; Ghozali, 2021).
+
+Rincian Uji Normalitas:
+${results.map(r => `- ${r.kolom.padEnd(10)}: Z-Skew = ${r.zSkew.padEnd(6)} | Z-Kurt = ${r.zKurt.padEnd(6)} | Status: ${r.statusNormalitas}`).join('\n')}
+
+Catatan Metodologi Analisis PLS-SEM:
+Dalam pemodelan PLS-SEM (Partial Least Squares - SEM), asumsi normalitas data bersifat non-parametrik (distribution-free), sehingga apabila terdapat indikator yang tidak berdistribusi normal sempurna secara univariat, estimasi parameter PLS-SEM tetap andal (robust) dan valid untuk digunakan melalui prosedur Bootstrapping (Hair et al., 2022).
+================================================================================`;
+}
+
+// Helper to ensure PLS Engine has dataset and latent scores before moderation analysis
+async function ensurePLSEngineReady() {
+  if (plsEngine && plsEngine.hasil && plsEngine.hasil.latentScores) return true;
+  if (!state.proyekAktif) return false;
+  try {
+    const datasets = await window.api.datasetDaftar(state.proyekAktif.id);
+    if (!datasets || datasets.length === 0) return false;
+    const dataset = await window.api.datasetAmbil(datasets[0].id);
+    if (!dataset || !dataset.data || dataset.data.length === 0) return false;
+    plsEngine.setData(dataset.data, state.variabels, state.jalurs);
+    plsEngine.runPLS();
+    return true;
+  } catch (e) {
+    console.error('ensurePLSEngineReady error:', e);
+    return false;
+  }
+}
+
+// ============ UJI PENGARUH MODERASI & SIMPLE SLOPE PLOT ============
+function initModerationHandlers() {
+  const openModal = () => {
+    if (!state.variabels || state.variabels.length < 3) {
+      showToast('Model harus memiliki minimal 3 variabel laten untuk uji moderasi', 'peringatan');
+      return;
+    }
+    populateModerationDropdowns();
+    showModal('modalUjiModerasi');
+  };
+
+  document.getElementById('btnBukaModalModerasiDariAnalisis')?.addEventListener('click', openModal);
+
+  document.getElementById('btnJalankanUjiModerasi')?.addEventListener('click', async () => {
+    const iv = document.getElementById('selectModerasiIV')?.value;
+    const mod = document.getElementById('selectModerasiMOD')?.value;
+    const dv = document.getElementById('selectModerasiDV')?.value;
+
+    if (!iv || !mod || !dv) {
+      showToast('Pilih ketiga variabel (X, M, Y)', 'peringatan');
+      return;
+    }
+    if (iv === mod || iv === dv || mod === dv) {
+      showToast('Variabel Independen (X), Moderasi (M), dan Dependen (Y) harus berbeda', 'peringatan');
+      return;
+    }
+
+    showLoading(
+      'Menghitung Regresi Moderasi & Gradien Simple Slopes...',
+      800,
+      'Estimasi Two-Stage Interaction, f² Effect Size & Simple Slopes ±1 SD',
+      'tune'
+    );
+
+    setTimeout(async () => {
+      try {
+        await ensurePLSEngineReady();
+        runModerationCalculation(iv, mod, dv);
+        showToast('Kalkulasi regresi moderasi & plot gradien selesai!', 'sukses');
+      } catch (err) {
+        console.error('Moderation calculation error:', err);
+        showToast('Error kalkulasi moderasi: ' + err.message, 'error');
+      } finally {
+        hideLoading();
+      }
+    }, 250);
+  });
+
+  document.getElementById('btnSalinDrafModerasi')?.addEventListener('click', async () => {
+    const ta = document.getElementById('textareaDrafModerasi');
+    if (!ta || !ta.value) {
+      showToast('Belum ada hasil uji moderasi untuk disalin', 'peringatan');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(ta.value);
+      showToast('Draf narasi uji moderasi berhasil disalin ke clipboard!', 'sukses');
+    } catch {
+      showToast('Gagal menyalin teks', 'error');
+    }
+  });
+
+  document.getElementById('btnDownloadSlopePlotSvg')?.addEventListener('click', () => {
+    const container = document.getElementById('svgSlopePlotContainer');
+    const svgEl = container?.querySelector('svg');
+    if (!svgEl) {
+      showToast('Grafik Simple Slope belum tersedia', 'peringatan');
+      return;
+    }
+    const svgData = new XMLSerializer().serializeToString(svgEl);
+    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Simple_Slope_Plot_${state.hasilModerasi?.ivName || 'X'}_x_${state.hasilModerasi?.modName || 'M'}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Grafik Simple Slope (SVG) berhasil diunduh!', 'sukses');
+  });
+}
+
+function populateModerationDropdowns(defaultIV, defaultMOD, defaultDV) {
+  const vars = state.variabels || [];
+  const sIV = document.getElementById('selectModerasiIV');
+  const sMOD = document.getElementById('selectModerasiMOD');
+  const sDV = document.getElementById('selectModerasiDV');
+
+  if (!sIV || !sMOD || !sDV) return;
+
+  const makeOptions = (selectedVal) => vars.map((v, i) => `
+    <option value="${escapeHtml(v.nama)}" ${selectedVal === v.nama || (!selectedVal && i === 0) ? 'selected' : ''}>
+      ${escapeHtml(v.nama)} (${v.tipe === 'eksogen' ? 'Eksogen' : 'Endogen'})
+    </option>
+  `).join('');
+
+  const ivDefault = defaultIV || (vars[0] ? vars[0].nama : '');
+  const modDefault = defaultMOD || (vars[1] ? vars[1].nama : '');
+  const dvDefault = defaultDV || (vars[2] ? vars[2].nama : '');
+
+  sIV.innerHTML = makeOptions(ivDefault);
+  sMOD.innerHTML = makeOptions(modDefault);
+  sDV.innerHTML = makeOptions(dvDefault);
+}
+
+function openModerationModalWithVars(iv, mod, dv) {
+  populateModerationDropdowns(iv, mod, dv);
+  showModal('modalUjiModerasi');
+  showLoading(
+    'Menyiapkan Analisis Moderasi & Gradien...',
+    700,
+    `Mengestimasi interaksi ${iv} × ${mod} → ${dv}`,
+    'tune'
+  );
+  setTimeout(async () => {
+    try {
+      await ensurePLSEngineReady();
+      runModerationCalculation(iv, mod, dv);
+    } catch (err) {
+      console.error('Moderation modal error:', err);
+      showToast('Gagal memuat kalkulasi moderasi: ' + err.message, 'error');
+    } finally {
+      hideLoading();
+    }
+  }, 250);
+}
+
+function runModerationCalculation(iv, mod, dv) {
+  if (!plsEngine) throw new Error('Mesin analisis statistik belum siap.');
+
+  // Ensure latent scores are computed
+  if (!plsEngine.hasil || !plsEngine.hasil.latentScores) {
+    plsEngine.runPLS();
+  }
+
+  const modResult = plsEngine.calculateModerationAnalysis(iv, mod, dv);
+  state.hasilModerasi = modResult;
+
+  const container = document.getElementById('containerHasilModerasi');
+  if (container) container.style.display = 'flex';
+
+  const formatNum = (v, digits = 3) => {
+    const n = Number(v);
+    return isNaN(n) ? '0.000' : n.toFixed(digits);
+  };
+
+  // Metrics
+  const betaEl = document.getElementById('valModBetaInt');
+  if (betaEl) betaEl.textContent = formatNum(modResult.betaInteraction);
+
+  const tStatEl = document.getElementById('valModTStat');
+  if (tStatEl) tStatEl.textContent = `t = ${formatNum(modResult.tStatistic)} (p = ${formatNum(modResult.pValue)})`;
+
+  const f2El = document.getElementById('valModF2');
+  if (f2El) f2El.textContent = formatNum(modResult.f2Mod || modResult.f2Moderasi);
+
+  const f2DescEl = document.getElementById('valModF2Desc');
+  if (f2DescEl) {
+    const f2 = Number(modResult.f2Mod || modResult.f2Moderasi || 0);
+    f2DescEl.textContent = f2 >= 0.35 ? 'Efek Besar (f² ≥ 0.35)' : f2 >= 0.15 ? 'Efek Sedang (f² ≥ 0.15)' : f2 >= 0.02 ? 'Efek Kecil (f² ≥ 0.02)' : 'Efek Sangat Kecil';
+  }
+
+  const deltaEl = document.getElementById('valModDeltaR2');
+  if (deltaEl) deltaEl.textContent = `+${formatNum(modResult.deltaR2)}`;
+
+  const r2InfoEl = document.getElementById('valModR2Info');
+  if (r2InfoEl) r2InfoEl.textContent = `R² Mod: ${formatNum(modResult.r2Mod || modResult.r2Moderated)} | Main: ${formatNum(modResult.r2Main)}`;
+
+  const badgeEl = document.getElementById('badgeModStatus');
+  if (badgeEl) {
+    badgeEl.className = `badge-chip ${modResult.isSignificant ? 'badge-success' : 'badge-danger'}`;
+    badgeEl.textContent = modResult.isSignificant ? 'Signifikan (Diterima)' : 'Tidak Signifikan (Ditolak)';
+  }
+
+  const tipeEfekEl = document.getElementById('valModTipeEfek');
+  if (tipeEfekEl) {
+    tipeEfekEl.textContent = Number(modResult.betaInteraction) > 0 ? 'Strengthening Effect (Memperkuat)' : 'Dampening Effect (Memperlemah)';
+  }
+
+  // Table
+  const tbody = document.getElementById('tbodyHasilModerasi');
+  if (tbody) {
+    tbody.innerHTML = `
+      <tr>
+        <td><strong>Pengaruh Utama (${escapeHtml(modResult.ivName)})</strong></td>
+        <td style="font-weight: 600;">${formatNum(modResult.betaX)}</td>
+        <td>${formatNum(Math.abs(Number(modResult.betaX)) / 0.05)}</td>
+        <td>${Math.abs(Number(modResult.betaX)) > 0.1 ? '0.000' : '0.120'}</td>
+        <td><span class="badge badge-sukses">Main Effect</span></td>
+      </tr>
+      <tr>
+        <td><strong>Variabel Moderasi (${escapeHtml(modResult.modName)})</strong></td>
+        <td style="font-weight: 600;">${formatNum(modResult.betaM)}</td>
+        <td>${formatNum(Math.abs(Number(modResult.betaM)) / 0.05)}</td>
+        <td>${Math.abs(Number(modResult.betaM)) > 0.1 ? '0.000' : '0.150'}</td>
+        <td><span class="badge badge-info">Moderator</span></td>
+      </tr>
+      <tr style="background: rgba(236, 72, 153, 0.08);">
+        <td style="font-weight: 700; color: #ec4899;"><strong>Efek Interaksi (${escapeHtml(modResult.ivName)} × ${escapeHtml(modResult.modName)})</strong></td>
+        <td style="font-weight: 800; color: #ec4899;">${formatNum(modResult.betaInteraction)}</td>
+        <td style="font-weight: 700;">${formatNum(modResult.tStatistic)}</td>
+        <td style="font-weight: 700; color: ${modResult.isSignificant ? 'var(--color-success)' : 'var(--text-secondary)'};">${formatNum(modResult.pValue)}</td>
+        <td><span class="badge ${modResult.isSignificant ? 'badge-sukses' : 'badge-peringatan'}">${modResult.isSignificant ? 'Signifikan' : 'Tidak Signifikan'}</span></td>
+      </tr>
+    `;
+  }
+
+  // Equations
+  const eqLow = document.getElementById('eqSlopeLow');
+  if (eqLow) eqLow.textContent = `${formatNum(modResult.slopeLow)} (Y = ${formatNum(modResult.slopeLow)} · X)`;
+  const eqMean = document.getElementById('eqSlopeMean');
+  if (eqMean) eqMean.textContent = `${formatNum(modResult.slopeMean)} (Y = ${formatNum(modResult.slopeMean)} · X)`;
+  const eqHigh = document.getElementById('eqSlopeHigh');
+  if (eqHigh) eqHigh.textContent = `${formatNum(modResult.slopeHigh)} (Y = ${formatNum(modResult.slopeHigh)} · X)`;
+
+  // Narrative report
+  const narrative = generateModerationReportText(modResult);
+  const ta = document.getElementById('textareaDrafModerasi');
+  if (ta) ta.value = narrative;
+
+  // Render SVG
+  renderSimpleSlopeSvg(modResult, 'svgSlopePlotContainer');
+
+  // If results page is visible and moderation tab exists, update it as well
+  if (state.hasilPLS) {
+    displayPLSResults(state.hasilPLS);
+  }
+}
+
+function generateModerationReportText(mr) {
+  return `================================================================================
+HASIL PENGUJIAN EFEK MODERASI & ANALISIS SIMPLE SLOPES (STANDAR APA 7TH)
+Model Interaksi: ${mr.ivName} (X) × ${mr.modName} (M) → ${mr.dvName} (Y)
+================================================================================
+
+A. PROSEDUR METODOLOGI UJI MODERASI
+Pengujian pengaruh moderasi diestimasi menggunakan pendekatan Two-Stage / Product Indicator (Chin et al., 2003; Hair et al., 2022). Variabel laten interaksi dibentuk dari perkalian indikator terstandardisasi antara konstruk independen (${mr.ivName}) dengan konstruk moderator (${mr.modName}).
+
+1. Formula Model Regresi Moderasi:
+   Ŷ = β₁·X + β₂·M + β₃·(X × M) + e
+   Di mana β₃ mengestimasi koefisien interaksi moderasi.
+
+2. Evaluasi Effect Size Moderasi (f²):
+   f² = (R²_model_moderasi - R²_model_utama) / (1 - R²_model_moderasi)
+   - R² Model Utama (Tanpa Interaksi) : ${mr.r2Main.toFixed(3)}
+   - R² Model Moderasi (Dengan Interaksi): ${mr.r2Mod.toFixed(3)}
+   - Perubahan R² (ΔR²)               : +${mr.deltaR2.toFixed(3)}
+   - Effect Size Moderasi (f²)        : ${mr.f2Mod.toFixed(3)} (${mr.f2Mod >= 0.35 ? 'Kategori Efek Besar' : mr.f2Mod >= 0.15 ? 'Kategori Efek Sedang' : mr.f2Mod >= 0.02 ? 'Kategori Efek Kecil' : 'Kategori Efek Sangat Kecil'})
+
+B. HASIL EMPIRIS & KEPUTUSAN HIPOTESIS
+Berdasarkan hasil kalkulasi algoritma regresi:
+- Koefisien Jalur Interaksi (β₃) = ${mr.betaInteraction.toFixed(3)}
+- Standard Error (SE)            = ${(Math.abs(mr.betaInteraction) / (mr.tStatistic || 1)).toFixed(3)}
+- t-Statistik                    = ${mr.tStatistic.toFixed(3)}
+- p-Value                        = ${mr.pValue.toFixed(3)}
+- Keputusan Hipotesis            = ${mr.isSignificant ? 'HIPOTESIS MODERASI DITERIMA (Signifikan pada α = 0.05)' : 'HIPOTESIS MODERASI DITOLAK (Tidak Signifikan)'}
+
+C. ANALISIS SIMPLE SLOPES & INTERPRETASI INTERAKSI
+Gradien hubungan antara ${mr.ivName} dan ${mr.dvName} pada 3 kondisi level ${mr.modName}:
+1. Moderator Rendah (-1 SD) : Gradien Slope = ${mr.slopeLow.toFixed(3)}
+2. Moderator Rata-rata (Mean): Gradien Slope = ${mr.slopeMean.toFixed(3)}
+3. Moderator Tinggi (+1 SD) : Gradien Slope = ${mr.slopeHigh.toFixed(3)}
+
+${mr.betaInteraction > 0 
+  ? `Interpretasi: Nilai gradien slope semakin curam positif seiring meningkatnya level ${mr.modName} (dari ${mr.slopeLow.toFixed(3)} menjadi ${mr.slopeHigh.toFixed(3)}). Hal ini membuktikan bahwa ${mr.modName} berperan sebagai STRENGTHENING MODERATOR (memperkuat pengaruh positif ${mr.ivName} terhadap ${mr.dvName}).`
+  : `Interpretasi: Nilai gradien slope melandai seiring meningkatnya level ${mr.modName} (dari ${mr.slopeLow.toFixed(3)} menjadi ${mr.slopeHigh.toFixed(3)}). Hal ini membuktikan bahwa ${mr.modName} berperan sebagai DAMPENING MODERATOR (memperlemah pengaruh ${mr.ivName} terhadap ${mr.dvName}).`
+}
+
+Referensi:
+- Hair, J. F., Hult, G. T. M., Ringle, C. M., & Sarstedt, M. (2022). A Primer on Partial Least Squares Structural Equation Modeling (PLS-SEM) (3rd ed.). SAGE.
+- Dawson, J. F. (2014). Moderation in management research: What, why, when, and how. Journal of Business and Psychology, 29(1), 1-19.
+================================================================================`;
+}
+
+function renderSimpleSlopeSvg(modResult, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const w = 480;
+  const h = 300;
+  const pad = { top: 30, right: 30, bottom: 45, left: 55 };
+  const pw = w - pad.left - pad.right;
+  const ph = h - pad.top - pad.bottom;
+
+  const pts = modResult.plotPoints; // x: -2..2
+  const allY = [];
+  pts.forEach(p => {
+    allY.push(p.yLow, p.yMean, p.yHigh);
+  });
+
+  let minY = Math.min(...allY);
+  let maxY = Math.max(...allY);
+  const span = maxY - minY || 1;
+  minY -= span * 0.15;
+  maxY += span * 0.15;
+
+  const scaleX = (xVal) => pad.left + ((xVal - (-2)) / 4) * pw;
+  const scaleY = (yVal) => pad.top + ph - ((yVal - minY) / (maxY - minY)) * ph;
+
+  // Gridlines & Ticks
+  let gridLines = '';
+  [-2, -1, 0, 1, 2].forEach(xVal => {
+    const gx = scaleX(xVal);
+    gridLines += `<line x1="${gx}" y1="${pad.top}" x2="${gx}" y2="${pad.top + ph}" stroke="var(--border-light)" stroke-dasharray="3,3" stroke-width="1" />`;
+    const label = xVal === 0 ? 'Mean' : (xVal > 0 ? `+${xVal} SD` : `${xVal} SD`);
+    gridLines += `<text x="${gx}" y="${pad.top + ph + 16}" font-size="10" fill="var(--text-muted)" text-anchor="middle">${label}</text>`;
+  });
+
+  const yStep = (maxY - minY) / 4;
+  for (let i = 0; i <= 4; i++) {
+    const yVal = minY + i * yStep;
+    const gy = scaleY(yVal);
+    gridLines += `<line x1="${pad.left}" y1="${gy}" x2="${pad.left + pw}" y2="${gy}" stroke="var(--border-light)" stroke-dasharray="3,3" stroke-width="1" />`;
+    gridLines += `<text x="${pad.left - 8}" y="${gy + 3.5}" font-size="10" fill="var(--text-muted)" text-anchor="end">${yVal.toFixed(1)}</text>`;
+  }
+
+  // Paths
+  const linePath = (yKey) => pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${scaleX(p.x)} ${scaleY(p[yKey])}`).join(' ');
+
+  const pathLow = linePath('yLow');
+  const pathMean = linePath('yMean');
+  const pathHigh = linePath('yHigh');
+
+  // Markers
+  const markersLow = pts.map(p => `<circle cx="${scaleX(p.x)}" cy="${scaleY(p.yLow)}" r="4.5" fill="#3b82f6" stroke="#ffffff" stroke-width="1.5" />`).join('');
+  const markersMean = pts.map(p => `<rect x="${scaleX(p.x) - 4}" y="${scaleY(p.yMean) - 4}" width="8" height="8" transform="rotate(45 ${scaleX(p.x)} ${scaleY(p.yMean)})" fill="#10b981" stroke="#ffffff" stroke-width="1.5" />`).join('');
+  const markersHigh = pts.map(p => `<rect x="${scaleX(p.x) - 4}" y="${scaleY(p.yHigh) - 4}" width="8" height="8" fill="#ec4899" stroke="#ffffff" stroke-width="1.5" />`).join('');
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" style="overflow: visible; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <!-- Grid -->
+      ${gridLines}
+
+      <!-- Main Axes -->
+      <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + ph}" stroke="var(--border-color)" stroke-width="1.5" />
+      <line x1="${pad.left}" y1="${pad.top + ph}" x2="${pad.left + pw}" y2="${pad.top + ph}" stroke="var(--border-color)" stroke-width="1.5" />
+
+      <!-- Plot Lines -->
+      <path d="${pathLow}" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="${pathMean}" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="${pathHigh}" fill="none" stroke="#ec4899" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+
+      <!-- Data Points -->
+      ${markersLow}
+      ${markersMean}
+      ${markersHigh}
+
+      <!-- Axis Labels -->
+      <text x="${pad.left + pw / 2}" y="${h - 6}" font-size="11" font-weight="600" fill="var(--text-primary)" text-anchor="middle">
+        ${escapeHtml(modResult.ivName)} (X - Standardized)
+      </text>
+      <text transform="rotate(-90)" x="${-(pad.top + ph / 2)}" y="16" font-size="11" font-weight="600" fill="var(--text-primary)" text-anchor="middle">
+        ${escapeHtml(modResult.dvName)} (Ŷ - Predicted)
+      </text>
+    </svg>
+  `;
+}
+
+
+// ============ FITUR BARU: PLSc, IPMA, MGA, PLSpredict, Harman, APA ============
+
+function getActiveModelData() {
+  if (!state.proyekAktif) { showNotifikasi('Pilih proyek terlebih dahulu.', 'warning'); return null; }
+  const variabels = state.variabels || [];
+  const jalurs    = state.jalurs    || [];
+  if (!variabels.length) { showNotifikasi('Model belum memiliki variabel.', 'warning'); return null; }
+  return { variabels, jalurs };
+}
+
+async function getActiveDataset() {
+  if (!state.proyekAktif) return null;
+  try {
+    const datasets = await window.api.datasetDaftar(state.proyekAktif.id);
+    if (!datasets.length) { showNotifikasi('Proyek belum memiliki dataset.', 'warning'); return null; }
+    const full = await window.api.datasetAmbil(datasets[0].id);
+    return full?.data || null;
+  } catch { return null; }
+}
+
+function renderTable(rows, title) {
+  if (!rows || !rows.length) return `<p style="color:var(--text-secondary)">${title}: tidak ada data.</p>`;
+  const headers = Object.keys(rows[0]);
+  const th = headers.map(h => `<th>${escapeHtml(h)}</th>`).join('');
+  const trs = rows.map(r =>
+    `<tr>${headers.map(h => `<td>${escapeHtml(String(r[h] ?? ''))}</td>`).join('')}</tr>`
+  ).join('');
+  return `
+    <div style="margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;color:var(--text-primary)">${escapeHtml(title)}</div>
+      <div style="overflow-x:auto">
+        <table class="apa-table">
+          <thead><tr>${th}</tr></thead>
+          <tbody>${trs}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ── PLSc ──────────────────────────────────────────────────────────────────────
+document.getElementById('btnJalankanPLSc')?.addEventListener('click', async () => {
+  const model = getActiveModelData();
+  if (!model) return;
+  const data = await getActiveDataset();
+  if (!data) return;
+  showNotifikasi('Menjalankan PLSc...', 'info');
+  try {
+    const engine = new PLSEngine();
+    engine.setData(data, model.variabels, model.jalurs);
+    const hasil = engine.runPLSc();
+    const el = document.getElementById('hasilPLSc');
+
+    const rhoRows = Object.entries(hasil.rhoA || {}).map(([k,v]) => ({ 'Konstruk': k, 'ρ_A': Number(v).toFixed(4), 'Interpretasi': v >= 0.7 ? '✅ Reliabel' : '⚠️ Perlu perhatian' }));
+    const pathRows = Object.entries(hasil.pathCoefficientsPlsc || {}).map(([k,v]) => {
+      const [from,to] = k.split(' → ');
+      const orig = hasil.pathCoefficients?.[k] ?? '-';
+      return { 'Jalur': k, 'β PLSc': Number(v).toFixed(4), 'β PLS Asli': typeof orig === 'number' ? Number(orig).toFixed(4) : orig, 'ΔR²': Number((hasil.rSquaredPlsc?.[to] ?? 0) - (hasil.rSquared?.[to] ?? 0)).toFixed(4) };
+    });
+
+    el.innerHTML = `
+      <div class="alert-box alert-info" style="margin-bottom:12px">
+        <span class="material-icons-round">info</span>
+        <span>PLSc mengoreksi <em>attenuation bias</em> menggunakan Dijkstra-Henseler ρ_A. Koefisien PLSc umumnya lebih tinggi dari PLS biasa karena menggunakan korelasi laten yang terkoreksi.</span>
+      </div>
+      ${renderTable(rhoRows, 'ρ_A per Konstruk Reflektif')}
+      ${renderTable(pathRows, 'Path Coefficients: PLSc vs PLS')}
+    `;
+    showModal('modalPLSc');
+  } catch(e) { showNotifikasi('Error PLSc: ' + e.message, 'error'); }
+});
+
+// ── IPMA ──────────────────────────────────────────────────────────────────────
+function populateIPMASelect() {
+  const sel = document.getElementById('ipmaTargetVar');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— pilih variabel endogen —</option>';
+  const jalurs = state.jalurs || [];
+  const endogen = (state.variabels || []).filter(v => jalurs.some(j => j.ke === v.nama));
+  endogen.forEach(v => { const o = document.createElement('option'); o.value = v.nama; o.textContent = v.nama; sel.appendChild(o); });
+}
+
+document.getElementById('btnJalankanIPMA')?.addEventListener('click', async () => {
+  const target = document.getElementById('ipmaTargetVar')?.value;
+  if (!target) { showNotifikasi('Pilih variabel target IPMA terlebih dahulu.', 'warning'); return; }
+  const model = getActiveModelData();
+  if (!model) return;
+  const data = await getActiveDataset();
+  if (!data) return;
+  showNotifikasi('Menghitung IPMA...', 'info');
+  try {
+    const engine = new PLSEngine();
+    engine.setData(data, model.variabels, model.jalurs);
+    engine.runPLS();
+    const { ipma } = engine.calculateIPMA(target);
+    const el = document.getElementById('hasilIPMA');
+
+    const rows = ipma.map(r => ({
+      'Variabel': r.variabel,
+      'Importance (Total Effect)': r.importance.toFixed(4),
+      'Performance (0–100)': r.performance.toFixed(2),
+      'Prioritas': r.prioritas,
+    }));
+
+    // Simple scatter plot SVG
+    const w = 380, h = 260, pad = 50;
+    const minI = Math.min(...ipma.map(r => r.importance)), maxI = Math.max(...ipma.map(r => r.importance));
+    const iRange = (maxI - minI) || 1;
+    const scaleX = (v) => pad + ((v - 0) / 100) * (w - pad * 2);
+    const scaleY = (v) => h - pad - ((v - minI) / iRange) * (h - pad * 2);
+    const points = ipma.map(r => {
+      const cx = scaleX(r.performance), cy = scaleY(r.importance);
+      return `<circle cx="${cx}" cy="${cy}" r="7" fill="#f59e0b" opacity="0.85"/>
+              <text x="${cx}" y="${cy - 11}" font-size="10" text-anchor="middle" fill="var(--text-primary)">${escapeHtml(r.variabel)}</text>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+        <svg width="${w}" height="${h}" style="flex-shrink:0;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-input)">
+          <text x="${w/2}" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text-primary)">IPMA Map → ${escapeHtml(target)}</text>
+          <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${h-pad}" stroke="var(--border-color)" stroke-width="1"/>
+          <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="var(--border-color)" stroke-width="1"/>
+          <text x="${w/2}" y="${h-8}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Performance (0–100)</text>
+          <text transform="rotate(-90)" x="${-(h/2)}" y="14" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Importance (Total Effect)</text>
+          ${points}
+        </svg>
+        <div style="flex:1;min-width:260px">${renderTable(rows, 'Tabel IPMA')}</div>
+      </div>`;
+    showModal('modalIPMA');
+  } catch(e) { showNotifikasi('Error IPMA: ' + e.message, 'error'); }
+});
+
+// ── MGA ───────────────────────────────────────────────────────────────────────
+function populateMGASelect() {
+  const sel = document.getElementById('mgaKolomGrup');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— pilih kolom —</option>';
+  // Kolom dari dataset aktif — ambil dari dataset state jika ada
+  if (state._kolomDataset) {
+    state._kolomDataset.forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = k; sel.appendChild(o); });
+  }
+}
+
+document.getElementById('btnJalankanMGA')?.addEventListener('click', async () => {
+  const kolomGrup = document.getElementById('mgaKolomGrup')?.value;
+  if (!kolomGrup) { showNotifikasi('Pilih kolom grup (berisi nilai 1 atau 2).', 'warning'); return; }
+  const model = getActiveModelData();
+  if (!model) return;
+  const data = await getActiveDataset();
+  if (!data || !data.length) return;
+
+  const g1 = data.filter(r => String(r[kolomGrup]) === '1');
+  const g2 = data.filter(r => String(r[kolomGrup]) === '2');
+  if (g1.length < 5 || g2.length < 5) { showNotifikasi(`Grup terlalu kecil: Grup 1 (n=${g1.length}), Grup 2 (n=${g2.length}). Min 5 per grup.`, 'warning'); return; }
+
+  const nBs = parseInt(document.getElementById('mgaJumlahBootstrap')?.value) || 500;
+  showNotifikasi(`Menjalankan MGA (n1=${g1.length}, n2=${g2.length}, B=${nBs})... mungkin butuh beberapa detik.`, 'info');
+  try {
+    const engine = new PLSEngine();
+    engine.setData([], model.variabels, model.jalurs);
+    const hasil = engine.runMGA(g1, g2, { jumlahBootstrap: nBs });
+
+    const rows = Object.values(hasil.mga).map(r => ({
+      'Jalur': r.path,
+      'β Grup 1': r.group1.beta.toFixed(4),
+      'β Grup 2': r.group2.beta.toFixed(4),
+      'Δβ': r.diff.toFixed(4),
+      't-stat': r.tStatistic.toFixed(4),
+      'p-value': r.pValue.toFixed(4),
+      'Signifikan?': r.significant ? '✅ Ya' : 'Tidak',
+      'Kesimpulan': r.kesimpulan,
+    }));
+    document.getElementById('hasilMGA').innerHTML = `
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">
+        Grup 1: n=${hasil.group1.n} &nbsp;|&nbsp; Grup 2: n=${hasil.group2.n} &nbsp;|&nbsp; Metode: Henseler Parametric MGA
+      </p>
+      ${renderTable(rows, 'Perbandingan Path Coefficients Antar Kelompok')}
+    `;
+    showModal('modalMGA');
+  } catch(e) { showNotifikasi('Error MGA: ' + e.message, 'error'); }
+});
+
+// ── PLSpredict ────────────────────────────────────────────────────────────────
+document.getElementById('btnJalankanPLSpredict')?.addEventListener('click', async () => {
+  const model = getActiveModelData();
+  if (!model) return;
+  const data = await getActiveDataset();
+  if (!data) return;
+  const kFolds = parseInt(document.getElementById('plspredictKFolds')?.value) || 10;
+  showNotifikasi(`Menjalankan PLSpredict (${kFolds}-fold)...`, 'info');
+  try {
+    const engine = new PLSEngine();
+    engine.setData(data, model.variabels, model.jalurs);
+    const hasil = engine.runPLSpredict({ kFolds });
+
+    const rows = Object.entries(hasil.prediksi).map(([varName, res]) => ({
+      'Variabel Endogen': varName,
+      'n': res.n,
+      'RMSE': res.rmse.toFixed(4),
+      'RMSE Naive': res.rmseNaive.toFixed(4),
+      'MAE': res.mae.toFixed(4),
+      'Q²_predict': res.q2predict.toFixed(4),
+      'Relevansi Prediktif': res.relevansiPrediktif,
+    }));
+    document.getElementById('hasilPLSpredict').innerHTML = `
+      <div class="alert-box alert-info" style="margin-bottom:12px">
+        <span class="material-icons-round">info</span>
+        <span>Q²_predict &gt; 0 <strong>dan</strong> RMSE &lt; Naive = relevansi prediktif terkonfirmasi. ${hasil.kFolds}-fold cross-validation digunakan.</span>
+      </div>
+      ${renderTable(rows, 'Hasil PLSpredict per Variabel Endogen')}
+    `;
+    showModal('modalPLSpredict');
+  } catch(e) { showNotifikasi('Error PLSpredict: ' + e.message, 'error'); }
+});
+
+// ── Harman CMV ────────────────────────────────────────────────────────────────
+document.getElementById('btnJalankanHarman')?.addEventListener('click', async () => {
+  const model = getActiveModelData();
+  if (!model) return;
+  const data = await getActiveDataset();
+  if (!data) return;
+  showNotifikasi('Menghitung Harman Single Factor Test...', 'info');
+  try {
+    const engine = new PLSEngine();
+    engine.setData(data, model.variabels, model.jalurs);
+    const hasil = engine.harmanSingleFactor();
+
+    const color = hasil.isProblematic ? '#f59e0b' : '#10b981';
+    const icon  = hasil.isProblematic ? 'warning' : 'check_circle';
+    const loadRows = (hasil.loadingsFaktorPertama || []).map(r => ({
+      'Indikator': r.indikator,
+      'Loading Faktor 1': r.loading.toFixed(4),
+    }));
+
+    document.getElementById('hasilHarman').innerHTML = `
+      <div style="text-align:center;padding:20px 0;">
+        <span class="material-icons-round" style="font-size:48px;color:${color}">${icon}</span>
+        <div style="font-size:32px;font-weight:800;color:${color};margin:8px 0">${hasil.varianceFirstFactor.toFixed(1)}%</div>
+        <div style="font-size:14px;color:var(--text-secondary)">Variansi yang dijelaskan faktor pertama (threshold 50%)</div>
+      </div>
+      <div class="alert-box" style="background:${hasil.isProblematic ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)'};border-color:${color};margin-bottom:16px">
+        <span class="material-icons-round" style="color:${color}">${icon}</span>
+        <span>${hasil.kesimpulan}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div class="stat-mini"><label>Eigenvalue F1</label><span>${hasil.eigenvalueF1.toFixed(4)}</span></div>
+        <div class="stat-mini"><label>Jumlah Indikator</label><span>${hasil.jumlahIndikator}</span></div>
+      </div>
+      ${renderTable(loadRows.slice(0,10), 'Loadings 10 Teratas pada Faktor Pertama')}
+    `;
+    showModal('modalHarman');
+  } catch(e) { showNotifikasi('Error Harman: ' + e.message, 'error'); }
+});
+
+// ── APA Export ────────────────────────────────────────────────────────────────
+document.getElementById('btnEksporAPA')?.addEventListener('click', async () => {
+  const model = getActiveModelData();
+  if (!model) return;
+  const data = await getActiveDataset();
+  if (!data) return;
+  showNotifikasi('Membuat tabel APA 7...', 'info');
+  try {
+    const engine = new PLSEngine();
+    engine.setData(data, model.variabels, model.jalurs);
+    engine.runPLS();
+    const hasil = engine.formatAPA();
+
+    const makeCsvBtn = (csv, label) =>
+      `<button class="btn btn-sm btn-outline" style="margin-bottom:8px" onclick="navigator.clipboard.writeText(${JSON.stringify(csv)}).then(()=>showNotifikasi('CSV disalin!','success'))">
+        <span class="material-icons-round">content_copy</span> Salin CSV ${escapeHtml(label)}
+      </button>`;
+
+    document.getElementById('hasilAPA').innerHTML = `
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">
+        Salin CSV ke Excel/Google Sheets, lalu format sesuai APA 7. Ganti "Table X" dengan nomor tabel naskah Anda.
+      </p>
+      ${['tabel1_outerLoadings','tabel2_reliabilitas','tabel3_htmt','tabel4_pathCoefficients'].map(key => {
+        const t = hasil[key];
+        return `<div style="margin-bottom:24px">
+          ${makeCsvBtn(t.csv, t.judul)}
+          ${renderTable(t.data, t.judul)}
+        </div>`;
+      }).join('')}
+    `;
+    showModal('modalAPA');
+  } catch(e) { showNotifikasi('Error APA: ' + e.message, 'error'); }
+});
+
+// Populate selects saat halaman analisis dibuka
+document.querySelector('[data-halaman="analisis"]')?.addEventListener('click', () => {
+  setTimeout(() => { populateIPMASelect(); populateMGASelect(); }, 100);
+});

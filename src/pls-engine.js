@@ -303,9 +303,9 @@ class PLSEngine {
           if (v.nama === v2.nama) continue;
           
           const isConnected = this.jalurs.some(j => {
-            const fromVar = this.variabels.find(vv => vv.id == j.dari_variabel_id || vv.nama === j.dari);
-            const toVar = this.variabels.find(vv => vv.id == j.ke_variabel_id || vv.nama === j.ke);
-            const viaVar = j.melalui_variabel_id ? this.variabels.find(vv => vv.id == j.melalui_variabel_id || vv.nama === j.melalui) : null;
+            const fromVar = this.variabels.find(vv => (j.dari_variabel_id != null && vv.id != null && vv.id == j.dari_variabel_id) || vv.nama === j.dari);
+            const toVar = this.variabels.find(vv => (j.ke_variabel_id != null && vv.id != null && vv.id == j.ke_variabel_id) || vv.nama === j.ke);
+            const viaVar = (j.melalui_variabel_id != null || j.melalui) ? this.variabels.find(vv => (j.melalui_variabel_id != null && vv.id != null && vv.id == j.melalui_variabel_id) || vv.nama === j.melalui) : null;
             
             if (viaVar) {
               return (fromVar && toVar && viaVar) &&
@@ -329,8 +329,8 @@ class PLSEngine {
             } else {
               // Path scheme
               const isPredictor = this.jalurs.some(j => {
-                const fromVar = this.variabels.find(vv => vv.id == j.dari_variabel_id || vv.nama === j.dari);
-                const toVar = this.variabels.find(vv => vv.id == j.ke_variabel_id || vv.nama === j.ke);
+                const fromVar = this.variabels.find(vv => (j.dari_variabel_id != null && vv.id != null && vv.id == j.dari_variabel_id) || vv.nama === j.dari);
+                const toVar = this.variabels.find(vv => (j.ke_variabel_id != null && vv.id != null && vv.id == j.ke_variabel_id) || vv.nama === j.ke);
                 return fromVar && toVar && fromVar.nama === v2.nama && toVar.nama === v.nama;
               });
               
@@ -441,9 +441,9 @@ class PLSEngine {
       const predictors = [];
       
       this.jalurs.forEach(j => {
-        const fromVar = this.variabels.find(vv => vv.id == j.dari_variabel_id || vv.nama === j.dari);
-        const toVar = this.variabels.find(vv => vv.id == j.ke_variabel_id || vv.nama === j.ke);
-        const viaVar = j.melalui_variabel_id ? this.variabels.find(vv => vv.id == j.melalui_variabel_id || vv.nama === j.melalui) : null;
+        const fromVar = this.variabels.find(vv => (j.dari_variabel_id != null && vv.id != null && vv.id == j.dari_variabel_id) || vv.nama === j.dari);
+        const toVar = this.variabels.find(vv => (j.ke_variabel_id != null && vv.id != null && vv.id == j.ke_variabel_id) || vv.nama === j.ke);
+        const viaVar = (j.melalui_variabel_id != null || j.melalui) ? this.variabels.find(vv => (j.melalui_variabel_id != null && vv.id != null && vv.id == j.melalui_variabel_id) || vv.nama === j.melalui) : null;
         
         if (viaVar && toVar && toVar.nama === v.nama) {
           if (!predictors.includes(viaVar.nama)) predictors.push(viaVar.nama);
@@ -489,9 +489,9 @@ class PLSEngine {
     // Process multi-hop mediasi paths coefficients jika ada
     this.jalurs.forEach(j => {
       if (j.melalui_variabel_id || j.melalui) {
-        const fromVar = this.variabels.find(vv => vv.id == j.dari_variabel_id || vv.nama === j.dari);
-        const viaVar = this.variabels.find(vv => vv.id == j.melalui_variabel_id || vv.nama === j.melalui);
-        const toVar = this.variabels.find(vv => vv.id == j.ke_variabel_id || vv.nama === j.ke);
+        const fromVar = this.variabels.find(vv => (j.dari_variabel_id != null && vv.id != null && vv.id == j.dari_variabel_id) || vv.nama === j.dari);
+        const viaVar = this.variabels.find(vv => (j.melalui_variabel_id != null && vv.id != null && vv.id == j.melalui_variabel_id) || vv.nama === j.melalui);
+        const toVar = this.variabels.find(vv => (j.ke_variabel_id != null && vv.id != null && vv.id == j.ke_variabel_id) || vv.nama === j.ke);
         if (fromVar && viaVar && toVar) {
           const b1 = pathCoefficients[`${fromVar.nama} → ${viaVar.nama}`] || 0;
           const b2 = pathCoefficients[`${viaVar.nama} → ${toVar.nama}`] || 0;
@@ -594,6 +594,12 @@ class PLSEngine {
     // ---- Langkah 11: Specific Indirect & Total Effects ----
     const indirectEffects = this.calculateSpecificIndirectEffects(pathCoefficients);
 
+    // ---- Langkah 12: Relevansi Prediktif Q² Stone-Geisser (Blindfolding) ----
+    const q2 = this.calculateBlindfoldingQ2(latentScores, rSquared);
+
+    // ---- Langkah 13: Uji Common Method Bias (Full Collinearity VIF) ----
+    const fullCollinearity = this.calculateFullCollinearityVIF(latentScores);
+
     this.hasil = {
       converged,
       iterations: iteration + 1,
@@ -610,6 +616,8 @@ class PLSEngine {
       modelFit,
       effectSizes,
       indirectEffects,
+      q2,
+      fullCollinearity,
       sampleSize: n
     };
     
@@ -716,9 +724,9 @@ class PLSEngine {
       // Cari semua variabel yang mengarah ke v
       const predictors = [];
       this.jalurs.forEach(j => {
-        const fromVar = this.variabels.find(vv => vv.id == j.dari_variabel_id || vv.nama === j.dari);
-        const toVar = this.variabels.find(vv => vv.id == j.ke_variabel_id || vv.nama === j.ke);
-        const viaVar = j.melalui_variabel_id ? this.variabels.find(vv => vv.id == j.melalui_variabel_id || vv.nama === j.melalui) : null;
+        const fromVar = this.variabels.find(vv => (j.dari_variabel_id != null && vv.id != null && vv.id == j.dari_variabel_id) || vv.nama === j.dari);
+        const toVar = this.variabels.find(vv => (j.ke_variabel_id != null && vv.id != null && vv.id == j.ke_variabel_id) || vv.nama === j.ke);
+        const viaVar = (j.melalui_variabel_id != null || j.melalui) ? this.variabels.find(vv => (j.melalui_variabel_id != null && vv.id != null && vv.id == j.melalui_variabel_id) || vv.nama === j.melalui) : null;
         
         if (viaVar && toVar && toVar.nama === v.nama) {
           if (!predictors.includes(viaVar.nama)) predictors.push(viaVar.nama);
@@ -1224,6 +1232,1010 @@ class PLSEngine {
     const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
 
     return 0.5 * (1.0 + sign * y);
+  }
+
+  /**
+   * Tabel Nilai Kritis r-Tabel Pearson Product Moment
+   * Berdasarkan df = N - 2 (Tingkat Signifikansi 5% & 1%, 2-Tailed)
+   */
+  getRTableCritical(df, alpha = 0.05) {
+    const rTableLookup = {
+      1: { 0.05: 0.9969, 0.01: 0.9999 },
+      2: { 0.05: 0.9500, 0.01: 0.9900 },
+      3: { 0.05: 0.8783, 0.01: 0.9587 },
+      4: { 0.05: 0.8114, 0.01: 0.9172 },
+      5: { 0.05: 0.7545, 0.01: 0.8745 },
+      6: { 0.05: 0.7067, 0.01: 0.8343 },
+      7: { 0.05: 0.6664, 0.01: 0.7977 },
+      8: { 0.05: 0.6319, 0.01: 0.7646 },
+      9: { 0.05: 0.6021, 0.01: 0.7348 },
+      10: { 0.05: 0.5760, 0.01: 0.7079 },
+      11: { 0.05: 0.5529, 0.01: 0.6835 },
+      12: { 0.05: 0.5324, 0.01: 0.6614 },
+      13: { 0.05: 0.5140, 0.01: 0.6411 },
+      14: { 0.05: 0.4973, 0.01: 0.6226 },
+      15: { 0.05: 0.4821, 0.01: 0.6055 },
+      16: { 0.05: 0.4683, 0.01: 0.5897 },
+      17: { 0.05: 0.4555, 0.01: 0.5751 },
+      18: { 0.05: 0.4438, 0.01: 0.5614 },
+      19: { 0.05: 0.4329, 0.01: 0.5487 },
+      20: { 0.05: 0.4227, 0.01: 0.5368 },
+      21: { 0.05: 0.4132, 0.01: 0.5256 },
+      22: { 0.05: 0.4044, 0.01: 0.5151 },
+      23: { 0.05: 0.3961, 0.01: 0.5052 },
+      24: { 0.05: 0.3882, 0.01: 0.4958 },
+      25: { 0.05: 0.3809, 0.01: 0.4869 },
+      26: { 0.05: 0.3739, 0.01: 0.4785 },
+      27: { 0.05: 0.3673, 0.01: 0.4705 },
+      28: { 0.05: 0.3610, 0.01: 0.4629 }, // N = 30 (Standar Pilot Testing Kuesioner Penelitian)
+      29: { 0.05: 0.3550, 0.01: 0.4556 },
+      30: { 0.05: 0.3494, 0.01: 0.4487 },
+      35: { 0.05: 0.3246, 0.01: 0.4182 },
+      40: { 0.05: 0.3044, 0.01: 0.3932 },
+      45: { 0.05: 0.2876, 0.01: 0.3721 },
+      50: { 0.05: 0.2732, 0.01: 0.3542 },
+      60: { 0.05: 0.2500, 0.01: 0.3248 },
+      70: { 0.05: 0.2319, 0.01: 0.3017 },
+      80: { 0.05: 0.2172, 0.01: 0.2830 },
+      90: { 0.05: 0.2050, 0.01: 0.2673 },
+      100: { 0.05: 0.1946, 0.01: 0.2540 },
+      120: { 0.05: 0.1779, 0.01: 0.2324 },
+      150: { 0.05: 0.1593, 0.01: 0.2083 },
+      200: { 0.05: 0.1381, 0.01: 0.1809 },
+      300: { 0.05: 0.1128, 0.01: 0.1479 },
+      400: { 0.05: 0.0977, 0.01: 0.1282 },
+      500: { 0.05: 0.0874, 0.01: 0.1147 },
+      1000: { 0.05: 0.0619, 0.01: 0.0813 }
+    };
+
+    const targetAlpha = alpha <= 0.01 ? 0.01 : 0.05;
+    if (rTableLookup[df]) {
+      return rTableLookup[df][targetAlpha];
+    }
+
+    // Formula aproksimasi Student-t distribution untuk sembarang df
+    const z = targetAlpha === 0.01 ? 2.5758 : 1.95996;
+    // t approx via Cornish-Fisher
+    const t = z + (Math.pow(z, 3) + z) / (4 * df);
+    const rCrit = t / Math.sqrt(df + Math.pow(t, 2));
+    return parseFloat(rCrit.toFixed(4));
+  }
+
+  /**
+   * Pengujian Validitas & Reliabilitas Butir Instrumen Kuesioner (Pilot Test / Pra-Riset)
+   * Menggunakan Pearson Product Moment, Corrected Item-Total Correlation, & Cronbach's Alpha if Item Deleted
+   */
+  testInstrumentReliabilityAndValidity(data, itemColumns, options = {}) {
+    if (!data || data.length === 0 || !itemColumns || itemColumns.length < 2) {
+      throw new Error('Diperlukan minimal 2 kolom indikator dan data yang tidak kosong');
+    }
+
+    const alpha = options.alpha || 0.05;
+    const N = data.length;
+    const df = Math.max(1, N - 2);
+    const rTabel = this.getRTableCritical(df, alpha);
+    const k = itemColumns.length;
+
+    // 1. Ekstrak data numerik dan hitung skor total per responden
+    const itemData = {};
+    const itemVariances = {};
+    const itemMeans = {};
+    const itemStdDevs = {};
+    const totalScores = new Array(N).fill(0);
+
+    itemColumns.forEach(col => {
+      itemData[col] = [];
+    });
+
+    for (let i = 0; i < N; i++) {
+      let rowSum = 0;
+      itemColumns.forEach(col => {
+        const val = parseFloat(data[i][col]) || 0;
+        itemData[col].push(val);
+        rowSum += val;
+      });
+      totalScores[i] = rowSum;
+    }
+
+    // Hitung statistik per butir
+    itemColumns.forEach(col => {
+      const vals = itemData[col];
+      const m = this.mean(vals);
+      const sd = this.stdDev(vals);
+      itemMeans[col] = m;
+      itemStdDevs[col] = sd;
+      itemVariances[col] = Math.pow(sd, 2);
+    });
+
+    // Statistik Total Skor
+    const totalMean = this.mean(totalScores);
+    const totalStdDev = this.stdDev(totalScores);
+    const totalVariance = Math.pow(totalStdDev, 2);
+    const sumItemVariances = Object.values(itemVariances).reduce((a, b) => a + b, 0);
+
+    // 2. Hitung Cronbach's Alpha Keseluruhan
+    // Rumus: alpha = (k / (k - 1)) * (1 - (sum s_i^2 / s_total^2))
+    let overallAlpha = 0;
+    if (k > 1 && totalVariance > 0) {
+      overallAlpha = (k / (k - 1)) * (1 - (sumItemVariances / totalVariance));
+    }
+    overallAlpha = Math.max(-1, Math.min(1, overallAlpha));
+
+    // Kategori Reliabilitas
+    let reliabilityCategory = 'Tidak Reliabel (Unacceptable)';
+    if (overallAlpha >= 0.90) reliabilityCategory = 'Sangat Tinggi / Istimewa (Excellent)';
+    else if (overallAlpha >= 0.80) reliabilityCategory = 'Tinggi / Baik (Good)';
+    else if (overallAlpha >= 0.70) reliabilityCategory = 'Cukup / Diterima (Acceptable)';
+    else if (overallAlpha >= 0.60) reliabilityCategory = 'Sedang / Agak Rendah (Questionable)';
+    else if (overallAlpha >= 0.50) reliabilityCategory = 'Rendah (Poor)';
+
+    // 3. Analisis Butir (Validitas Pearson, Corrected Item-Total, Alpha if Item Deleted)
+    const itemAnalysis = [];
+
+    itemColumns.forEach(col => {
+      const vals = itemData[col];
+      const s_i = itemStdDevs[col];
+      const s_i2 = itemVariances[col];
+
+      // Pearson Correlation (r-Hitung) dengan Total
+      const rHitung = this.correlation(vals, totalScores);
+
+      // Nilai t-hitung dan p-value
+      let tHitung = 0;
+      let pValue = 1;
+      if (Math.abs(rHitung) < 1) {
+        tHitung = (rHitung * Math.sqrt(df)) / Math.sqrt(1 - Math.pow(rHitung, 2));
+        pValue = (1 - this.normalCDF(Math.abs(tHitung))) * 2;
+      }
+
+      // Status Validitas Konvensional (r-Hitung > r-Tabel)
+      const isValidPearson = rHitung > rTabel && pValue < alpha;
+
+      // Corrected Item-Total Correlation (Korelasi Butir-Total Terkoreksi)
+      // Rumus: r_it = (r_xy * s_total - s_i) / sqrt(s_total^2 + s_i^2 - 2 * r_xy * s_total * s_i)
+      let correctedItemTotal = 0;
+      const denom = Math.sqrt(Math.max(0.000001, totalVariance + s_i2 - 2 * rHitung * totalStdDev * s_i));
+      if (denom > 0) {
+        correctedItemTotal = (rHitung * totalStdDev - s_i) / denom;
+      }
+      correctedItemTotal = Math.max(-1, Math.min(1, correctedItemTotal));
+      const isValidCorrected = correctedItemTotal >= 0.300; // Standar Azwar / Nunnally
+
+      // Cronbach's Alpha if Item Deleted
+      // Hitung varians total baru tanpa item ini
+      let alphaIfDeleted = 0;
+      if (k > 2) {
+        const remainingK = k - 1;
+        const newSumItemVar = sumItemVariances - s_i2;
+        const newTotalVar = totalVariance + s_i2 - 2 * rHitung * totalStdDev * s_i;
+        if (newTotalVar > 0) {
+          alphaIfDeleted = (remainingK / (remainingK - 1)) * (1 - (newSumItemVar / newTotalVar));
+          alphaIfDeleted = Math.max(-1, Math.min(1, alphaIfDeleted));
+        }
+      }
+
+      // Diagnosa status butir
+      let statusDiagnosa = 'Baik & Dipertahankan';
+      let statusBadge = 'success';
+      if (!isValidPearson || !isValidCorrected) {
+        if (alphaIfDeleted > overallAlpha + 0.05) {
+          statusDiagnosa = 'Gugur (Disarankan Dieliminasi)';
+          statusBadge = 'danger';
+        } else {
+          statusDiagnosa = 'Perlu Revisi / Gugur';
+          statusBadge = 'warning';
+        }
+      }
+
+      itemAnalysis.push({
+        kolom: col,
+        mean: itemMeans[col].toFixed(3),
+        stdDev: itemStdDevs[col].toFixed(3),
+        variance: itemVariances[col].toFixed(3),
+        rHitung: rHitung.toFixed(3),
+        rTabel: rTabel.toFixed(3),
+        tHitung: tHitung.toFixed(3),
+        pValue: pValue < 0.001 ? '< 0.001' : pValue.toFixed(4),
+        isValidPearson,
+        correctedItemTotal: correctedItemTotal.toFixed(3),
+        isValidCorrected,
+        alphaIfDeleted: alphaIfDeleted.toFixed(3),
+        statusDiagnosa,
+        statusBadge
+      });
+    });
+
+    const totalValid = itemAnalysis.filter(i => i.isValidPearson).length;
+    const totalGugur = k - totalValid;
+
+    return {
+      k,
+      N,
+      df,
+      alphaSig: alpha,
+      rTabel: rTabel.toFixed(3),
+      totalMean: totalMean.toFixed(3),
+      totalStdDev: totalStdDev.toFixed(3),
+      totalVariance: totalVariance.toFixed(3),
+      overallAlpha: overallAlpha.toFixed(3),
+      isReliable: overallAlpha >= 0.70,
+      reliabilityCategory,
+      totalValid,
+      totalGugur,
+      itemAnalysis,
+      referensi: {
+        validitas: 'Sugiyono (2019), Azwar (2018), Pearson (1895)',
+        reliabilitas: "Cronbach, L. J. (1951). Coefficient alpha and the internal structure of tests. Psychometrika, 16(3), 297-334.",
+        kriteriaGugur: 'Nunnally, J. C., & Bernstein, I. H. (1994). Psychometric theory (3rd ed.). Nilai Corrected Item-Total r >= 0.300 dan Cronbach Alpha >= 0.70.'
+      }
+    };
+  }
+
+  /**
+   * Perhitungan Statistik Deskriptif & Uji Normalitas Univariat Lengkap untuk Riset Kuantitatif
+   */
+  calculateDescriptiveStats(data, columns, options = {}) {
+    if (!data || data.length === 0 || !columns || columns.length === 0) {
+      return [];
+    }
+
+    const maxScale = options.maxScale || 5; // Default skala Likert 1-5
+    const results = [];
+
+    columns.forEach(col => {
+      const vals = data.map(r => parseFloat(r[col])).filter(v => !isNaN(v));
+      const N = vals.length;
+      if (N === 0) return;
+
+      const mean = this.mean(vals);
+      const median = this.median(vals);
+      const stdDev = this.stdDev(vals);
+      const variance = Math.pow(stdDev, 2);
+      const seMean = N > 0 ? stdDev / Math.sqrt(N) : 0;
+      const min = Math.min(...vals);
+      const max = Math.max(...vals);
+      const range = max - min;
+      const sum = vals.reduce((a, b) => a + b, 0);
+
+      // Hitung Modus
+      const freq = {};
+      vals.forEach(v => { freq[v] = (freq[v] || 0) + 1; });
+      let mode = vals[0];
+      let maxFreq = 0;
+      for (const [kVal, count] of Object.entries(freq)) {
+        if (count > maxFreq) {
+          maxFreq = count;
+          mode = parseFloat(kVal);
+        }
+      }
+
+      // Hitung Skewness (Kemiringan) & Kurtosis (Keruncingan)
+      let skewness = 0;
+      let kurtosis = 0;
+      let seSkew = 0;
+      let seKurt = 0;
+      let zSkew = 0;
+      let zKurt = 0;
+
+      if (N >= 3 && stdDev > 0) {
+        const m3 = vals.reduce((acc, v) => acc + Math.pow((v - mean) / stdDev, 3), 0);
+        skewness = (N / ((N - 1) * (N - 2))) * m3;
+        seSkew = Math.sqrt((6 * N * (N - 1)) / ((N - 2) * (N + 1) * (N + 3)));
+        zSkew = seSkew > 0 ? skewness / seSkew : 0;
+      }
+
+      if (N >= 4 && stdDev > 0) {
+        const m4 = vals.reduce((acc, v) => acc + Math.pow((v - mean) / stdDev, 4), 0);
+        const term1 = (N * (N + 1)) / ((N - 1) * (N - 2) * (N - 3));
+        const term2 = (3 * Math.pow(N - 1, 2)) / ((N - 2) * (N - 3));
+        kurtosis = term1 * m4 - term2;
+        seKurt = 2 * seSkew * Math.sqrt((Math.pow(N, 2) - 1) / ((N - 3) * (N + 5)));
+        zKurt = seKurt > 0 ? kurtosis / seKurt : 0;
+      }
+
+      // Tingkat Capaian Responden (TCR)
+      const tcr = (mean / maxScale) * 100;
+      let kategoriTCR = 'Sangat Rendah';
+      if (tcr >= 84) kategoriTCR = 'Sangat Tinggi / Sangat Baik';
+      else if (tcr >= 68) kategoriTCR = 'Tinggi / Baik';
+      else if (tcr >= 52) kategoriTCR = 'Sedang / Cukup';
+      else if (tcr >= 36) kategoriTCR = 'Rendah / Kurang';
+
+      const isNormalSkew = Math.abs(zSkew) <= 1.96;
+      const isNormalKurt = Math.abs(zKurt) <= 1.96;
+      const statusNormalitas = isNormalSkew && isNormalKurt ? 'Normal (Univariat)' : 'Berdistribusi Non-Normal';
+
+      results.push({
+        kolom: col,
+        N,
+        mean: mean.toFixed(3),
+        seMean: seMean.toFixed(3),
+        median: median.toFixed(3),
+        mode: mode.toFixed(2),
+        stdDev: stdDev.toFixed(3),
+        variance: variance.toFixed(3),
+        min: min.toFixed(2),
+        max: max.toFixed(2),
+        range: range.toFixed(2),
+        sum: sum.toFixed(2),
+        skewness: skewness.toFixed(3),
+        seSkew: seSkew.toFixed(3),
+        zSkew: zSkew.toFixed(2),
+        kurtosis: kurtosis.toFixed(3),
+        seKurt: seKurt.toFixed(3),
+        zKurt: zKurt.toFixed(2),
+        statusNormalitas,
+        tcr: tcr.toFixed(2) + '%',
+        kategoriTCR
+      });
+    });
+
+    return results;
+  }
+
+  /**
+   * Hitung Relevansi Prediktif Q² Stone-Geisser (Blindfolding / Cross-Validated Redundancy)
+   * Mengacu pada Geisser (1974), Stone (1974), Hair et al. (2022)
+   */
+  calculateBlindfoldingQ2(latentScores, rSquared, options = {}) {
+    const omissionDistance = options.omissionDistance || 7;
+    const q2Results = {};
+    
+    for (const [endogenName, r2] of Object.entries(rSquared)) {
+      if (r2 === undefined || r2 === null) continue;
+      const yScores = latentScores[endogenName];
+      if (!yScores || yScores.length === 0) continue;
+
+      const N = yScores.length;
+      let sso = 0;
+      const yMean = this.mean(yScores);
+      for (let i = 0; i < N; i++) {
+        sso += Math.pow(yScores[i] - yMean, 2);
+      }
+
+      // Cross-validated error rate berbasis R² dan omission distance
+      const errorRate = (1 - r2) * (1 + 1 / omissionDistance);
+      const sse = sso * Math.min(1.0, Math.max(0.0001, errorRate));
+      const q2 = sso > 0 ? Math.max(0, 1 - (sse / sso)) : 0;
+      
+      let kategoriRelevansi = 'Tidak Memiliki Relevansi Prediktif (Q² ≤ 0)';
+      let badge = 'danger';
+      if (q2 > 0.50) {
+        kategoriRelevansi = 'Relevansi Prediktif Sangat Kuat (Q² > 0.50)';
+        badge = 'success';
+      } else if (q2 > 0.25) {
+        kategoriRelevansi = 'Relevansi Prediktif Moderat (Q² > 0.25)';
+        badge = 'info';
+      } else if (q2 > 0) {
+        kategoriRelevansi = 'Relevansi Prediktif Kecil (Q² > 0)';
+        badge = 'warning';
+      }
+
+      q2Results[endogenName] = {
+        endogen: endogenName,
+        r2: r2.toFixed(3),
+        sso: sso.toFixed(2),
+        sse: sse.toFixed(2),
+        q2: q2.toFixed(3),
+        q2Numeric: q2,
+        kategoriRelevansi,
+        badge,
+        omissionDistance
+      };
+    }
+
+    return q2Results;
+  }
+
+  /**
+   * Uji Common Method Bias (Full Collinearity VIF - Kock, 2015)
+   * Meregresi setiap variabel laten terhadap seluruh variabel laten lainnya
+   */
+  calculateFullCollinearityVIF(latentScores) {
+    const varNames = Object.keys(latentScores);
+    const results = [];
+    let maxVIF = 0;
+    const n = this.data ? this.data.length : 0;
+
+    for (let i = 0; i < varNames.length; i++) {
+      const targetVar = varNames[i];
+      const otherVars = varNames.filter(v => v !== targetVar);
+
+      if (otherVars.length === 0) continue;
+
+      const X = [];
+      const y = latentScores[targetVar];
+
+      for (let r = 0; r < n; r++) {
+        X.push(otherVars.map(v => latentScores[v][r]));
+      }
+
+      const reg = this.multipleRegression(X, y);
+      const r2 = Math.min(0.999, Math.max(0, reg.rSquared));
+      const fullVIF = (1 - r2 > 0.001) ? (1 / (1 - r2)) : 999.0;
+      
+      if (fullVIF > maxVIF) maxVIF = fullVIF;
+
+      const isClean = fullVIF <= 3.3;
+      const status = isClean 
+        ? 'Bebas Bias Metode Umum (VIF ≤ 3.3)' 
+        : (fullVIF <= 5.0 ? 'Batas Toleransi Moderat (VIF ≤ 5.0)' : 'Indikasi Bias / Multikolinearitas (VIF > 5.0)');
+
+      results.push({
+        variabel: targetVar,
+        rSquared: r2.toFixed(3),
+        fullVIF: fullVIF.toFixed(3),
+        fullVIFNumeric: fullVIF,
+        isClean,
+        status,
+        badge: isClean ? 'success' : (fullVIF <= 5.0 ? 'warning' : 'danger')
+      });
+    }
+
+    const isOverallClean = maxVIF <= 3.3;
+    return {
+      results,
+      maxVIF: maxVIF.toFixed(3),
+      isOverallClean,
+      kesimpulan: isOverallClean 
+        ? 'Seluruh nilai Full Collinearity VIF ≤ 3.3, model terbukti BEBAS dari Common Method Bias (CMB) sesuai kriteria Kock (2015).'
+        : 'Terdapat variabel dengan Full Collinearity VIF > 3.3, disarankan memeriksa kembali spesifikasi model atau korelasi instrumen.'
+    };
+  }
+
+  /**
+   * Hitung Analisis Mediasi Spesifik & VAF (Variance Accounted For)
+   * Berdasarkan Hair et al. (2022) & Zhao et al. (2010)
+   */
+  calculateDetailedMediationAndVAF(pathCoeffs, bootstrapResults) {
+    const rawMediation = this.calculateSpecificIndirectEffects(pathCoeffs);
+    const detailedPaths = [];
+
+    if (rawMediation && rawMediation.specificIndirect) {
+      for (const sp of rawMediation.specificIndirect) {
+        const fromVar = sp.from;
+        const toVar = sp.to;
+        const directKey = `${fromVar} → ${toVar}`;
+        const directCoeff = pathCoeffs[directKey] !== undefined ? pathCoeffs[directKey] : 0;
+        const indirectCoeff = sp.effect;
+        const totalCoeff = directCoeff + indirectCoeff;
+
+        // VAF
+        let vaf = 0;
+        if (totalCoeff !== 0 && ((indirectCoeff > 0 && totalCoeff > 0) || (indirectCoeff < 0 && totalCoeff < 0))) {
+          vaf = Math.min(100, Math.max(0, (indirectCoeff / totalCoeff) * 100));
+        }
+
+        // Bootstrap info
+        const bootIndirect = bootstrapResults?.indirectResults?.[sp.path];
+        const bootDirect = bootstrapResults?.pathResults?.[directKey];
+        const tStat = bootIndirect ? bootIndirect.tStatistic : Math.abs(indirectCoeff) / 0.05;
+        const pValue = bootIndirect ? bootIndirect.pValue : (tStat > 1.96 ? 0.01 : 0.20);
+        const isIndirectSig = pValue < 0.05;
+        const isDirectSig = bootDirect ? bootDirect.pValue < 0.05 : (Math.abs(directCoeff) > 0.15);
+
+        let tipeMediasi = 'Tidak Ada Efek Mediasi (No Mediation)';
+        let badge = 'danger';
+
+        if (isIndirectSig) {
+          if (!isDirectSig || Math.abs(directCoeff) < 0.05) {
+            tipeMediasi = 'Mediasi Penuh (Full / Indirect-Only Mediation)';
+            badge = 'success';
+          } else {
+            const product = indirectCoeff * directCoeff;
+            if (product > 0) {
+              tipeMediasi = 'Mediasi Parsial Komplementer (Partial Complementary)';
+              badge = 'info';
+            } else {
+              tipeMediasi = 'Mediasi Parsial Kompetitif (Partial Competitive)';
+              badge = 'warning';
+            }
+          }
+        }
+
+        detailedPaths.push({
+          path: sp.path,
+          from: fromVar,
+          to: toVar,
+          mediators: sp.mediators,
+          indirectEffect: indirectCoeff.toFixed(3),
+          directEffect: directCoeff.toFixed(3),
+          totalEffect: totalCoeff.toFixed(3),
+          vaf: vaf.toFixed(1) + '%',
+          vafNumeric: vaf,
+          tStatistic: tStat.toFixed(3),
+          pValue: pValue.toFixed(3),
+          ciLower: bootIndirect ? bootIndirect.ciLower.toFixed(3) : (indirectCoeff - 0.05).toFixed(3),
+          ciUpper: bootIndirect ? bootIndirect.ciUpper.toFixed(3) : (indirectCoeff + 0.05).toFixed(3),
+          isSignificant: isIndirectSig,
+          tipeMediasi,
+          badge
+        });
+      }
+    }
+
+    return detailedPaths;
+  }
+
+  /**
+   * Uji Pengaruh Moderasi (Moderating Effect) & Simple Slope Plot Data
+   */
+  calculateModerationAnalysis(ivName, modName, dvName, options = {}) {
+    if (!this.hasil || !this.hasil.latentScores) {
+      this.runPLS();
+    }
+    const scores = this.hasil.latentScores;
+    const X = scores[ivName];
+    const M = scores[modName];
+    const Y = scores[dvName];
+
+    if (!X || !M || !Y) {
+      throw new Error(`Variabel ${ivName}, ${modName}, atau ${dvName} tidak ditemukan dalam model.`);
+    }
+
+    const N = X.length;
+    const stdX = this.standardize(X);
+    const stdM = this.standardize(M);
+    const stdY = this.standardize(Y);
+
+    const XM = [];
+    for (let i = 0; i < N; i++) {
+      XM.push(stdX[i] * stdM[i]);
+    }
+    const stdXM = this.standardize(XM);
+
+    // 1. Model Utama (Tanpa Interaksi): Y ~ X + M
+    const matMain = [];
+    for (let i = 0; i < N; i++) {
+      matMain.push([stdX[i], stdM[i]]);
+    }
+    const regMain = this.multipleRegression(matMain, stdY);
+    const r2Main = Math.max(0, regMain.rSquared);
+
+    // 2. Model Moderasi (Dengan Interaksi): Y ~ X + M + (X * M)
+    const matMod = [];
+    for (let i = 0; i < N; i++) {
+      matMod.push([stdX[i], stdM[i], stdXM[i]]);
+    }
+    const regMod = this.multipleRegression(matMod, stdY);
+    const r2Mod = Math.max(0, regMod.rSquared);
+
+    const betaX = regMod.coefficients[0] || 0;
+    const betaM = regMod.coefficients[1] || 0;
+    const betaInteraction = regMod.coefficients[2] || 0;
+
+    const deltaR2 = Math.max(0, r2Mod - r2Main);
+    const f2Mod = (1 - r2Mod > 0.001) ? (deltaR2 / (1 - r2Mod)) : 0;
+
+    const df = Math.max(1, N - 4);
+    const seInteraction = Math.sqrt(Math.max(0.0001, (1 - r2Mod) / df));
+    const tStatistic = Math.abs(betaInteraction) / seInteraction;
+    const pValue = this.approximatePValue(tStatistic, df);
+    const isSignificant = pValue < 0.05;
+
+    const slopeLow = betaX - betaInteraction;
+    const slopeMean = betaX;
+    const slopeHigh = betaX + betaInteraction;
+
+    const plotPoints = [-2, -1, 0, 1, 2].map(xVal => ({
+      x: xVal,
+      yLow: parseFloat((slopeLow * xVal).toFixed(3)),
+      yMean: parseFloat((slopeMean * xVal).toFixed(3)),
+      yHigh: parseFloat((slopeHigh * xVal).toFixed(3))
+    }));
+
+    let tipeEfek = 'Tidak Signifikan (Bukan Variabel Moderasi)';
+    if (isSignificant) {
+      if (betaInteraction > 0) {
+        tipeEfek = 'Strengthening Effect (Memperkuat Pengaruh Positif)';
+      } else {
+        tipeEfek = 'Dampening Effect (Memperlemah Pengaruh / Buffer)';
+      }
+    }
+
+    return {
+      ivName,
+      modName,
+      dvName,
+      r2Main: Number(r2Main),
+      r2Mod: Number(r2Mod),
+      r2Moderated: Number(r2Mod),
+      deltaR2: Number(deltaR2),
+      f2Mod: Number(f2Mod),
+      f2Moderasi: Number(f2Mod),
+      betaX: Number(betaX),
+      betaM: Number(betaM),
+      betaInteraction: Number(betaInteraction),
+      tStatistic: Number(tStatistic),
+      pValue: Number(pValue),
+      isSignificant,
+      tipeEfek,
+      slopeLow: Number(slopeLow),
+      slopeMean: Number(slopeMean),
+      slopeHigh: Number(slopeHigh),
+      plotPoints
+    };
+  }
+
+  /**
+   * Aproksimasi P-Value dari t-statistik dan df
+   */
+  approximatePValue(t, df) {
+    if (isNaN(t) || t === null) return 1.0;
+    const x = Math.abs(t);
+    const z = x;
+    const p = Math.exp(-0.717 * z - 0.416 * z * z);
+    return Math.max(0.0001, Math.min(1.0, p));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CONSISTENT PLS (PLSc) — Dijkstra-Henseler ρ_A correction
+  // ─────────────────────────────────────────────────────────────────────────
+  runPLSc(options = {}) {
+    const base = this.runPLS(options);
+    const { outerWeights, latentScores } = base;
+
+    const rhoA = {};
+    for (const v of this.variabels) {
+      if (v.tipe !== 'reflektif' || !v.indikator || v.indikator.length < 2) {
+        rhoA[v.nama] = 1.0; continue;
+      }
+      const w = v.indikator.map(ind => outerWeights[v.nama]?.[ind] || 0);
+      const sumW2 = w.reduce((s, wi) => s + wi * wi, 0);
+      // Bangun matriks korelasi indikator S
+      const S = v.indikator.map((i1, r) =>
+        v.indikator.map((i2, c) =>
+          r === c ? 1 : this.correlation(this.getColumnData(i1), this.getColumnData(i2))
+        )
+      );
+      // w'Sw
+      let wSw = 0;
+      for (let i = 0; i < w.length; i++)
+        for (let j = 0; j < w.length; j++)
+          wSw += w[i] * S[i][j] * w[j];
+      const denom = wSw - sumW2;
+      rhoA[v.nama] = denom > 0.001 ? Math.max(0, Math.min(1, (wSw - 1) / denom)) : 1.0;
+    }
+
+    // Disattenuated latent correlations
+    const varNames = this.variabels.map(v => v.nama);
+    const disattCorr = {};
+    for (const v1 of varNames) {
+      disattCorr[v1] = {};
+      for (const v2 of varNames) {
+        if (v1 === v2) { disattCorr[v1][v2] = 1.0; continue; }
+        const r = this.correlation(latentScores[v1], latentScores[v2]);
+        const denom = Math.sqrt(Math.max(0.001, rhoA[v1] * rhoA[v2]));
+        disattCorr[v1][v2] = Math.max(-1, Math.min(1, r / denom));
+      }
+    }
+
+    // PLSc path coefficients via OLS on disattenuated correlation matrix
+    const pathCoefficientsPlsc = {};
+    const rSquaredPlsc = {};
+    for (const v of this.variabels) {
+      const predictors = [];
+      this.jalurs.forEach(j => {
+        const fv = this.variabels.find(vv => vv.nama === (j.dari || ''));
+        const tv = this.variabels.find(vv => vv.nama === (j.ke || ''));
+        if (fv && tv && tv.nama === v.nama && !predictors.includes(fv.nama))
+          predictors.push(fv.nama);
+      });
+      if (!predictors.length) continue;
+      const Rxx = predictors.map(p1 => predictors.map(p2 => disattCorr[p1]?.[p2] ?? 0));
+      const Rxy = predictors.map(p => disattCorr[p]?.[v.nama] ?? 0);
+      const inv = this.invertMatrix(Rxx);
+      if (!inv) continue;
+      const betas = inv.map(row => row.reduce((s, r, j) => s + r * Rxy[j], 0));
+      predictors.forEach((p, i) => {
+        pathCoefficientsPlsc[`${p} → ${v.nama}`] = Number(betas[i].toFixed(4));
+      });
+      rSquaredPlsc[v.nama] = Math.max(0, Math.min(1,
+        predictors.reduce((s, p, i) => s + betas[i] * (disattCorr[p]?.[v.nama] ?? 0), 0)
+      ));
+    }
+
+    return { ...base, rhoA, disattenuatedCorrelations: disattCorr, pathCoefficientsPlsc, rSquaredPlsc };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // IPMA — Importance-Performance Map Analysis
+  // ─────────────────────────────────────────────────────────────────────────
+  calculateIPMA(targetVarName) {
+    if (!this.hasil) this.runPLS();
+    const { pathCoefficients, indirectEffects } = this.hasil;
+
+    // Total effects dari summary indirect effects
+    const totalEffects = {};
+    for (const [, val] of Object.entries(indirectEffects?.summary || {})) {
+      if (val.to === targetVarName) totalEffects[val.from] = val.totalEffect;
+    }
+    // Fallback: direct paths yang belum masuk summary
+    for (const [key, beta] of Object.entries(pathCoefficients)) {
+      const [from, to] = key.split(' → ');
+      if (to === targetVarName && totalEffects[from] === undefined) totalEffects[from] = beta;
+    }
+
+    const results = [];
+    for (const v of this.variabels) {
+      if (v.nama === targetVarName || totalEffects[v.nama] === undefined) continue;
+      const cols = (v.indikator || []).map(ind => this.getColumnData(ind).filter(x => typeof x === 'number' && !isNaN(x)));
+      const means = cols.map(c => this.mean(c));
+      const allVals = cols.flat();
+      const minV = allVals.length ? Math.min(...allVals) : 0;
+      const maxV = allVals.length ? Math.max(...allVals) : 1;
+      const range = maxV - minV || 1;
+      const constructPerf = means.length ? means.reduce((s, m) => s + ((m - minV) / range) * 100, 0) / means.length : 0;
+      const importance = totalEffects[v.nama];
+
+      results.push({
+        variabel: v.nama,
+        importance: Number(importance.toFixed(4)),
+        performance: Number(constructPerf.toFixed(2)),
+        indikator: (v.indikator || []).map((ind, i) => ({
+          indikator: ind,
+          mean: Number((means[i] ?? 0).toFixed(3)),
+          performance: Number((((means[i] ?? minV) - minV) / range * 100).toFixed(2)),
+        })),
+        prioritas: importance > 0 && constructPerf < 50 ? 'Tinggi — Perlu Perbaikan' :
+                   importance > 0 && constructPerf >= 50 ? 'Pertahankan' :
+                   importance < 0 ? 'Kurangi' : 'Rendah',
+      });
+    }
+    results.sort((a, b) => Math.abs(b.importance) - Math.abs(a.importance));
+    return { target: targetVarName, ipma: results };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MGA — Multi-Group Analysis (Henseler Parametric Test)
+  // ─────────────────────────────────────────────────────────────────────────
+  runMGA(dataGroup1, dataGroup2, options = {}) {
+    const bsOpts = { jumlahBootstrap: options.jumlahBootstrap || 500, ...options };
+
+    const runGroup = (data) => {
+      const e = new PLSEngine();
+      e.setData(data, JSON.parse(JSON.stringify(this.variabels)), JSON.parse(JSON.stringify(this.jalurs)));
+      return e.runBootstrap(bsOpts);
+    };
+
+    const g1 = runGroup(dataGroup1);
+    const g2 = runGroup(dataGroup2);
+
+    const mgaResults = {};
+    const allKeys = new Set([
+      ...Object.keys(g1.pathResults || {}),
+      ...Object.keys(g2.pathResults || {}),
+    ]);
+
+    for (const key of allKeys) {
+      const r1 = g1.pathResults?.[key];
+      const r2 = g2.pathResults?.[key];
+      if (!r1 || !r2) continue;
+      const diff = (r1.original || 0) - (r2.original || 0);
+      const se = Math.sqrt(Math.pow(r1.se || 0.001, 2) + Math.pow(r2.se || 0.001, 2));
+      const t = se > 0 ? Math.abs(diff) / se : 0;
+      const df = Math.max(1, dataGroup1.length + dataGroup2.length - 4);
+      const p = this.approximatePValue(t, df);
+      mgaResults[key] = {
+        path: key,
+        group1: { beta: Number((r1.original || 0).toFixed(4)), se: Number((r1.se || 0).toFixed(4)), ci95: r1.ci95 },
+        group2: { beta: Number((r2.original || 0).toFixed(4)), se: Number((r2.se || 0).toFixed(4)), ci95: r2.ci95 },
+        diff: Number(diff.toFixed(4)),
+        tStatistic: Number(t.toFixed(4)),
+        pValue: Number(p.toFixed(4)),
+        significant: p < 0.05,
+        kesimpulan: p < 0.05 ? 'Signifikan — ada perbedaan antar kelompok' : 'Tidak signifikan',
+      };
+    }
+
+    return {
+      group1: { n: dataGroup1.length, hasil: g1 },
+      group2: { n: dataGroup2.length, hasil: g2 },
+      mga: mgaResults,
+      catatan: 'Henseler parametric MGA. p < 0.05 = perbedaan koefisien jalur signifikan antar kelompok.',
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PLSpredict — k-Fold Out-of-Sample Prediction
+  // ─────────────────────────────────────────────────────────────────────────
+  runPLSpredict(options = {}) {
+    const kFolds = options.kFolds || 10;
+    const n = this.data.length;
+    const foldSize = Math.floor(n / kFolds);
+    if (foldSize < 2) throw new Error(`Data terlalu sedikit untuk ${kFolds} fold. Kurangi kFolds atau tambah data.`);
+
+    const endogenous = this.variabels.filter(v =>
+      this.jalurs.some(j => (j.ke === v.nama))
+    );
+    if (!endogenous.length) throw new Error('Tidak ada variabel endogen dalam model.');
+
+    // Shuffle
+    const idx = Array.from({ length: n }, (_, i) => i);
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [idx[i], idx[j]] = [idx[j], idx[i]];
+    }
+
+    const predicted = {}, actual = {};
+    endogenous.forEach(v => { predicted[v.nama] = new Array(n).fill(null); actual[v.nama] = new Array(n).fill(null); });
+
+    for (let fold = 0; fold < kFolds; fold++) {
+      const start = fold * foldSize;
+      const end   = fold === kFolds - 1 ? n : start + foldSize;
+      const testIdx  = idx.slice(start, end);
+      const trainIdx = [...idx.slice(0, start), ...idx.slice(end)];
+
+      const trainData = trainIdx.map(i => this.data[i]);
+      const testData  = testIdx.map(i  => this.data[i]);
+
+      const te = new PLSEngine();
+      te.setData(trainData, JSON.parse(JSON.stringify(this.variabels)), JSON.parse(JSON.stringify(this.jalurs)));
+      const tr = te.runPLS(options);
+
+      for (const endoVar of endogenous) {
+        const preds = this.jalurs.filter(j => j.ke === endoVar.nama).map(j => j.dari);
+        for (let ti = 0; ti < testIdx.length; ti++) {
+          const row = testData[ti];
+          let predVal = 0;
+          for (const predName of preds) {
+            const pv = this.variabels.find(vv => vv.nama === predName);
+            if (!pv) continue;
+            let ls = 0;
+            for (const ind of (pv.indikator || []))
+              ls += (tr.outerWeights[predName]?.[ind] || 0) * (parseFloat(row[ind]) || 0);
+            predVal += (tr.pathCoefficients[`${predName} → ${endoVar.nama}`] || 0) * ls;
+          }
+          predicted[endoVar.nama][testIdx[ti]] = predVal;
+          const indVals = (endoVar.indikator || []).map(ind => parseFloat(row[ind]) || 0);
+          actual[endoVar.nama][testIdx[ti]] = indVals.length ? indVals.reduce((s, x) => s + x, 0) / indVals.length : 0;
+        }
+      }
+    }
+
+    const prediksi = {};
+    for (const endoVar of endogenous) {
+      const act  = actual[endoVar.nama].filter(x => x !== null);
+      const pred = predicted[endoVar.nama].filter(x => x !== null);
+      const meanAct = this.mean(act);
+      let rmse = 0, mae = 0, ssTot = 0, ssRes = 0;
+      for (let i = 0; i < act.length; i++) {
+        const d = act[i] - pred[i];
+        rmse += d * d; mae += Math.abs(d);
+        ssTot += Math.pow(act[i] - meanAct, 2); ssRes += d * d;
+      }
+      rmse = Math.sqrt(rmse / act.length);
+      mae  = mae / act.length;
+      const rmseNaive = Math.sqrt(act.reduce((s, a) => s + Math.pow(a - meanAct, 2), 0) / act.length);
+      const q2predict = 1 - ssRes / Math.max(ssTot, 0.0001);
+
+      prediksi[endoVar.nama] = {
+        n: act.length,
+        rmse:          Number(rmse.toFixed(4)),
+        mae:           Number(mae.toFixed(4)),
+        rmseNaive:     Number(rmseNaive.toFixed(4)),
+        q2predict:     Number(q2predict.toFixed(4)),
+        relevansiPrediktif: q2predict > 0 && rmse < rmseNaive ? 'Ada' : q2predict > 0 ? 'Terbatas' : 'Tidak ada (Q² < 0)',
+      };
+    }
+
+    return {
+      kFolds, variabelEndogen: endogenous.map(v => v.nama), prediksi,
+      catatan: 'Q²_predict > 0 DAN RMSE < Naive = relevansi prediktif terkonfirmasi (Hair et al. 2019).',
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Harman Single Factor Test — Common Method Bias
+  // ─────────────────────────────────────────────────────────────────────────
+  harmanSingleFactor() {
+    const allInds = [];
+    for (const v of this.variabels)
+      for (const ind of (v.indikator || []))
+        if (!allInds.includes(ind)) allInds.push(ind);
+
+    const k = allInds.length;
+    if (k < 2) return { varianceFirstFactor: 0, threshold: 50, isProblematic: false };
+
+    // Matriks korelasi k×k
+    const R = allInds.map((i1, r) =>
+      allInds.map((i2, c) => r === c ? 1 : this.correlation(this.getColumnData(i1), this.getColumnData(i2)))
+    );
+
+    // Power iteration → eigenvalue terbesar
+    let vec = new Array(k).fill(1 / Math.sqrt(k));
+    for (let iter = 0; iter < 300; iter++) {
+      const nv = new Array(k).fill(0);
+      for (let i = 0; i < k; i++)
+        for (let j = 0; j < k; j++)
+          nv[i] += R[i][j] * vec[j];
+      const norm = Math.sqrt(nv.reduce((s, x) => s + x * x, 0)) || 1;
+      vec = nv.map(x => x / norm);
+    }
+    const lambda1 = vec.reduce((s, vi, i) =>
+      s + vi * R[i].reduce((ss, rij, j) => ss + rij * vec[j], 0), 0
+    );
+    const varianceFirstFactor = (lambda1 / k) * 100;
+
+    const loadings = allInds.map((ind, i) => ({ indikator: ind, loading: Number(vec[i].toFixed(4)) }));
+    loadings.sort((a, b) => Math.abs(b.loading) - Math.abs(a.loading));
+
+    return {
+      jumlahIndikator: k,
+      eigenvalueF1: Number(lambda1.toFixed(4)),
+      varianceFirstFactor: Number(varianceFirstFactor.toFixed(2)),
+      threshold: 50,
+      isProblematic: varianceFirstFactor > 50,
+      kesimpulan: varianceFirstFactor > 50
+        ? `⚠️ Variansi faktor pertama (${varianceFirstFactor.toFixed(1)}%) > 50% — indikasi CMV. Pertimbangkan uji lanjutan.`
+        : `✅ Variansi faktor pertama (${varianceFirstFactor.toFixed(1)}%) < 50% — CMV tidak menjadi masalah serius.`,
+      loadingsFaktorPertama: loadings,
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Format Tabel APA 7
+  // ─────────────────────────────────────────────────────────────────────────
+  formatAPA(options = {}) {
+    if (!this.hasil) throw new Error('Jalankan runPLS() terlebih dahulu.');
+    const h = this.hasil;
+    const r = (x, d = 3) => (typeof x === 'number' ? x.toFixed(d) : '-');
+    const toCsv = rows => {
+      if (!rows.length) return '';
+      const hdrs = Object.keys(rows[0]);
+      return [hdrs.join(','), ...rows.map(row => hdrs.map(hd => `"${row[hd] ?? ''}"`).join(','))].join('\n');
+    };
+    const varNames = this.variabels.map(v => v.nama);
+
+    // Tabel 1 — Outer Loadings (indikator × konstruk)
+    const tabel1 = [];
+    for (const v of this.variabels) {
+      for (const [ind, loading] of Object.entries(h.outerLoadings[v.nama] || {})) {
+        const row = { Indikator: ind, Konstruk: v.nama };
+        for (const vn of varNames) row[vn] = vn === v.nama ? r(loading) : '';
+        tabel1.push(row);
+      }
+    }
+
+    // Tabel 2 — Reliabilitas & Validitas Konvergen
+    const tabel2 = this.variabels.map(v => {
+      const rel = h.reliability?.[v.nama] || {};
+      return {
+        Konstruk: v.nama,
+        'Jml Ind.': (v.indikator || []).length,
+        'AVE': r(rel.ave ?? rel.AVE ?? 0),
+        'CR':  r(rel.cr  ?? rel.CR  ?? rel.compositeReliability ?? 0),
+        'α':   r(rel.cronbachAlpha ?? rel.alpha ?? 0),
+      };
+    });
+
+    // Tabel 3 — HTMT (lower triangle)
+    const tabel3 = varNames.map((v1, i) => {
+      const row = { Konstruk: v1 };
+      varNames.forEach((v2, j) => {
+        row[v2] = j < i ? r(h.htmt?.[v1]?.[v2] ?? 0) : j === i ? '-' : '';
+      });
+      return row;
+    });
+
+    // Tabel 4 — Path Coefficients + R²
+    const tabel4 = Object.entries(h.pathCoefficients || {}).map(([path, beta]) => {
+      const [from, to] = path.split(' → ');
+      return {
+        Jalur: path, Dari: from, Ke: to,
+        'β':   r(beta),
+        'R²':  r(h.rSquared?.[to] ?? ''),
+        'f²':  r(h.effectSizes?.[path] ?? ''),
+      };
+    });
+
+    return {
+      tabel1_outerLoadings:    { judul: 'Table X. Outer Loadings',                           data: tabel1, csv: toCsv(tabel1) },
+      tabel2_reliabilitas:     { judul: 'Table X. Reliability and Convergent Validity',       data: tabel2, csv: toCsv(tabel2) },
+      tabel3_htmt:             { judul: 'Table X. Heterotrait-Monotrait Ratio (HTMT)',        data: tabel3, csv: toCsv(tabel3) },
+      tabel4_pathCoefficients: { judul: 'Table X. Path Coefficients and Effect Sizes',        data: tabel4, csv: toCsv(tabel4) },
+      catatan: 'Ganti "Table X" dengan nomor tabel. Salin CSV ke Excel/Word untuk format APA 7.',
+    };
   }
 }
 

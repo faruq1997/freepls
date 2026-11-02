@@ -8,3 +8,11 @@ build/
 Thumbs.db
 .vscode/
 .idea/
+
+# User analysis output and raw research datasets
+from_freePLS/
+*.csv
+*.xlsx
+*.xls
+!sample/data_contoh.csv
+

@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('api', {
   
   // Dataset
   datasetImpor: (proyekId) => ipcRenderer.invoke('dataset-impor', proyekId),
+  datasetTambah: (data) => ipcRenderer.invoke('dataset-tambah', data),
   datasetDaftar: (proyekId) => ipcRenderer.invoke('dataset-daftar', proyekId),
   datasetAmbil: (id) => ipcRenderer.invoke('dataset-ambil', id),
   datasetSimpanData: (data) => ipcRenderer.invoke('dataset-simpan-data', data),
@@ -47,6 +48,9 @@ contextBridge.exposeInMainWorld('api', {
   eksporGambar: (data) => ipcRenderer.invoke('ekspor-gambar', data),
 
   // External Links & Email
-  openExternal: (url) => ipcRenderer.invoke('open-external', url)
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+
+  // MCP
+  getAppPath: () => ipcRenderer.invoke('get-app-path'),
 });
 

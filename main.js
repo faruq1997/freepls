@@ -181,6 +181,7 @@ ipcMain.handle('window-maximize', () => {
 });
 ipcMain.handle('window-close', () => mainWindow.close());
 ipcMain.handle('open-external', (_, url) => shell.openExternal(url));
+ipcMain.handle('get-app-path', () => __dirname);
 
 // ============ PROYEK (PROJECT) HANDLERS ============
 ipcMain.handle('proyek-buat', (_, { nama, deskripsi }) => {
@@ -422,6 +423,14 @@ ipcMain.handle('dataset-impor', async (_, proyekId) => {
     jumlah_baris: rows.length,
     jumlah_kolom: columns.length
   };
+});
+
+ipcMain.handle('dataset-tambah', (_, { proyek_id, nama, kolom, data, jumlah_baris, jumlah_kolom }) => {
+  const res = dbRun(
+    'INSERT INTO dataset (proyek_id, nama, kolom, data, jumlah_baris, jumlah_kolom) VALUES (?, ?, ?, ?, ?, ?)',
+    [proyek_id, nama, JSON.stringify(kolom || []), JSON.stringify(data || []), jumlah_baris || data.length, jumlah_kolom || kolom.length]
+  );
+  return { id: res.lastInsertRowid, proyek_id, nama, kolom, data, jumlah_baris: jumlah_baris || data.length, jumlah_kolom: jumlah_kolom || kolom.length };
 });
 
 ipcMain.handle('dataset-daftar', (_, proyekId) => {

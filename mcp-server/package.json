@@ -1,0 +1,16 @@
+{
+  "name": "freepls-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for FreePLS Indonesia – PLS-SEM analysis via AI agents",
+  "main": "index.js",
+  "bin": {
+    "freepls-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test-mcp.js"
+  },
+  "keywords": ["mcp", "pls-sem", "statistics", "research"],
+  "license": "CC-BY-NC-4.0"
+}
+
