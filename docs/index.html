@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreePLS Indonesia - Software PLS-SEM Desktop Gratis untuk Riset Akademik</title>
+  <meta name="description" content="FreePLS Indonesia adalah software Partial Least Squares Structural Equation Modeling (PLS-SEM) berbasis desktop untuk analisis riset akademik, skripsi, tesis, dan publikasi ilmiah di Indonesia.">
+  <meta name="author" content="Faruq Aziz">
+  <meta name="keywords" content="FreePLS, PLS-SEM, SmartPLS alternatif, Partial Least Squares, Analisis Jalur, Structural Equation Modeling, Riset Akademik, Metodologi Penelitian">
+  <link rel="canonical" href="https://faruq1997.github.io/freepls-indonesia/">
+  <link rel="icon" type="image/png" href="icon.png">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://faruq1997.github.io/freepls-indonesia/">
+  <meta property="og:title" content="FreePLS Indonesia - Software PLS-SEM Desktop Gratis untuk Riset Akademik">
+  <meta property="og:description" content="Aplikasi desktop analisis PLS-SEM lengkap dengan algoritma Wold, Bootstrapping, HTMT, AVE, CR, Model Fit, serta integrasi AI Agent via MCP Server.">
+  <meta property="og:locale" content="id_ID">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="FreePLS Indonesia - Software PLS-SEM Desktop Gratis">
+  <meta name="twitter:description" content="Aplikasi desktop analisis PLS-SEM lengkap untuk riset akademik dan mahasiswa di Indonesia.">
+
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "FreePLS Indonesia",
+    "operatingSystem": "Windows 10, Windows 11 (64-bit)",
+    "applicationCategory": "EducationalApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "IDR"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Faruq Aziz",
+      "url": "https://github.com/faruq1997"
+    },
+    "description": "Software Partial Least Squares Structural Equation Modeling (PLS-SEM) desktop gratis untuk riset akademik, skripsi, dan disertasi di Indonesia.",
+    "downloadUrl": "https://github.com/faruq1997/freepls-indonesia/releases/tag/v1",
+    "softwareVersion": "1.0.0",
+    "license": "https://creativecommons.org/licenses/by-nc/4.0/"
+  }
+  </script>
+
+  <style>
+    /* CSS Variables: Strictly solid colors, no gradients */
+    :root {
+      --bg-canvas: #ffffff;
+      --bg-surface: #f8fafc;
+      --bg-subtle: #f1f5f9;
+      --bg-code: #0f172a;
+      
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --text-light: #64748b;
+      --text-inverse: #ffffff;
+      
+      --border-subtle: #e2e8f0;
+      --border-medium: #cbd5e1;
+      --border-dark: #334155;
+      
+      --brand-primary: #1d4ed8;
+      --brand-hover: #1e40af;
+      --brand-active: #172554;
+      
+      --brand-success: #15803d;
+      --brand-warning-bg: #fef3c7;
+      --brand-warning-text: #92400e;
+      --brand-warning-border: #fcd34d;
+      
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+      
+      --max-width: 1120px;
+      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-stack);
+      color: var(--text-main);
+      background-color: var(--bg-canvas);
+      line-height: 1.6;
+      font-size: 16px;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Accessibility focus styling */
+    a:focus-visible,
+    button:focus-visible,
+    summary:focus-visible {
+      outline: 2px solid var(--brand-primary);
+      outline-offset: 3px;
+    }
+
+    /* Layout Container */
+    .container {
+      width: 100%;
+      max-width: var(--max-width);
+      margin-left: auto;
+      margin-right: auto;
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+
+    /* Typography */
+    h1, h2, h3, h4 {
+      color: var(--text-main);
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      letter-spacing: -0.025em;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 1.875rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      margin-bottom: 8px;
+    }
+
+    p {
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Navigation */
+    header {
+      background-color: var(--bg-canvas);
+      border-bottom: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+
+    .brand-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-main);
+      font-weight: 700;
+      font-size: 1.15rem;
+    }
+
+    .brand-tag {
+      background-color: var(--bg-subtle);
+      color: var(--brand-primary);
+      border: 1px solid var(--border-medium);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      list-style: none;
+    }
+
+    .nav-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .nav-link:hover {
+      color: var(--brand-primary);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-mobile-toggle {
+      display: none;
+      background: none;
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      color: var(--text-main);
+      font-size: 0.9rem;
+      cursor: pointer;
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* Buttons (Solid, flat, high contrast) */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      cursor: pointer;
+      min-height: 44px;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background-color: var(--brand-primary);
+      color: var(--text-inverse);
+      border: 1px solid var(--brand-primary);
+    }
+
+    .btn-primary:hover {
+      background-color: var(--brand-hover);
+      border-color: var(--brand-hover);
+    }
+
+    .btn-primary:active {
+      background-color: var(--brand-active);
+      border-color: var(--brand-active);
+    }
+
+    .btn-secondary {
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      border: 1px solid var(--border-medium);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--bg-subtle);
+      border-color: var(--text-muted);
+    }
+
+    .btn-secondary:active {
+      background-color: var(--border-subtle);
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      min-height: 36px;
+    }
+
+    /* Hero Section */
+    .hero-section {
+      padding: 64px 0 48px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      background-color: var(--bg-canvas);
+    }
+
+    .hero-content {
+      max-width: 840px;
+    }
+
+    .hero-lead {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .hero-cta-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .hero-notice-box {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-left: 4px solid var(--brand-primary);
+      padding: 16px 20px;
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    }
+
+    .hero-notice-box p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    /* Section Styling */
+    section {
+      padding: 64px 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .section-alt {
+      background-color: var(--bg-surface);
+    }
+
+    .section-header {
+      margin-bottom: 40px;
+    }
+
+    .section-subtitle {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      max-width: 760px;
+    }
+
+    /* Feature Cards */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .feature-card {
+      background-color: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 24px;
+    }
+
+    .section-alt .feature-card {
+      background-color: var(--bg-canvas);
+      border-color: var(--border-subtle);
+    }
+
+    .feature-tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--brand-primary);
+      margin-bottom: 8px;
+    }
+
+    .feature-card h3 {
+      font-size: 1.15rem;
+      margin-bottom: 8px;
+    }
+
+    .feature-card p {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Workflow Steps (Content-driven asymmetric list) */
+    .workflow-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-width: 880px;
+    }
+
+    .workflow-item {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      background-color: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 20px;
+    }
+
+    .workflow-num {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      background-color: var(--bg-subtle);
+      color: var(--brand-primary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .workflow-body h4 {
+      font-size: 1.05rem;
+      margin-bottom: 4px;
+    }
+
+    .workflow-body p {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    /* MCP Integration Section */
+    .mcp-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      align-items: start;
+    }
+
+    .mcp-info p {
+      margin-bottom: 16px;
+    }
+
+    .mcp-list {
+      list-style-type: square;
+      padding-left: 20px;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 20px;
+    }
+
+    .mcp-list li {
+      margin-bottom: 8px;
+    }
+
+    .code-box {
+      background-color: var(--bg-code);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background-color: #1e293b;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .code-title {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+
+    .code-pre {
+      padding: 16px;
+      margin: 0;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: #f1f5f9;
+    }
+
+    /* System Requirements Table */
+    .specs-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 0.95rem;
+    }
+
+    .specs-table th,
+    .specs-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .specs-table th {
+      background-color: var(--bg-subtle);
+      color: var(--text-main);
+      font-weight: 600;
+      width: 240px;
+    }
+
+    .specs-table td {
+      color: var(--text-muted);
+    }
+
+    /* Download Box */
+    .download-card {
+      background-color: var(--bg-canvas);
+      border: 2px solid var(--brand-primary);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      max-width: 800px;
+    }
+
+    .download-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .download-title {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+
+    .version-pill {
+      background-color: var(--bg-subtle);
+      border: 1px solid var(--border-medium);
+      color: var(--brand-primary);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+    }
+
+    .download-details {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+
+    .detail-item strong {
+      color: var(--text-main);
+    }
+
+    .detail-item span {
+      color: var(--text-muted);
+    }
+
+    /* FAQ Details/Summary */
+    .faq-container {
+      max-width: 840px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .faq-item {
+      background-color: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .faq-summary {
+      padding: 18px 20px;
+      font-weight: 600;
+      font-size: 1.05rem;
+      color: var(--text-main);
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+
+    .faq-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .faq-summary::after {
+      content: "+";
+      font-size: 1.25rem;
+      color: var(--text-light);
+      font-weight: 700;
+    }
+
+    details[open] .faq-summary::after {
+      content: "-";
+    }
+
+    details[open] .faq-summary {
+      border-bottom: 1px solid var(--border-subtle);
+      background-color: var(--bg-surface);
+    }
+
+    .faq-answer {
+      padding: 18px 20px;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Disclaimer Box */
+    .disclaimer-card {
+      background-color: var(--brand-warning-bg);
+      border: 1px solid var(--brand-warning-border);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      margin-top: 24px;
+    }
+
+    .disclaimer-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--brand-warning-text);
+      margin-bottom: 6px;
+    }
+
+    .disclaimer-text {
+      font-size: 0.9rem;
+      color: var(--brand-warning-text);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    /* Footer */
+    footer {
+      background-color: var(--bg-surface);
+      border-top: 1px solid var(--border-subtle);
+      padding: 48px 0 32px 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 32px;
+      margin-bottom: 32px;
+    }
+
+    .footer-col h4 {
+      font-size: 0.95rem;
+      color: var(--text-main);
+      margin-bottom: 12px;
+    }
+
+    .footer-links {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    .footer-links a:hover {
+      color: var(--brand-primary);
+    }
+
+    .footer-bottom {
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 0.85rem;
+      color: var(--text-light);
+    }
+
+    /* Responsive Breakpoints */
+    @media (max-width: 900px) {
+      .feature-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .mcp-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 680px) {
+      h1 {
+        font-size: 1.85rem;
+      }
+
+      h2 {
+        font-size: 1.45rem;
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .download-details {
+        grid-template-columns: 1fr;
+      }
+
+      .btn-mobile-toggle {
+        display: block;
+      }
+
+      .nav-links {
+        display: none;
+        flex-direction: column;
+        align-items: flex-start;
+        position: absolute;
+        top: 64px;
+        left: 0;
+        right: 0;
+        background-color: var(--bg-canvas);
+        border-bottom: 1px solid var(--border-medium);
+        padding: 20px;
+        gap: 16px;
+      }
+
+      .nav-links.active {
+        display: flex;
+      }
+
+      .specs-table th {
+        width: 140px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <header>
+    <div class="container">
+      <div class="nav-inner">
+        <a href="#hero" class="brand-link" aria-label="FreePLS Indonesia Halaman Utama">
+          <span>FreePLS Indonesia</span>
+          <span class="brand-tag">v1.0</span>
+        </a>
+
+        <button class="btn-mobile-toggle" id="menuToggle" aria-expanded="false" aria-controls="primaryNav" aria-label="Buka menu navigasi">
+          Menu
+        </button>
+
+        <nav id="primaryNav" aria-label="Navigasi Utama">
+          <ul class="nav-links" id="navLinks">
+            <li><a href="#fitur" class="nav-link">Fitur Analisis</a></li>
+            <li><a href="#alur-kerja" class="nav-link">Alur Kerja</a></li>
+            <li><a href="#mcp" class="nav-link">AI & MCP Server</a></li>
+            <li><a href="#spesifikasi" class="nav-link">Spesifikasi</a></li>
+            <li><a href="#faq" class="nav-link">FAQ</a></li>
+            <li><a href="#unduh" class="btn btn-primary btn-sm">Unduh Aplikasi</a></li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero-section" id="hero">
+      <div class="container">
+        <div class="hero-content">
+          <h1>Software PLS-SEM Desktop Gratis untuk Riset Akademik di Indonesia</h1>
+          <p class="hero-lead">
+            FreePLS Indonesia dirancang untuk memudahkan mahasiswa, dosen, dan peneliti dalam melakukan estimasi model persamaan struktural berbasis varian (PLS-SEM) secara mandiri, akurat, dan tanpa batasan lisensi komersial.
+          </p>
+
+          <div class="hero-cta-group">
+            <a href="#unduh" class="btn btn-primary">Unduh Installer (Windows x64)</a>
+            <a href="https://github.com/faruq1997/freepls-indonesia" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Repositori GitHub</a>
+          </div>
+
+          <div class="hero-notice-box">
+            <p>
+              <strong>Komitmen Akses Akademik:</strong> FreePLS dirilis secara terbuka di bawah lisensi Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0). Bebas digunakan untuk penelitian tugas akhir, skripsi, tesis, dan publikasi jurnal ilmiah.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Fitur Section -->
+    <section id="fitur">
+      <div class="container">
+        <div class="section-header">
+          <h2>Kapabilitas Perhitungan Statistik PLS-SEM</h2>
+          <p class="section-subtitle">
+            Implementasi algoritma matriks numerik mengacu pada standar literatur Partial Least Squares (Wold, 1982; Lohmöller, 1989; Hair et al., 2017).
+          </p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <span class="feature-tag">Outer Model</span>
+            <h3>Model Pengukuran Reflektif & Formatif</h3>
+            <p>
+              Menghitung Outer Loading, Outer Weight, Cronbach's Alpha, Composite Reliability (CR rho_a & rho_c), dan Average Variance Extracted (AVE) secara otomatis untuk evaluasi validitas konvergen dan reliabilitas konstruk.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-tag">Validitas Diskriminan</span>
+            <h3>HTMT & Fornell-Larcker</h3>
+            <p>
+              Tersedia matriks Fornell-Larcker Criterion, Cross Loadings per indikator, serta rasio Heterotrait-Monotrait (HTMT) dengan kriteria acuan ambang batas 0.85 atau 0.90.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-tag">Inner Model</span>
+            <h3>Evaluasi Model Struktural</h3>
+            <p>
+              Menghitung Path Coefficients (koefisien jalur), Koefisien Determinasi (R-squared dan R-squared disesuaikan), Effect Size (f-squared), serta deteksi multikolinieritas melalui Inner VIF.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-tag">Uji Signifikansi</span>
+            <h3>Non-Parametric Bootstrapping</h3>
+            <p>
+              Resampling otomatis subsampel acak (hingga 500+ iterasi subsampel) untuk menghasilkan standar deviasi, t-statistic empiris, dan p-value dua sisi bagi setiap jalur hubungan hipotesis.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-tag">Relevansi & Fit</span>
+            <h3>Q-squared, SRMR & Indeks Model</h3>
+            <p>
+              Menyediakan estimasi relevansi prediktif Stone-Geisser (Q-squared) melalui teknik blindfolding, Standardized Root Mean Square Residual (SRMR), Normed Fit Index (NFI), dan Consistent PLS (PLSc).
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-tag">Ekspor Laporan</span>
+            <h3>Tabel CSV, Visual SVG & Laporan HTML</h3>
+            <p>
+              Hasil analisis dapat diekspor langsung dalam format tabel CSV untuk Microsoft Excel, diagram jalur berformat SVG beresolusi tinggi, dokumen Markdown, dan laporan HTML siap lampir untuk dokumen tugas akhir.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Alur Kerja Section -->
+    <section class="section-alt" id="alur-kerja">
+      <div class="container">
+        <div class="section-header">
+          <h2>Alur Pengolahan Data di FreePLS</h2>
+          <p class="section-subtitle">
+            Langkah terstruktur dari dataset mentah hingga interpretasi hasil pengujian hipotesis penelitian.
+          </p>
+        </div>
+
+        <div class="workflow-list">
+          <div class="workflow-item">
+            <div class="workflow-num">1</div>
+            <div class="workflow-body">
+              <h4>Impor Dataset Riset</h4>
+              <p>Masukkan berkas data mentah dalam format CSV atau Excel (.xlsx). Pastikan baris pertama berisi kode indikator kuesioner dan data numerik telah bersih dari nilai hilang (missing values).</p>
+            </div>
+          </div>
+
+          <div class="workflow-item">
+            <div class="workflow-num">2</div>
+            <div class="workflow-body">
+              <h4>Definisikan Konstruk & Indikator</h4>
+              <p>Tambahkan variabel laten (eksogen atau endogen), kelompokkan indikator pengukuran ke masing-masing konstruk, dan pilih jenis model (reflektif atau formatif).</p>
+            </div>
+          </div>
+
+          <div class="workflow-item">
+            <div class="workflow-num">3</div>
+            <div class="workflow-body">
+              <h4>Hubungkan Jalur Struktural (Path Model)</h4>
+              <p>Gambarkan panah pengaruh antar konstruk pada kanvas visual interaktif sesuai rumusan kerangka pemikiran dan hipotesis penelitian.</p>
+            </div>
+          </div>
+
+          <div class="workflow-item">
+            <div class="workflow-num">4</div>
+            <div class="workflow-body">
+              <h4>Eksekusi Algoritma PLS & Bootstrapping</h4>
+              <p>Jalankan iterasi PLS Engine untuk memperoleh koefisien jalur dan outer loadings. Lanjutkan dengan kalkulasi bootstrapping untuk menguji signifikansi nilai t dan nilai p.</p>
+            </div>
+          </div>
+
+          <div class="workflow-item">
+            <div class="workflow-num">5</div>
+            <div class="workflow-body">
+              <h4>Interpretasikan & Unduh Laporan Riset</h4>
+              <p>Periksa tab evaluasi model pengukuran dan model struktural. Salin tabel ringkasan atau ekspor diagram jalur SVG untuk dimasukkan ke Bab 4 laporan skripsi atau manuskrip artikel.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MCP Integration Section -->
+    <section id="mcp">
+      <div class="container">
+        <div class="section-header">
+          <h2>Dukungan AI Agent melalui Model Context Protocol (MCP)</h2>
+          <p class="section-subtitle">
+            Integrasikan FreePLS ke dalam alur kerja asisten koding dan AI Agent seperti Claude Desktop, Cursor, atau Antigravity.
+          </p>
+        </div>
+
+        <div class="mcp-layout">
+          <div class="mcp-info">
+            <p>
+              FreePLS Indonesia menyertakan paket MCP Server bawaan yang berlokasi pada direktori <code>mcp-server/</code>. Server ini menyediakan tool analitik siap panggil:
+            </p>
+            <ul class="mcp-list">
+              <li><strong>pls_full_pipeline:</strong> Membaca file data, mengelompokkan variabel, menjalankan iterasi PLS dan Bootstrapping, lalu menulis laporan lengkap (HTML, CSV, SVG) secara otonom.</li>
+              <li><strong>pls_calculate:</strong> Menjalankan estimasi matriks PLS murni pada model yang telah terkonfigurasi.</li>
+              <li><strong>pls_bootstrap:</strong> Menghasilkan uji signifikansi empiris dengan sampling acak berulang.</li>
+            </ul>
+            <p>
+              Dengan protokol MCP, AI Agent dapat membantu memeriksa anomali data, memverifikasi kriteria validitas, dan mendokumentasikan hasil temuan penelitian secara terstruktur.
+            </p>
+          </div>
+
+          <div class="code-box">
+            <div class="code-header">
+              <span class="code-title">claude_desktop_config.json</span>
+              <button class="btn btn-secondary btn-sm" id="btnCopyConfig" aria-label="Salin konfigurasi JSON">Salin Konfigurasi</button>
+            </div>
+            <pre class="code-pre" id="mcpConfigText"><code>{
+  "mcpServers": {
+    "freepls": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\Username\\AppData\\Local\\Programs\\FreePLS Indonesia\\resources\\mcp-server\\index.js"
+      ]
+    }
+  }
+}</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Spesifikasi Teknis Section -->
+    <section class="section-alt" id="spesifikasi">
+      <div class="container">
+        <div class="section-header">
+          <h2>Spesifikasi & Kebutuhan Sistem</h2>
+          <p class="section-subtitle">
+            Aplikasi berdiri sendiri (standalone) tanpa ketergantungan runtime eksternal.
+          </p>
+        </div>
+
+        <table class="specs-table" aria-label="Tabel Kebutuhan Sistem FreePLS Indonesia">
+          <tbody>
+            <tr>
+              <th scope="row">Sistem Operasi</th>
+              <td>Windows 10, Windows 11 (arsitektur 64-bit)</td>
+            </tr>
+            <tr>
+              <th scope="row">Format Distribusi</th>
+              <td>Installer berkas tunggal (.exe) berbasis Electron</td>
+            </tr>
+            <tr>
+              <th scope="row">Kebutuhan Memori (RAM)</th>
+              <td>Minimum 4 GB RAM (direkomendasikan 8 GB untuk dataset besar & bootstrapping > 1000)</td>
+            </tr>
+            <tr>
+              <th scope="row">Penyimpanan Hard Disk</th>
+              <td>Minimum 300 MB ruang kosong untuk instalasi dan basis data proyek lokal</td>
+            </tr>
+            <tr>
+              <th scope="row">Konektivitas Internet</th>
+              <td>Tidak dibutuhkan saat eksekusi. Seluruh perhitungan matriks dan penyimpanan SQLite berjalan offline di komputer lokal</td>
+            </tr>
+            <tr>
+              <th scope="row">Format Berkas Masukan</th>
+              <td>CSV (pemisah koma atau titik koma), Microsoft Excel (.xlsx)</td>
+            </tr>
+            <tr>
+              <th scope="row">Format Luaran Hasil</th>
+              <td>CSV, SVG grafik vektor, dokumen Markdown, dan laporan HTML interaktif</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Unduh Section -->
+    <section id="unduh">
+      <div class="container">
+        <div class="section-header">
+          <h2>Unduh FreePLS Indonesia</h2>
+          <p class="section-subtitle">
+            Dapatkan berkas installer resmi versi terbaru langsung dari repositori GitHub Releases.
+          </p>
+        </div>
+
+        <div class="download-card">
+          <div class="download-header">
+            <div>
+              <h3 class="download-title">FreePLS Indonesia untuk Windows</h3>
+              <p>Paket installer resmi dengan seluruh library statistik dan MCP server terintegrasi.</p>
+            </div>
+            <span class="version-pill">Rilis v1.0.0</span>
+          </div>
+
+          <div class="download-details">
+            <div class="detail-item">
+              <strong>Nama Berkas:</strong> <span>FreePLS Indonesia Setup 1.0.0.exe</span>
+            </div>
+            <div class="detail-item">
+              <strong>Arsitektur:</strong> <span>x64 (Windows 64-bit)</span>
+            </div>
+            <div class="detail-item">
+              <strong>Biaya Lisensi:</strong> <span>Gratis (Non-komersial & Akademik)</span>
+            </div>
+            <div class="detail-item">
+              <strong>Pengembang:</strong> <span>Faruq Aziz (@faruq1997)</span>
+            </div>
+          </div>
+
+          <div class="hero-cta-group" style="margin-bottom: 0;">
+            <a href="https://github.com/faruq1997/freepls-indonesia/releases/tag/v1" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+              Halaman Rilis & Unduh File v1
+            </a>
+            <a href="https://github.com/faruq1997/freepls-indonesia" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">
+              Repositori Source Code (GitHub)
+            </a>
+          </div>
+        </div>
+
+        <div class="disclaimer-card" id="lisensi">
+          <div class="disclaimer-title">Pernyataan Hukum & Penafian Merek (Disclaimer)</div>
+          <p class="disclaimer-text">
+            FreePLS Indonesia adalah perangkat lunak independen yang dikembangkan oleh Faruq Aziz untuk tujuan penelitian ilmiah dan pendidikan. Perangkat lunak ini tidak berafiliasi, disponsori, atau didukung oleh SmartPLS GmbH. Merek dagang "SmartPLS" adalah milik sah dari SmartPLS GmbH. Penggunaan nama "PLS" merujuk pada metodologi statistik umum Partial Least Squares.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="section-alt" id="faq">
+      <div class="container">
+        <div class="section-header">
+          <h2>Pertanyaan yang Sering Diajukan (FAQ)</h2>
+          <p class="section-subtitle">
+            Informasi praktis seputar penggunaan dan lisensi perangkat lunak.
+          </p>
+        </div>
+
+        <div class="faq-container">
+          <details class="faq-item">
+            <summary class="faq-summary">Apakah FreePLS Indonesia benar-benar gratis untuk mahasiswa?</summary>
+            <div class="faq-answer">
+              Ya. FreePLS Indonesia dilisensikan di bawah Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0). Mahasiswa, dosen, dan peneliti independen dapat menggunakannya secara cuma-cuma tanpa batas waktu untuk penyusunan skripsi, tesis, disertasi, maupun artikel jurnal non-komersial.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-summary">Apakah data penelitian saya dikirim ke server daring (cloud)?</summary>
+            <div class="faq-answer">
+              Tidak. FreePLS adalah aplikasi desktop lokal. Seluruh pembacaan berkas data, kalkulasi aljabar linier, dan penyimpanan model ke database SQLite berjalan sepenuhnya di komputer Anda tanpa memerlukan koneksi internet.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-summary">Apakah hasil perhitungannya sesuai dengan kaidah literatur PLS-SEM?</summary>
+            <div class="faq-answer">
+              Ya. Engine komputasi FreePLS mengimplementasikan persamaan standar algoritma PLS Wold dan Lohmöller: normalisasi data, inner weighting schemes (path/centroid), estimasi outer loadings dan weights, kalkulasi Fornell-Larcker, serta bootstrapping non-parametrik untuk uji hipotesis sesuai rekomendasi Hair et al. (2017).
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-summary">Bagaimana cara mengutip FreePLS Indonesia dalam karya tulis ilmiah?</summary>
+            <div class="faq-answer">
+              Anda dapat mencantumkan rujukan berikut pada bagian metodologi penelitian: "Aziz, F. (2026). FreePLS Indonesia: Perangkat Lunak Analisis Partial Least Squares Structural Equation Modeling (Versi 1.0.0). Tersedia di https://github.com/faruq1997/freepls-indonesia".
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-col">
+          <h4>FreePLS Indonesia</h4>
+          <p style="max-width: 320px; font-size: 0.88rem;">
+            Aplikasi analisis PLS-SEM desktop independen untuk mendukung keterbukaan riset dan pendidikan statistika di Indonesia.
+          </p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Tautan Cepat</h4>
+          <ul class="footer-links">
+            <li><a href="#fitur">Fitur Analisis</a></li>
+            <li><a href="#alur-kerja">Alur Kerja</a></li>
+            <li><a href="#mcp">AI Agent & MCP</a></li>
+            <li><a href="#spesifikasi">Spesifikasi</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Dokumentasi & Sumber</h4>
+          <ul class="footer-links">
+            <li><a href="https://github.com/faruq1997/freepls-indonesia" target="_blank" rel="noopener noreferrer">Repositori GitHub</a></li>
+            <li><a href="https://github.com/faruq1997/freepls-indonesia/releases/tag/v1" target="_blank" rel="noopener noreferrer">Unduh Rilis v1</a></li>
+            <li><a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener noreferrer">Lisensi CC BY-NC 4.0</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>
+          Hak Cipta &copy; 2026 Faruq Aziz (@faruq1997). Seluruh hak cipta dilindungi undang-undang untuk penggunaan non-komersial.
+        </div>
+        <div>
+          Bebas royalti untuk riset akademik & publikasi ilmiah.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Interactivity Scripts -->
+  <script>
+    // Mobile navigation toggle
+    const menuToggle = document.getElementById('menuToggle');
+    const navLinks = document.getElementById('navLinks');
+
+    if (menuToggle && navLinks) {
+      menuToggle.addEventListener('click', function() {
+        const isOpen = navLinks.classList.toggle('active');
+        menuToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+
+      // Close menu when pressing Escape
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && navLinks.classList.contains('active')) {
+          navLinks.classList.remove('active');
+          menuToggle.setAttribute('aria-expanded', 'false');
+          menuToggle.focus();
+        }
+      });
+
+      // Close menu when clicking a link
+      navLinks.querySelectorAll('a').forEach(function(link) {
+        link.addEventListener('click', function() {
+          navLinks.classList.remove('active');
+          menuToggle.setAttribute('aria-expanded', 'false');
+        });
+      });
+    }
+
+    // Copy MCP configuration button
+    const btnCopyConfig = document.getElementById('btnCopyConfig');
+    const mcpConfigText = document.getElementById('mcpConfigText');
+
+    if (btnCopyConfig && mcpConfigText) {
+      btnCopyConfig.addEventListener('click', function() {
+        const textToCopy = mcpConfigText.innerText;
+        navigator.clipboard.writeText(textToCopy).then(function() {
+          const originalText = btnCopyConfig.innerText;
+          btnCopyConfig.innerText = 'Tersalin!';
+          setTimeout(function() {
+            btnCopyConfig.innerText = originalText;
+          }, 2000);
+        }).catch(function(err) {
+          console.error('Gagal menyalin:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
