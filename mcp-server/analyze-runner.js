@@ -6,9 +6,17 @@
 const fs   = require('fs');
 const path = require('path');
 
+function getAppPath(...segments) {
+  const dev = path.join(__dirname, '..', ...segments);
+  if (fs.existsSync(dev)) return dev;
+  const unpacked = path.join(__dirname, '..', 'app.asar.unpacked', ...segments);
+  if (fs.existsSync(unpacked)) return unpacked;
+  return dev;
+}
+
 const PROJECT_ROOT = path.join(__dirname, '..');
 const OUT_BASE     = path.join(PROJECT_ROOT, 'from_freePLS');
-const { PLSEngine } = require(path.join(PROJECT_ROOT, 'src', 'pls-engine.js'));
+const { PLSEngine } = require(getAppPath('src', 'pls-engine.js'));
 
 // ─── FILE PARSERS ─────────────────────────────────────────────────────────────
 
@@ -33,8 +41,8 @@ function parseCSV(filePath) {
 }
 
 function parseExcel(filePath) {
-  // Try xlsx (may be available in Electron node_modules)
-  const XLSX = require(path.join(PROJECT_ROOT, 'node_modules', 'xlsx'));
+  // Try xlsx (may be available in Electron node_modules or app.asar.unpacked)
+  const XLSX = require(getAppPath('node_modules', 'xlsx'));
   const wb   = XLSX.readFile(filePath);
   const ws   = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { defval: 0 });
@@ -519,7 +527,7 @@ async function analyzeFile({ filePath, variabels, jalurs, targetIPMA, options={}
 
   // 6. Generate visuals (HTML + SVG charts)
   try {
-    const visualsPath = path.join(PROJECT_ROOT, 'from_freePLS', 'generate-visuals.js');
+    const visualsPath = path.join(__dirname, 'generate-visuals.js');
     delete require.cache[require.resolve(visualsPath)];
     const generateVisuals = require(visualsPath);
     generateVisuals(rawResults, outDir);

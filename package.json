@@ -29,12 +29,22 @@
       "preload.js",
       "src/**/*",
       "assets/**/*",
+      "mcp-server/**/*",
       "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/sql.js/**/*",
+      "node_modules/xlsx/**/*",
+      "src/pls-engine.js"
     ],
     "extraResources": [
       {
         "from": "node_modules/sql.js/dist/sql-wasm.wasm",
         "to": "sql-wasm.wasm"
+      },
+      {
+        "from": "mcp-server",
+        "to": "mcp-server"
       }
     ]
   },

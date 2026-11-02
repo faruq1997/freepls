@@ -27,8 +27,17 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
+// ── Helper Resolusi Path (Mendukung Dev dan Packaged App/Release) ───────────
+function getAppPath(...segments) {
+  const dev = path.join(__dirname, '..', ...segments);
+  if (fs.existsSync(dev)) return dev;
+  const unpacked = path.join(__dirname, '..', 'app.asar.unpacked', ...segments);
+  if (fs.existsSync(unpacked)) return unpacked;
+  return dev;
+}
+
 // ── Engine ────────────────────────────────────────────────────────────────────
-const { PLSEngine } = require(path.join(__dirname, '..', 'src', 'pls-engine.js'));
+const { PLSEngine } = require(getAppPath('src', 'pls-engine.js'));
 const { analyzeFile } = require(path.join(__dirname, 'analyze-runner.js'));
 
 // ── Database (sql.js) ─────────────────────────────────────────────────────────
@@ -46,7 +55,7 @@ function getAppUserData() {
 
 async function openDb() {
   if (db) return db;
-  const initSqlJs = require(path.join(__dirname, '..', 'node_modules', 'sql.js'));
+  const initSqlJs = require(getAppPath('node_modules', 'sql.js'));
   SQL = await initSqlJs();
   const dbFile = path.join(getAppUserData(), 'freepls.db');
   db = fs.existsSync(dbFile)
