@@ -331,6 +331,11 @@ class PLSEngine {
               const isPredictor = this.jalurs.some(j => {
                 const fromVar = this.variabels.find(vv => (j.dari_variabel_id != null && vv.id != null && vv.id == j.dari_variabel_id) || vv.nama === j.dari);
                 const toVar = this.variabels.find(vv => (j.ke_variabel_id != null && vv.id != null && vv.id == j.ke_variabel_id) || vv.nama === j.ke);
+                const viaVar = (j.melalui_variabel_id != null || j.melalui) ? this.variabels.find(vv => (j.melalui_variabel_id != null && vv.id != null && vv.id == j.melalui_variabel_id) || vv.nama === j.melalui) : null;
+                if (viaVar) {
+                  return (fromVar && viaVar && fromVar.nama === v2.nama && viaVar.nama === v.nama) ||
+                         (viaVar && toVar && viaVar.nama === v2.nama && toVar.nama === v.nama);
+                }
                 return fromVar && toVar && fromVar.nama === v2.nama && toVar.nama === v.nama;
               });
               
@@ -447,6 +452,8 @@ class PLSEngine {
         
         if (viaVar && toVar && toVar.nama === v.nama) {
           if (!predictors.includes(viaVar.nama)) predictors.push(viaVar.nama);
+        } else if (viaVar && fromVar && viaVar.nama === v.nama) {
+          if (!predictors.includes(fromVar.nama)) predictors.push(fromVar.nama);
         } else if (fromVar && toVar && toVar.nama === v.nama) {
           if (!predictors.includes(fromVar.nama)) predictors.push(fromVar.nama);
         }
@@ -730,6 +737,8 @@ class PLSEngine {
         
         if (viaVar && toVar && toVar.nama === v.nama) {
           if (!predictors.includes(viaVar.nama)) predictors.push(viaVar.nama);
+        } else if (viaVar && fromVar && viaVar.nama === v.nama) {
+          if (!predictors.includes(fromVar.nama)) predictors.push(fromVar.nama);
         } else if (fromVar && toVar && toVar.nama === v.nama) {
           if (!predictors.includes(fromVar.nama)) predictors.push(fromVar.nama);
         }
@@ -1918,7 +1927,12 @@ class PLSEngine {
       this.jalurs.forEach(j => {
         const fv = this.variabels.find(vv => vv.nama === (j.dari || ''));
         const tv = this.variabels.find(vv => vv.nama === (j.ke || ''));
-        if (fv && tv && tv.nama === v.nama && !predictors.includes(fv.nama))
+        const via = (j.melalui_variabel_id != null || j.melalui) ? this.variabels.find(vv => vv.nama === (j.melalui || '')) : null;
+        if (via && tv && tv.nama === v.nama && !predictors.includes(via.nama))
+          predictors.push(via.nama);
+        else if (via && fv && via.nama === v.nama && !predictors.includes(fv.nama))
+          predictors.push(fv.nama);
+        else if (fv && tv && tv.nama === v.nama && !predictors.includes(fv.nama))
           predictors.push(fv.nama);
       });
       if (!predictors.length) continue;

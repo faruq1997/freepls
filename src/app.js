@@ -2692,42 +2692,17 @@ window.terapkanTemplateModel = terapkanTemplateModel;
 
       const medVar = state.variabels.find(v => v.id == mediator);
 
-      // 1. Tambah jalur X -> Z jika belum ada
-      const existingXZ = state.jalurs.find(j => (j.dari_variabel_id == dari || j.dari === dariVar.nama) && (j.ke_variabel_id == mediator || j.ke === medVar.nama));
-      if (!existingXZ) {
-        state.jalurs.push({
-          id: Date.now(),
-          dari: dariVar.nama,
-          ke: medVar.nama,
-          dari_variabel_id: dari,
-          ke_variabel_id: mediator,
-          label: '',
-          tipe_garis: 'solid',
-          tebal_garis: tebalGaris,
-          kelengkungan: 0
-        });
-      }
+      // Bersihkan jalur auto-generated lama yang kosong/tumpang tindih dengan mediasi ini
+      state.jalurs = state.jalurs.filter(j => {
+        const isOldXZ = (j.dari_variabel_id == dari || j.dari === dariVar.nama) && (j.ke_variabel_id == mediator || j.ke === medVar.nama) && (!j.label || j.label.trim() === '');
+        const isOldZY = (j.dari_variabel_id == mediator || j.dari === medVar.nama) && (j.ke_variabel_id == ke || j.ke === keVar.nama) && (!j.label || j.label.trim() === '');
+        return !isOldXZ && !isOldZY;
+      });
 
-      // 2. Tambah jalur Z -> Y jika belum ada
-      const existingZY = state.jalurs.find(j => (j.dari_variabel_id == mediator || j.dari === medVar.nama) && (j.ke_variabel_id == ke || j.ke === keVar.nama));
-      if (!existingZY) {
-        state.jalurs.push({
-          id: Date.now() + 1,
-          dari: medVar.nama,
-          ke: keVar.nama,
-          dari_variabel_id: mediator,
-          ke_variabel_id: ke,
-          label: '',
-          tipe_garis: 'solid',
-          tebal_garis: tebalGaris,
-          kelengkungan: 0
-        });
-      }
-
-      // 3. Tambah jalur mediasi tidak langsung X -> Z -> Y dengan melalui_variabel_id
+      // Tambah satu jalur mediasi X -> Z -> Y dengan style yang dipilih user (solid atau putus-putus)
       const indirectLabel = label || `${dariVar.nama} → ${medVar.nama} → ${keVar.nama}`;
       state.jalurs.push({
-        id: Date.now() + 2,
+        id: Date.now(),
         dari: dariVar.nama,
         ke: keVar.nama,
         dari_variabel_id: dari,
@@ -3682,6 +3657,20 @@ function drawPLSDiagram(ctx, options = {}) {
     const toVar = state.variabels.find(v => v.id == jalur.ke_variabel_id || v.nama === jalur.ke);
     const viaVar = jalur.melalui_variabel_id ? state.variabels.find(v => v.id == jalur.melalui_variabel_id || v.nama === jalur.melalui) : null;
     if (!fromVar || !toVar) continue;
+
+    // Hindari render ganda: jika jalur ini adalah jalur direct tanpa label yang sudah dicakup oleh jalur mediasi (viaVar), lewati
+    if (!viaVar && (!jalur.label || jalur.label.trim() === '')) {
+      const isCoveredByVia = state.jalurs.some(otherJ => {
+        if (!otherJ.melalui_variabel_id && !otherJ.melalui) return false;
+        const otherFrom = otherJ.dari_variabel_id || otherJ.dari;
+        const otherTo = otherJ.ke_variabel_id || otherJ.ke;
+        const otherVia = otherJ.melalui_variabel_id || otherJ.melalui;
+        const thisFrom = jalur.dari_variabel_id || jalur.dari;
+        const thisTo = jalur.ke_variabel_id || jalur.ke;
+        return (thisFrom == otherFrom && thisTo == otherVia) || (thisFrom == otherVia && thisTo == otherTo);
+      });
+      if (isCoveredByVia) continue;
+    }
     
     const isPathSelected = (selectedPathId === jalur.id || state.selectedPaths?.includes(jalur.id)) && !isExport;
     const currentPathColor = isPathSelected ? '#f093fb' : pathColor;
