@@ -4490,3 +4490,250 @@ body:has(.fullscreen-canvas) .toast-container {
   flex-shrink: 0;
   margin-top: 1px;
 }
+
+/* ============ HALAMAN BANTUAN (PANDUAN TEORI, RUMUS & REFERENSI) ============ */
+.bantuan-container {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding-bottom: 50px;
+}
+
+.bantuan-hero {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 28px 32px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.bantuan-hero-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.bantuan-hero-desc {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 820px;
+  margin-bottom: 20px;
+}
+
+.bantuan-search-box {
+  display: flex;
+  align-items: center;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  gap: 10px;
+  margin-bottom: 16px;
+  transition: var(--transition-fast);
+}
+
+.bantuan-search-box:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.bantuan-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13.5px;
+}
+
+.bantuan-pills-nav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.bantuan-pill {
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bantuan-pill:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.bantuan-pill.active {
+  background: var(--color-primary);
+  color: #ffffff;
+  border-color: var(--color-primary);
+}
+
+.bantuan-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 22px 26px;
+  margin-bottom: 20px;
+  transition: var(--transition-normal);
+  box-shadow: var(--shadow-sm);
+}
+
+.bantuan-card:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.bantuan-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.bantuan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bantuan-badge-measurement { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+.bantuan-badge-structural { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+.bantuan-badge-advanced { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+.bantuan-badge-instrument { background: rgba(139, 92, 246, 0.12); color: #8b5cf6; }
+.bantuan-badge-bootstrap { background: rgba(236, 72, 153, 0.12); color: #ec4899; }
+.bantuan-badge-ref { background: rgba(20, 184, 166, 0.12); color: #14b8a6; }
+
+.bantuan-card-title {
+  font-size: 16.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 6px 0 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bantuan-formula-box {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px 18px;
+  margin: 14px 0;
+  font-family: 'Cambria Math', 'Times New Roman', serif;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bantuan-formula-title {
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.bantuan-formula-content {
+  font-size: 14.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+  color: var(--text-primary);
+}
+
+.bantuan-formula-vars {
+  font-family: var(--font-family);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  border-top: 1px dashed var(--border-color);
+  padding-top: 6px;
+  margin-top: 4px;
+}
+
+.bantuan-rule-box {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin: 12px 0;
+  color: var(--text-primary);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.bantuan-rule-box .material-icons-round {
+  font-size: 18px;
+  color: #10b981;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.bantuan-steps {
+  margin: 10px 0 14px 0;
+  padding-left: 20px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.bantuan-steps li {
+  margin-bottom: 4px;
+}
+
+.bantuan-ref-item {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bantuan-ref-text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.bantuan-ref-text em {
+  font-style: italic;
+  color: var(--color-primary);
+}
+

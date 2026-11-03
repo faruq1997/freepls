@@ -60,6 +60,10 @@
           <span class="material-icons-round">assessment</span>
           <span class="sidebar-label">Hasil & Laporan</span>
         </button>
+        <button class="sidebar-item" data-halaman="bantuan" title="Buku Panduan, Rumus & Teori Lengkap">
+          <span class="material-icons-round">menu_book</span>
+          <span class="sidebar-label">Bantuan</span>
+        </button>
       </div>
       <div class="sidebar-footer">
         <button class="sidebar-item" id="btnToggleSidebarMenu" title="Sembunyikan/Tampilkan Menu (Ctrl+B)">
@@ -1089,7 +1093,846 @@
           </div>
         </div>
       </section>
-      
+
+      <!-- HALAMAN BANTUAN -->
+      <section class="halaman tersembunyi" id="halaman-bantuan">
+        <div class="bantuan-container">
+
+          <!-- Hero / Search -->
+          <div class="bantuan-hero">
+            <div class="bantuan-hero-title">
+              <span class="material-icons-round" style="color:#6366f1;font-size:28px;">menu_book</span>
+              Panduan Lengkap PLS-SEM
+            </div>
+            <p class="bantuan-hero-desc">
+              Referensi teori, rumus perhitungan, kriteria penerimaan, dan sitasi akademik untuk seluruh analisis dalam FreePLS Indonesia. Gunakan sebagai panduan interpretasi hasil penelitian Anda.
+            </p>
+            <div class="bantuan-search-box">
+              <span class="material-icons-round" style="color:var(--text-muted);font-size:18px;">search</span>
+              <input type="text" class="bantuan-search-input" id="bantuanSearchInput" placeholder="Cari topik, rumus, atau istilah (misal: AVE, loading, bootstrapping)..." autocomplete="off" />
+            </div>
+            <div class="bantuan-pills-nav">
+              <button class="bantuan-pill active" data-kategori="semua"><span class="material-icons-round" style="font-size:14px;">all_inclusive</span>Semua</button>
+              <button class="bantuan-pill" data-kategori="dasar"><span class="material-icons-round" style="font-size:14px;">foundation</span>Dasar PLS-SEM</button>
+              <button class="bantuan-pill" data-kategori="model-pengukuran"><span class="material-icons-round" style="font-size:14px;">rule</span>Model Pengukuran</button>
+              <button class="bantuan-pill" data-kategori="model-struktural"><span class="material-icons-round" style="font-size:14px;">account_tree</span>Model Struktural</button>
+              <button class="bantuan-pill" data-kategori="bootstrap"><span class="material-icons-round" style="font-size:14px;">shuffle</span>Bootstrap & Inferensi</button>
+              <button class="bantuan-pill" data-kategori="analisis-lanjutan"><span class="material-icons-round" style="font-size:14px;">science</span>Analisis Lanjutan</button>
+              <button class="bantuan-pill" data-kategori="referensi"><span class="material-icons-round" style="font-size:14px;">auto_stories</span>Referensi</button>
+            </div>
+          </div>
+
+          <div id="bantuanKonten">
+
+            <!-- ─── DASAR PLS-SEM ─────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="dasar" data-tags="pls sem structural equation modeling pengertian definisi">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-measurement">Dasar</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#6366f1;">lightbulb</span>Apa itu PLS-SEM?</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                <strong>Partial Least Squares – Structural Equation Modeling (PLS-SEM)</strong> adalah metode analisis multivariat yang mengestimasi model jalur (path model) menggunakan pendekatan berbasis komponen. PLS-SEM cocok untuk:
+              </p>
+              <ul class="bantuan-steps">
+                <li>Sampel kecil (minimal ≥ 30 responden, ideal ≥ 100)</li>
+                <li>Data tidak memenuhi asumsi normalitas multivariat</li>
+                <li>Model kompleks dengan banyak konstruk dan indikator</li>
+                <li>Tujuan prediksi dan eksplorasi teori</li>
+              </ul>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">info</span>
+                <span>Gunakan <strong>CB-SEM</strong> (LISREL, AMOS) bila tujuan konfirmasi teori dengan asumsi normalitas terpenuhi dan sampel besar (≥ 200). Gunakan <strong>PLS-SEM</strong> untuk prediksi, eksplorasi, dan kondisi data terbatas.</span>
+              </div>
+
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Persamaan Dasar Model PLS</span>
+                <div class="bantuan-formula-content">
+                  <span>y = B η + Γ ξ + ζ</span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>y</strong> = skor indikator endogen &nbsp;|&nbsp; <strong>η</strong> = variabel laten endogen &nbsp;|&nbsp; <strong>ξ</strong> = variabel laten eksogen<br>
+                  <strong>B</strong> = matriks koefisien jalur antar konstruk endogen &nbsp;|&nbsp; <strong>Γ</strong> = matriks koefisien jalur eksogen ke endogen<br>
+                  <strong>ζ</strong> = vektor error (residual) struktural
+                </p>
+              </div>
+            </div>
+
+            <!-- ─── OUTER LOADING ───────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="model-pengukuran" data-tags="outer loading faktor loading reflektif pearson korelasi">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-measurement">Model Pengukuran</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#3b82f6;">cable</span>Outer Loading (Faktor Loading)</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                Outer loading adalah korelasi antara indikator dengan konstruk latennya. Pada model <em>reflektif</em>, outer loading mencerminkan seberapa kuat sebuah indikator merepresentasikan konstruknya.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Rumus Outer Loading (Pearson Correlation)</span>
+                <div class="bantuan-formula-content">
+                  <span>λ<sub>j</sub> =</span>
+                  <span class="math-frac">
+                    <span class="math-num">Σ(x<sub>j</sub> − x̄<sub>j</sub>)(η − η̄)</span>
+                    <span class="math-den"><span class="math-root"><span class="math-root-sign">√</span><span class="math-root-content">Σ(x<sub>j</sub> − x̄<sub>j</sub>)² · Σ(η − η̄)²</span></span></span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>λ<sub>j</sub></strong> = outer loading indikator ke-j &nbsp;|&nbsp; <strong>x<sub>j</sub></strong> = nilai indikator &nbsp;|&nbsp; <strong>η</strong> = skor konstruk laten
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria Penerimaan:</strong> Outer loading ≥ 0.70 (Hair et al., 2022). Nilai 0.40–0.69 masih dapat diterima bila AVE dan CR konstruk tetap memenuhi syarat. Loading &lt; 0.40 → indikator dipertimbangkan untuk dihapus.</span>
+              </div>
+            </div>
+
+            <!-- ─── AVERAGE VARIANCE EXTRACTED (AVE) ──────────────── -->
+            <div class="bantuan-card" data-kategori="model-pengukuran" data-tags="AVE average variance extracted validitas konvergen convergent validity">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-measurement">Model Pengukuran</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#3b82f6;">verified</span>AVE — Average Variance Extracted</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                AVE mengukur proporsi rata-rata variansi indikator yang ditangkap oleh konstruk laten dibandingkan dengan variansi error. AVE merupakan indikator utama <strong>validitas konvergen</strong>.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Rumus AVE (Fornell & Larcker, 1981)</span>
+                <div class="bantuan-formula-content">
+                  <span>AVE =</span>
+                  <span class="math-frac">
+                    <span class="math-num">Σ λ<sub>j</sub>²</span>
+                    <span class="math-den">Σ λ<sub>j</sub>² + Σ var(ε<sub>j</sub>)</span>
+                  </span>
+                  <span>=</span>
+                  <span class="math-frac">
+                    <span class="math-num">Σ λ<sub>j</sub>²</span>
+                    <span class="math-den">n</span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>λ<sub>j</sub></strong> = outer loading indikator ke-j &nbsp;|&nbsp; <strong>n</strong> = jumlah indikator konstruk &nbsp;|&nbsp; <strong>var(ε<sub>j</sub>)</strong> = variansi error = 1 − λ<sub>j</sub>²
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria Penerimaan:</strong> AVE ≥ 0.50 (Fornell & Larcker, 1981). Artinya konstruk menjelaskan lebih dari 50% variansi indikatornya (signal &gt; noise).</span>
+              </div>
+            </div>
+
+            <!-- ─── COMPOSITE RELIABILITY ──────────────────────────── -->
+            <div class="bantuan-card" data-kategori="model-pengukuran" data-tags="composite reliability CR reliabilitas konstruk">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-measurement">Model Pengukuran</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#3b82f6;">security</span>Composite Reliability (CR / ρ<sub>c</sub>)</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                Composite Reliability mengukur konsistensi internal suatu konstruk reflektif. Berbeda dari Alpha Cronbach, CR memperhitungkan perbedaan bobot outer loading tiap indikator sehingga lebih akurat untuk PLS.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Rumus Composite Reliability (Werts et al., 1974)</span>
+                <div class="bantuan-formula-content">
+                  <span>CR =</span>
+                  <span class="math-frac">
+                    <span class="math-num">(Σ λ<sub>j</sub>)²</span>
+                    <span class="math-den">(Σ λ<sub>j</sub>)² + Σ (1 − λ<sub>j</sub>²)</span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>λ<sub>j</sub></strong> = outer loading indikator ke-j &nbsp;|&nbsp; <strong>(1 − λ<sub>j</sub>²)</strong> = variansi error indikator ke-j
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria Penerimaan:</strong> CR ≥ 0.70 (Hair et al., 2022). Nilai CR &gt; 0.95 perlu dicermati karena mengindikasikan indikator yang terlalu mirip (<em>redundancy</em>). Range ideal: 0.70–0.95.</span>
+              </div>
+            </div>
+
+            <!-- ─── CRONBACH ALPHA ──────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="model-pengukuran" data-tags="cronbach alpha alpha if item deleted reliabilitas internal">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-instrument">Uji Instrumen</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#8b5cf6;">verified_user</span>Cronbach's Alpha (α)</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                Cronbach's Alpha mengukur konsistensi internal dengan asumsi semua indikator memiliki bobot sama (equal weighting). Dalam PLS-SEM, Alpha Cronbach digunakan sebagai batas bawah reliabilitas (lower bound).
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Rumus Cronbach's Alpha</span>
+                <div class="bantuan-formula-content">
+                  <span>α =</span>
+                  <span class="math-frac">
+                    <span class="math-num">k</span>
+                    <span class="math-den">k − 1</span>
+                  </span>
+                  <span>×</span>
+                  <span>(1 −</span>
+                  <span class="math-frac">
+                    <span class="math-num">Σ s<sub>i</sub>²</span>
+                    <span class="math-den">s<sub>total</sub>²</span>
+                  </span>
+                  <span>)</span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>k</strong> = jumlah item (indikator) &nbsp;|&nbsp; <strong>s<sub>i</sub>²</strong> = variansi item ke-i &nbsp;|&nbsp; <strong>s<sub>total</sub>²</strong> = variansi total skor
+                </p>
+              </div>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Alpha if Item Deleted</span>
+                <div class="bantuan-formula-content">
+                  <span>α<sub>(j)</sub> = α saat indikator ke-j dihapus dari konstruk</span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  Jika α<sub>(j)</sub> &gt; α<sub>total</sub>, maka indikator ke-j menurunkan reliabilitas → pertimbangkan penghapusan
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria:</strong> α ≥ 0.70 untuk riset dasar; α ≥ 0.80 untuk riset terapan (Hair et al., 2022). Gunakan bersama CR — keduanya harus memenuhi batas minimum.</span>
+              </div>
+            </div>
+
+            <!-- ─── VALIDITAS DISKRIMINAN ──────────────────────────── -->
+            <div class="bantuan-card" data-kategori="model-pengukuran" data-tags="validitas diskriminan discriminant validity HTMT fornell larcker cross loading">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-measurement">Model Pengukuran</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#3b82f6;">compare_arrows</span>Validitas Diskriminan</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                Validitas diskriminan memastikan bahwa setiap konstruk unik dan tidak berkorelasi terlalu tinggi dengan konstruk lain. Tiga metode utama yang digunakan:
+              </p>
+
+              <p style="font-size:12.5px;font-weight:700;color:var(--text-primary);margin:12px 0 4px;">① Cross Loadings</p>
+              <div class="bantuan-rule-box" style="margin-top:0">
+                <span class="material-icons-round">check_circle</span>
+                <span>Loading setiap indikator pada konstruk sendiri harus <strong>lebih tinggi</strong> dari loading-nya terhadap konstruk lain. (Chin, 1998)</span>
+              </div>
+
+              <p style="font-size:12.5px;font-weight:700;color:var(--text-primary);margin:14px 0 4px;">② Fornell-Larcker Criterion</p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Syarat Fornell-Larcker</span>
+                <div class="bantuan-formula-content">
+                  <span><span class="math-root"><span class="math-root-sign">√</span><span class="math-root-content">AVE<sub>A</sub></span></span> &gt; r<sub>AB</sub></span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  Akar AVE setiap konstruk (A) harus &gt; korelasi konstruk tersebut dengan konstruk lain (r<sub>AB</sub>)
+                </p>
+              </div>
+
+              <p style="font-size:12.5px;font-weight:700;color:var(--text-primary);margin:14px 0 4px;">③ HTMT — Heterotrait-Monotrait Ratio (Rekomendasi Terkini)</p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Rumus HTMT (Henseler et al., 2015)</span>
+                <div class="bantuan-formula-content">
+                  <span>HTMT<sub>jk</sub> =</span>
+                  <span class="math-frac">
+                    <span class="math-num">r̄<sub>HeteroTrait</sub></span>
+                    <span class="math-den"><span class="math-root"><span class="math-root-sign">√</span><span class="math-root-content">r̄<sub>MT,A</sub> · r̄<sub>MT,B</sub></span></span></span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>r̄<sub>HeteroTrait</sub></strong> = rata-rata korelasi antar indikator lintas konstruk yang berbeda<br>
+                  <strong>r̄<sub>MT</sub></strong> = rata-rata korelasi <em>monotrait</em> (antar indikator dalam konstruk yang sama)
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria HTMT:</strong> HTMT &lt; 0.85 (kriteria konservatif, Henseler et al., 2015) atau HTMT &lt; 0.90 (kriteria moderat, Gold et al., 2001). HTMT adalah standar validitas diskriminan terbaru yang direkomendasikan menggantikan Fornell-Larcker untuk PLS-SEM.</span>
+              </div>
+            </div>
+
+            <!-- ─── ALGORITMA PLS ───────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="dasar" data-tags="algoritma PLS iterasi outer weight inner weight konvergensi">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-measurement">Dasar PLS-SEM</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#6366f1;">settings_suggest</span>Algoritma PLS-SEM</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                Algoritma PLS-SEM bekerja secara iteratif untuk mengestimasi skor konstruk laten. Prosesnya terdiri dari dua tahap iterasi:
+              </p>
+              <ol class="bantuan-steps">
+                <li><strong>Inisialisasi:</strong> Setiap konstruk diberi bobot awal (outer weight = 1 / √jumlah indikator)</li>
+                <li><strong>Iterasi Inner (Structural):</strong> Skor konstruk diperbarui berdasarkan hubungan struktural menggunakan centroid/factor/path weighting scheme</li>
+                <li><strong>Iterasi Outer (Measurement):</strong> Bobot indikator diperbarui berdasarkan korelasi dengan skor konstruk saat ini</li>
+                <li><strong>Uji Konvergensi:</strong> Ulang langkah 2–3 hingga perubahan outer weight &lt; 10<sup>−5</sup></li>
+                <li><strong>Estimasi Akhir:</strong> Hitung outer loading, koefisien jalur (OLS), dan ukuran model fit</li>
+              </ol>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Outer Weight (Mode A — Reflektif)</span>
+                <div class="bantuan-formula-content">
+                  <span>w<sub>j</sub> =</span>
+                  <span class="math-frac">
+                    <span class="math-num">Cov(x<sub>j</sub>, η)</span>
+                    <span class="math-den">Σ Cov(x<sub>j</sub>, η)²</span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>w<sub>j</sub></strong> = bobot outer indikator ke-j &nbsp;|&nbsp; Mode A (reflektif): bobot proporsional korelasi dengan konstruk<br>
+                  Mode B (formatif): bobot dihitung via OLS regresi indikator terhadap konstruk
+                </p>
+              </div>
+            </div>
+
+            <!-- ─── PATH COEFFICIENTS ──────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="model-struktural" data-tags="path coefficient koefisien jalur beta OLS regresi">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-structural">Model Struktural</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#10b981;">trending_up</span>Koefisien Jalur (Path Coefficients)</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                Koefisien jalur (β) merepresentasikan kekuatan dan arah hubungan antar konstruk laten dalam model struktural. Dihitung menggunakan Ordinary Least Squares (OLS) dari skor konstruk laten.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Estimasi OLS — Koefisien Jalur</span>
+                <div class="bantuan-formula-content">
+                  <span>β = (X<sup>T</sup>X)<sup>−1</sup> X<sup>T</sup>Y</span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>X</strong> = matriks skor konstruk eksogen &nbsp;|&nbsp; <strong>Y</strong> = vektor skor konstruk endogen<br>
+                  Hasilnya adalah koefisien terstandarisasi karena skor laten sudah dalam unit standar
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Interpretasi:</strong> β = 0.20 (efek kecil), β = 0.50 (efek sedang), β = 0.80 (efek besar) — Hair et al. (2022). Signifikansi diuji via bootstrapping (t-stat &gt; 1.96 untuk α = 0.05).</span>
+              </div>
+            </div>
+
+            <!-- ─── R-SQUARED ──────────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="model-struktural" data-tags="R squared R2 koefisien determinasi efek ukuran">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-structural">Model Struktural</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#10b981;">donut_large</span>R² — Koefisien Determinasi</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                R² (R-squared) mengukur proporsi variansi konstruk endogen yang dijelaskan oleh seluruh variabel prediktor (eksogen) dalam model. R² berkisar antara 0 dan 1.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Rumus R²</span>
+                <div class="bantuan-formula-content">
+                  <span>R² = 1 −</span>
+                  <span class="math-frac">
+                    <span class="math-num">SS<sub>res</sub></span>
+                    <span class="math-den">SS<sub>tot</sub></span>
+                  </span>
+                  <span>=</span>
+                  <span class="math-frac">
+                    <span class="math-num">Σ(Ŷ − Ȳ)²</span>
+                    <span class="math-den">Σ(Y − Ȳ)²</span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>SS<sub>res</sub></strong> = jumlah kuadrat residual &nbsp;|&nbsp; <strong>SS<sub>tot</sub></strong> = jumlah kuadrat total<br>
+                  <strong>Ŷ</strong> = nilai prediksi &nbsp;|&nbsp; <strong>Ȳ</strong> = rata-rata nilai aktual
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria Hair et al. (2022):</strong> R² ≥ 0.75 = substansial (kuat); 0.50–0.74 = moderat; 0.25–0.49 = lemah; &lt; 0.25 = sangat lemah. Batas minimum yang dapat diterima bergantung pada disiplin ilmu.</span>
+              </div>
+
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">R² Disesuaikan (Adjusted R²)</span>
+                <div class="bantuan-formula-content">
+                  <span>R²<sub>adj</sub> = 1 − (1 − R²) ×</span>
+                  <span class="math-frac">
+                    <span class="math-num">n − 1</span>
+                    <span class="math-den">n − k − 1</span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>n</strong> = jumlah sampel &nbsp;|&nbsp; <strong>k</strong> = jumlah variabel prediktor<br>
+                  R²<sub>adj</sub> mengoreksi bias akibat penambahan variabel prediktor; lebih konservatif dari R²
+                </p>
+              </div>
+            </div>
+
+            <!-- ─── F² EFFECT SIZE ─────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="model-struktural" data-tags="f squared effect size ukuran efek cohen">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-structural">Model Struktural</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#10b981;">zoom_in</span>f² — Ukuran Efek (Effect Size)</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                f² mengukur seberapa besar pengaruh satu konstruk prediktor terhadap R² konstruk endogen. f² melengkapi informasi koefisien jalur dengan mengukur kontribusi relatif tiap prediktor.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Rumus f² (Cohen, 1988)</span>
+                <div class="bantuan-formula-content">
+                  <span>f² =</span>
+                  <span class="math-frac">
+                    <span class="math-num">R²<sub>included</sub> − R²<sub>excluded</sub></span>
+                    <span class="math-den">1 − R²<sub>included</sub></span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>R²<sub>included</sub></strong> = R² saat prediktor X disertakan &nbsp;|&nbsp; <strong>R²<sub>excluded</sub></strong> = R² saat prediktor X dihapus
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria Cohen (1988):</strong> f² = 0.02 (kecil), f² = 0.15 (sedang), f² = 0.35 (besar). Nilai di bawah 0.02 menandakan konstruk prediktor tidak memberikan kontribusi praktis berarti.</span>
+              </div>
+            </div>
+
+            <!-- ─── VIF ────────────────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="model-pengukuran" data-tags="VIF variance inflation factor multikolinearitas collinearity formatif">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-measurement">Model Pengukuran</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#3b82f6;">warning_amber</span>VIF — Variance Inflation Factor</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                VIF digunakan untuk mendeteksi <em>multikolinearitas</em> antar indikator (khususnya pada model formatif) dan antar konstruk prediktor dalam model struktural.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Rumus VIF</span>
+                <div class="bantuan-formula-content">
+                  <span>VIF<sub>j</sub> =</span>
+                  <span class="math-frac">
+                    <span class="math-num">1</span>
+                    <span class="math-den">1 − R²<sub>j</sub></span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>R²<sub>j</sub></strong> = R² dari regresi indikator ke-j terhadap semua indikator lain dalam konstruk yang sama
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria:</strong> VIF &lt; 5.0 (Hair et al., 2022, standar umum PLS-SEM). Nilai yang lebih konservatif: VIF &lt; 3.3. VIF ≥ 5 mengindikasikan multikolinearitas masalah yang perlu ditangani (hapus/gabung indikator).</span>
+              </div>
+            </div>
+
+            <!-- ─── BOOTSTRAPPING ─────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="bootstrap" data-tags="bootstrapping bootstrap t statistic p value confidence interval signifikansi">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-bootstrap">Bootstrap & Inferensi</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#ec4899;">shuffle</span>Bootstrapping — Uji Signifikansi</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                PLS-SEM tidak mengasumsikan distribusi normal, sehingga uji signifikansi dilakukan melalui <strong>bootstrapping nonparametrik</strong>. Prosedur: sampling ulang dengan pengembalian (with replacement) dari data asli sebanyak B iterasi (minim 500, disarankan 5000).
+              </p>
+              <ol class="bantuan-steps">
+                <li>Sampling B sampel bootstrap (ukuran sama dengan data asli, with replacement)</li>
+                <li>Hitung estimasi parameter (β) pada tiap sampel bootstrap</li>
+                <li>Hitung standar error dari distribusi B estimasi bootstrap</li>
+                <li>Hitung t-statistik dan CI 95%</li>
+              </ol>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">t-Statistik Bootstrap</span>
+                <div class="bantuan-formula-content">
+                  <span>t =</span>
+                  <span class="math-frac">
+                    <span class="math-num">β̂<sub>original</sub></span>
+                    <span class="math-den">SE<sub>bootstrap</sub></span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>β̂<sub>original</sub></strong> = estimasi koefisien dari sampel asli &nbsp;|&nbsp; <strong>SE<sub>bootstrap</sub></strong> = standar deviasi dari distribusi estimasi bootstrap
+                </p>
+              </div>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Confidence Interval 95% (Bias-Corrected Percentile)</span>
+                <div class="bantuan-formula-content">
+                  <span>CI 95% = [ P<sub>2.5%</sub>, P<sub>97.5%</sub> ] dari distribusi bootstrap</span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  Jalur signifikan jika CI 95% tidak melewati nol. Setara dengan p &lt; 0.05 (dua sisi).
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria Signifikansi:</strong> |t| &gt; 1.96 (p &lt; 0.05, dua sisi) atau CI 95% tidak mencakup nilai nol. Gunakan minimum 500 bootstrap; Hair et al. (2022) merekomendasikan 5000.</span>
+              </div>
+            </div>
+
+            <!-- ─── EFEK MEDIASI ──────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="model-struktural" data-tags="mediasi efek tidak langsung indirect effect VAF mediation">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-structural">Model Struktural</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#10b981;">mediation</span>Efek Mediasi & VAF</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                Efek mediasi terjadi ketika variabel M menjadi perantara hubungan antara X dan Y. Kekuatan mediasi diukur menggunakan <strong>Variance Accounted For (VAF)</strong>.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Efek Tidak Langsung (Indirect Effect)</span>
+                <div class="bantuan-formula-content">
+                  <span>IE = a × b</span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>a</strong> = koefisien jalur X → M &nbsp;|&nbsp; <strong>b</strong> = koefisien jalur M → Y<br>
+                  <strong>TE (Total Effect)</strong> = DE + IE = c' + (a × b)
+                </p>
+              </div>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">VAF — Variance Accounted For</span>
+                <div class="bantuan-formula-content">
+                  <span>VAF =</span>
+                  <span class="math-frac">
+                    <span class="math-num">IE</span>
+                    <span class="math-den">TE</span>
+                  </span>
+                  <span>=</span>
+                  <span class="math-frac">
+                    <span class="math-num">a × b</span>
+                    <span class="math-den">a × b + c'</span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>c'</strong> = efek langsung X → Y saat M hadir
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Interpretasi VAF (Hair et al., 2022):</strong> VAF &lt; 0.20 = tidak ada mediasi; 0.20–0.80 = mediasi parsial; &gt; 0.80 = mediasi penuh. Signifikansi IE diuji via bootstrap CI 95% (Preacher & Hayes, 2008).</span>
+              </div>
+            </div>
+
+            <!-- ─── PLSc ───────────────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="analisis-lanjutan" data-tags="PLSc consistent pls rho A dijkstra henseler attenuation bias CB-SEM">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-advanced">Analisis Lanjutan</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#f59e0b;">tune</span>Consistent PLS (PLSc)</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                PLSc mengoreksi bias atenuasi (<em>attenuation bias</em>) yang terjadi pada PLS-SEM standar untuk konstruk reflektif menggunakan koefisien reliabilitas Dijkstra-Henseler (ρ<sub>A</sub>). Hasil PLSc konsisten secara statistik dan mendekati estimasi CB-SEM.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Rumus ρ_A (Dijkstra-Henseler, 2015)</span>
+                <div class="bantuan-formula-content">
+                  <span>ρ<sub>A</sub> =</span>
+                  <span class="math-frac">
+                    <span class="math-num">w'Sw − 1</span>
+                    <span class="math-den">w'Sw − w'w</span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>w</strong> = vektor outer weight &nbsp;|&nbsp; <strong>S</strong> = matriks korelasi antar indikator dalam konstruk<br>
+                  <strong>w'Sw</strong> = bentuk kuadratik: weighted sum of inter-indicator correlations<br>
+                  <strong>w'w</strong> = jumlah kuadrat weight
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span>ρ<sub>A</sub> ≥ 0.70 mengindikasikan reliabilitas yang cukup. PLSc direkomendasikan saat model reflektif dibandingkan dengan hasil CB-SEM atau saat peneliti menginginkan estimasi yang konsisten secara statistik (Dijkstra & Henseler, 2015).</span>
+              </div>
+            </div>
+
+            <!-- ─── IPMA ───────────────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="analisis-lanjutan" data-tags="IPMA importance performance map analysis peta prioritas">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-advanced">Analisis Lanjutan</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#f59e0b;">map</span>IPMA — Importance-Performance Map Analysis</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                IPMA menggabungkan informasi <strong>importance</strong> (total efek ke target) dan <strong>performance</strong> (rata-rata skor rescaled 0–100) untuk mengidentifikasi prioritas perbaikan. Variabel yang penting (importance tinggi) tetapi berkinerja rendah (performance rendah) memerlukan perhatian utama.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Importance = Total Effect (Hair et al., 2019)</span>
+                <div class="bantuan-formula-content">
+                  <span>Importance<sub>X→Y</sub> = DE<sub>XY</sub> + Σ (IE<sub>XMY</sub>)</span>
+                </div>
+              </div>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Performance — Rescaling (0–100)</span>
+                <div class="bantuan-formula-content">
+                  <span>P<sub>i</sub> =</span>
+                  <span class="math-frac">
+                    <span class="math-num">x̄<sub>i</sub> − x<sub>min</sub></span>
+                    <span class="math-den">x<sub>max</sub> − x<sub>min</sub></span>
+                  </span>
+                  <span>× 100</span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>x̄<sub>i</sub></strong> = rata-rata indikator &nbsp;|&nbsp; <strong>x<sub>min/max</sub></strong> = nilai minimum/maksimum teoretis atau empiris skala
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Interpretasi:</strong> Kuadran Kiri Atas = prioritas utama (tingkatkan segera). Kanan Atas = pertahankan. Kiri Bawah = prioritas rendah. Kanan Bawah = potensi terlalu berlebih. (Ringle & Sarstedt, 2016)</span>
+              </div>
+            </div>
+
+            <!-- ─── MGA ────────────────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="analisis-lanjutan" data-tags="MGA multi group analysis kelompok henseler parametric perbedaan">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-advanced">Analisis Lanjutan</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#f59e0b;">group</span>Multi-Group Analysis (MGA)</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                MGA menguji apakah koefisien jalur berbeda secara signifikan antara dua atau lebih kelompok (misal: pria vs wanita, kota vs desa). Metode yang digunakan adalah Henseler's Parametric MGA.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">t-Statistik MGA (Henseler et al., 2009)</span>
+                <div class="bantuan-formula-content">
+                  <span>t<sub>MGA</sub> =</span>
+                  <span class="math-frac">
+                    <span class="math-num">|β̂<sub>G1</sub> − β̂<sub>G2</sub>|</span>
+                    <span class="math-den"><span class="math-root"><span class="math-root-sign">√</span><span class="math-root-content">SE²<sub>G1</sub> + SE²<sub>G2</sub></span></span></span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>β̂<sub>G1</sub>, β̂<sub>G2</sub></strong> = koefisien jalur grup 1 dan 2 &nbsp;|&nbsp; <strong>SE<sub>G1</sub>, SE<sub>G2</sub></strong> = standar error bootstrap masing-masing grup<br>
+                  Derajat kebebasan: df = n<sub>G1</sub> + n<sub>G2</sub> − 4
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria:</strong> p &lt; 0.05 → koefisien jalur berbeda signifikan antar kelompok. Prasyarat: <em>measurement invariance</em> harus diuji terlebih dahulu (Henseler et al., 2016). Minimal 5 sampel per kelompok; ideal ≥ 30 per kelompok.</span>
+              </div>
+            </div>
+
+            <!-- ─── PLSpredict ─────────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="analisis-lanjutan" data-tags="PLSpredict Q2 predict RMSE MAE naive benchmark cross validation predictive relevance">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-advanced">Analisis Lanjutan</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#f59e0b;">batch_prediction</span>PLSpredict — Relevansi Prediktif Out-of-Sample</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                PLSpredict menggunakan k-fold cross-validation untuk mengevaluasi kemampuan prediksi model PLS-SEM secara <em>out-of-sample</em>. Berbeda dari Q² Blindfolding (in-sample), PLSpredict memberikan ukuran prediksi yang lebih realistis.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Q²_predict (Hair et al., 2019)</span>
+                <div class="bantuan-formula-content">
+                  <span>Q²<sub>predict</sub> = 1 −</span>
+                  <span class="math-frac">
+                    <span class="math-num">Σ(y − ŷ<sub>PLS</sub>)²</span>
+                    <span class="math-den">Σ(y − ȳ)²</span>
+                  </span>
+                </div>
+              </div>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">RMSE (Root Mean Square Error)</span>
+                <div class="bantuan-formula-content">
+                  <span>RMSE =</span>
+                  <span class="math-root">
+                    <span class="math-root-sign">√</span>
+                    <span class="math-root-content">
+                      <span class="math-frac">
+                        <span class="math-num">Σ(y − ŷ)²</span>
+                        <span class="math-den">n</span>
+                      </span>
+                    </span>
+                  </span>
+                </div>
+                <p class="bantuan-formula-vars">Bandingkan RMSE<sub>PLS</sub> dengan RMSE<sub>Naive</sub> (prediksi menggunakan mean — <em>naive benchmark</em>). Model PLS lebih baik jika RMSE<sub>PLS</sub> &lt; RMSE<sub>Naive</sub>.</p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria Relevansi Prediktif:</strong> Q²<sub>predict</sub> &gt; 0 DAN RMSE<sub>PLS</sub> &lt; RMSE<sub>Naive</sub> → model memiliki relevansi prediktif. Q²<sub>predict</sub> ≥ 0.25 (medium), ≥ 0.50 (besar) — Shmueli et al. (2019).</span>
+              </div>
+            </div>
+
+            <!-- ─── CMV HARMAN ─────────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="analisis-lanjutan" data-tags="CMV common method bias harman single factor eigenvalue variance">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-advanced">Analisis Lanjutan</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#f59e0b;">warning_amber</span>Harman Single Factor Test — CMV</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                <strong>Common Method Bias (CMV)</strong> terjadi saat variansi data lebih banyak dijelaskan oleh metode pengumpulan data (misal: kuesioner tunggal) daripada konstruk yang diukur. Harman Single Factor Test adalah pengujian yang paling sering diminta reviewer jurnal Indonesia.
+              </p>
+              <div class="bantuan-formula-box">
+                <span class="bantuan-formula-title">Prosedur Harman (Podsakoff et al., 2003)</span>
+                <div class="bantuan-formula-content">
+                  <span>% Variansi F<sub>1</sub> =</span>
+                  <span class="math-frac">
+                    <span class="math-num">λ<sub>1</sub></span>
+                    <span class="math-den">k</span>
+                  </span>
+                  <span>× 100%</span>
+                </div>
+                <p class="bantuan-formula-vars">
+                  <strong>λ<sub>1</sub></strong> = eigenvalue terbesar dari matriks korelasi seluruh indikator (Power Iteration)<br>
+                  <strong>k</strong> = jumlah total indikator dalam model
+                </p>
+              </div>
+              <div class="bantuan-rule-box">
+                <span class="material-icons-round">check_circle</span>
+                <span><strong>Kriteria:</strong> Jika variansi faktor pertama &lt; 50% → CMV tidak menjadi ancaman serius. Jika ≥ 50% → CMV berpotensi mengancam validitas, pertimbangkan prosedur mitigasi (Harman, 1967; Podsakoff et al., 2003).</span>
+              </div>
+            </div>
+
+            <!-- ─── DESKRIPTIF STATISTIK ──────────────────────────── -->
+            <div class="bantuan-card" data-kategori="dasar" data-tags="deskriptif statistik mean median modus std z-score kurtosis skewness">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-measurement">Statistik Deskriptif</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#3b82f6;">bar_chart</span>Statistik Deskriptif</h3>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px;">
+                <div class="bantuan-formula-box" style="margin:0;">
+                  <span class="bantuan-formula-title">Mean (Rata-rata)</span>
+                  <div class="bantuan-formula-content">
+                    <span>x̄ =</span>
+                    <span class="math-frac"><span class="math-num">Σ x<sub>i</sub></span><span class="math-den">n</span></span>
+                  </div>
+                </div>
+                <div class="bantuan-formula-box" style="margin:0;">
+                  <span class="bantuan-formula-title">Standar Deviasi (SD)</span>
+                  <div class="bantuan-formula-content">
+                    <span>s =</span>
+                    <span class="math-root"><span class="math-root-sign">√</span><span class="math-root-content">
+                      <span class="math-frac"><span class="math-num">Σ(x<sub>i</sub> − x̄)²</span><span class="math-den">n − 1</span></span>
+                    </span></span>
+                  </div>
+                </div>
+                <div class="bantuan-formula-box" style="margin:0;">
+                  <span class="bantuan-formula-title">Z-Score (Standarisasi)</span>
+                  <div class="bantuan-formula-content">
+                    <span>z<sub>i</sub> =</span>
+                    <span class="math-frac"><span class="math-num">x<sub>i</sub> − x̄</span><span class="math-den">s</span></span>
+                  </div>
+                  <p class="bantuan-formula-vars">|z| &gt; 3.0 = outlier ekstrem</p>
+                </div>
+                <div class="bantuan-formula-box" style="margin:0;">
+                  <span class="bantuan-formula-title">SE Mean (Standard Error of Mean)</span>
+                  <div class="bantuan-formula-content">
+                    <span>SE =</span>
+                    <span class="math-frac"><span class="math-num">s</span><span class="math-den"><span class="math-root"><span class="math-root-sign">√</span><span class="math-root-content">n</span></span></span></span>
+                  </div>
+                  <p class="bantuan-formula-vars">Ketidakpastian estimasi rata-rata populasi</p>
+                </div>
+                <div class="bantuan-formula-box" style="margin:0;">
+                  <span class="bantuan-formula-title">Skewness (Kemencengan)</span>
+                  <div class="bantuan-formula-content">
+                    <span>Sk =</span>
+                    <span class="math-frac">
+                      <span class="math-num"><span class="math-frac"><span class="math-num">Σ(x<sub>i</sub>−x̄)³</span><span class="math-den">n</span></span></span>
+                      <span class="math-den">s³</span>
+                    </span>
+                  </div>
+                  <p class="bantuan-formula-vars">Normal jika |Sk| &lt; 2.0 (Hair et al., 2022)</p>
+                </div>
+                <div class="bantuan-formula-box" style="margin:0;">
+                  <span class="bantuan-formula-title">Excess Kurtosis</span>
+                  <div class="bantuan-formula-content">
+                    <span>K =</span>
+                    <span class="math-frac">
+                      <span class="math-num"><span class="math-frac"><span class="math-num">Σ(x<sub>i</sub>−x̄)⁴</span><span class="math-den">n</span></span></span>
+                      <span class="math-den">s⁴</span>
+                    </span>
+                    <span>− 3</span>
+                  </div>
+                  <p class="bantuan-formula-vars">Normal jika |K| &lt; 7.0 (Hair et al., 2022)</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ─── OUTLIER DETEKSI ────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="dasar" data-tags="outlier deteksi z score mahalonobis trimming winsorizing">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-instrument">Praproses Data</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#8b5cf6;">policy</span>Deteksi & Penanganan Outlier</h3>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--text-secondary);line-height:1.65;">
+                Outlier adalah observasi yang jauh menyimpang dari pola umum data dan dapat mendistorsi hasil analisis. Dua pendekatan utama:
+              </p>
+              <p style="font-size:12.5px;font-weight:700;color:var(--text-primary);margin:10px 0 4px;">Deteksi — Z-Score Univariat</p>
+              <div class="bantuan-formula-box">
+                <div class="bantuan-formula-content">
+                  <span>z<sub>i</sub> =</span>
+                  <span class="math-frac"><span class="math-num">x<sub>i</sub> − x̄</span><span class="math-den">s</span></span>
+                </div>
+                <p class="bantuan-formula-vars">Outlier moderat: |z| ≥ 2.5 &nbsp;|&nbsp; Outlier ekstrem: |z| ≥ 3.0 (Hair et al., 2022)</p>
+              </div>
+              <p style="font-size:12.5px;font-weight:700;color:var(--text-primary);margin:10px 0 4px;">Penanganan ① Data Trimming (Penghapusan)</p>
+              <div class="bantuan-rule-box" style="margin-top:0">
+                <span class="material-icons-round">delete_outline</span>
+                <span>Hapus baris yang memiliki |z| ≥ threshold pada kolom manapun. Efektif jika outlier adalah error entri data atau responden tidak serius mengisi kuesioner.</span>
+              </div>
+              <p style="font-size:12.5px;font-weight:700;color:var(--text-primary);margin:10px 0 4px;">Penanganan ② Winsorizing (Pembatasan Nilai)</p>
+              <div class="bantuan-formula-box">
+                <div class="bantuan-formula-content">
+                  <span>x<sub>i</sub><sup>*</sup> = max(x̄ − k·s, min(x<sub>i</sub>, x̄ + k·s))</span>
+                </div>
+                <p class="bantuan-formula-vars"><strong>k</strong> = threshold Z-score (misal 3.0). Nilai ekstrem diganti dengan batas atas/bawah — ukuran sampel N tetap terjaga.</p>
+              </div>
+            </div>
+
+            <!-- ─── REFERENSI ──────────────────────────────────────── -->
+            <div class="bantuan-card" data-kategori="referensi" data-tags="referensi bibliografi sitasi APA journal book hair henseler fornell">
+              <div class="bantuan-card-header">
+                <div>
+                  <span class="bantuan-badge bantuan-badge-ref">Referensi</span>
+                  <h3 class="bantuan-card-title"><span class="material-icons-round" style="font-size:18px;color:#14b8a6;">auto_stories</span>Referensi Akademik Utama</h3>
+                </div>
+              </div>
+              <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6;">Daftar pustaka yang menjadi fondasi teori dan prosedur yang diimplementasikan dalam FreePLS Indonesia.</p>
+
+              <div class="bantuan-ref-item">
+                <div class="bantuan-ref-text">Hair, J. F., Risher, J. J., Sarstedt, M., &amp; Ringle, C. M. (2019). When to use and how to report the results of PLS-SEM. <em>European Business Review</em>, 31(1), 2–24. <a href="https://doi.org/10.1108/EBR-11-2018-0203" style="color:var(--color-primary);">doi.org/10.1108/EBR-11-2018-0203</a></div>
+              </div>
+              <div class="bantuan-ref-item">
+                <div class="bantuan-ref-text">Hair, J. F., Hult, G. T. M., Ringle, C. M., &amp; Sarstedt, M. (2022). <em>A Primer on Partial Least Squares Structural Equation Modeling (PLS-SEM)</em> (3rd ed.). SAGE Publications.</div>
+              </div>
+              <div class="bantuan-ref-item">
+                <div class="bantuan-ref-text">Henseler, J., Ringle, C. M., &amp; Sarstedt, M. (2015). A new criterion for assessing discriminant validity in variance-based structural equation modeling. <em>Journal of the Academy of Marketing Science</em>, 43(1), 115–135.</div>
+              </div>
+              <div class="bantuan-ref-item">
+                <div class="bantuan-ref-text">Fornell, C., &amp; Larcker, D. F. (1981). Evaluating structural equation models with unobservable variables and measurement error. <em>Journal of Marketing Research</em>, 18(1), 39–50.</div>
+              </div>
+              <div class="bantuan-ref-item">
+                <div class="bantuan-ref-text">Dijkstra, T. K., &amp; Henseler, J. (2015). Consistent partial least squares path modeling. <em>MIS Quarterly</em>, 39(2), 297–316.</div>
+              </div>
+              <div class="bantuan-ref-item">
+                <div class="bantuan-ref-text">Ringle, C. M., &amp; Sarstedt, M. (2016). Gain more insight from your PLS-SEM results: The importance-performance map analysis. <em>Industrial Management &amp; Data Systems</em>, 116(9), 1865–1886.</div>
+              </div>
+              <div class="bantuan-ref-item">
+                <div class="bantuan-ref-text">Shmueli, G., Sarstedt, M., Hair, J. F., Cheah, J. H., Ting, H., Vaithilingam, S., &amp; Ringle, C. M. (2019). Predictive model assessment in PLS-SEM: guidelines for using PLSpredict. <em>European Journal of Marketing</em>, 53(11), 2322–2347.</div>
+              </div>
+              <div class="bantuan-ref-item">
+                <div class="bantuan-ref-text">Podsakoff, P. M., MacKenzie, S. B., Lee, J. Y., &amp; Podsakoff, N. P. (2003). Common method biases in behavioral research: A critical review and recommended remedies. <em>Journal of Applied Psychology</em>, 88(5), 879–903.</div>
+              </div>
+              <div class="bantuan-ref-item">
+                <div class="bantuan-ref-text">Cohen, J. (1988). <em>Statistical Power Analysis for the Behavioral Sciences</em> (2nd ed.). Lawrence Erlbaum Associates.</div>
+              </div>
+              <div class="bantuan-ref-item">
+                <div class="bantuan-ref-text">Preacher, K. J., &amp; Hayes, A. F. (2008). Asymptotic and resampling strategies for assessing and comparing indirect effects in multiple mediator models. <em>Behavior Research Methods</em>, 40(3), 879–891.</div>
+              </div>
+            </div>
+
+          </div><!-- /#bantuanKonten -->
+        </div>
+      </section>
+
     </main>
   </div>
   

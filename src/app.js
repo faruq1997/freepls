@@ -419,6 +419,7 @@ function navigateTo(halaman) {
       renderEmptyResultsState();
     }
   }
+  if (halaman === 'bantuan') initBantuan();
 }
 
 // ============ MODAL MANAGEMENT ============
@@ -10858,3 +10859,43 @@ document.querySelector('[data-halaman="analisis"]')?.addEventListener('click', (
     populateMGASelect();
   }, 50);
 });
+
+// ============ HALAMAN BANTUAN — SEARCH & FILTER ============
+function initBantuan() {
+  const searchInput = document.getElementById('bantuanSearchInput');
+  const pills = document.querySelectorAll('.bantuan-pill');
+  const cards = document.querySelectorAll('#bantuanKonten .bantuan-card');
+
+  function applyFilter() {
+    const q = (searchInput?.value || '').toLowerCase().trim();
+    const activeKategori = document.querySelector('.bantuan-pill.active')?.dataset.kategori || 'semua';
+
+    cards.forEach(card => {
+      const tags = (card.dataset.tags || '').toLowerCase();
+      const titleEl = card.querySelector('.bantuan-card-title');
+      const titleText = (titleEl?.textContent || '').toLowerCase();
+      const bodyText = (card.textContent || '').toLowerCase();
+
+      const matchesSearch = !q || tags.includes(q) || titleText.includes(q) || bodyText.includes(q);
+      const matchesKategori = activeKategori === 'semua' || card.dataset.kategori === activeKategori;
+
+      card.style.display = (matchesSearch && matchesKategori) ? '' : 'none';
+    });
+  }
+
+  pills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      pills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      applyFilter();
+    });
+  });
+
+  searchInput?.addEventListener('input', applyFilter);
+
+  // Reset filter setiap kali halaman dibuka
+  searchInput.value = '';
+  pills.forEach(p => p.classList.remove('active'));
+  document.querySelector('.bantuan-pill[data-kategori="semua"]')?.classList.add('active');
+  applyFilter();
+}
