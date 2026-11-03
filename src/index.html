@@ -2149,38 +2149,111 @@
     </div>
   </div>
 
-  <!-- ============ MODAL DETEKSI OUTLIER ============ -->
+  <!-- ============ MODAL DETEKSI & PENANGANAN OUTLIER ============ -->
   <div class="modal-overlay tersembunyi" id="modalDeteksiOutlier">
-    <div class="modal modal-lg">
+    <div class="modal modal-xl" style="max-width: 1050px; width: 95vw;">
       <div class="modal-header">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="material-icons-round" style="color: #ec4899;">rule</span>
-          <h3>Deteksi Pencilan Data (Outlier Detection)</h3>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(236, 72, 153, 0.12); color: #ec4899; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+            <span class="material-icons-round">rule</span>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Deteksi & Penanganan Pencilan Data (Outlier)</h3>
+            <span style="font-size: 11.5px; color: var(--text-muted);">Metode Univariat & Multivariat Z-Score (|Z| &ge; 3.0 standar Hair et al., 2022)</span>
+          </div>
         </div>
         <button class="btn btn-icon btn-ghost modal-close">
           <span class="material-icons-round">close</span>
         </button>
       </div>
-      <div class="modal-body">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0;">
-            Deteksi multivariate outlier berdasarkan ambang batas Z-Score (|Z| &ge; 3.0 standar Hair et al.).
-          </p>
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <label style="font-size: 12px; margin: 0;">Ambang Batas |Z|:</label>
-            <select class="form-input" id="selectThresholdOutlier" style="padding: 3px 8px; width: auto; font-size: 12px;">
-              <option value="2.5">2.5 (Sensitif)</option>
-              <option value="3.0" selected>3.0 (Standar Akademik)</option>
-              <option value="3.5">3.5 (Konservatif)</option>
+      <div class="modal-body" style="max-height: 75vh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 10px 14px; gap: 12px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="material-icons-round" style="color: var(--color-primary); font-size: 18px;">tune</span>
+            <span style="font-size: 12.5px; color: var(--text-secondary);">
+              Kriteria deteksi outlier berdasarkan nilai absolut standar skor Z (|Z|):
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label for="selectThresholdOutlier" style="font-size: 12px; margin: 0; font-weight: 600;">Ambang Batas |Z|:</label>
+            <select class="form-input" id="selectThresholdOutlier" style="padding: 4px 10px; width: auto; font-size: 12px; height: 32px;">
+              <option value="2.5">|Z| &ge; 2.5 (Sensitif - Sampel Kecil N &le; 80)</option>
+              <option value="3.0" selected>|Z| &ge; 3.0 (Standar Akademik Hair et al. - N &ge; 100)</option>
+              <option value="3.5">|Z| &ge; 3.5 (Konservatif - Hanya Outlier Sangat Ekstrem)</option>
             </select>
           </div>
         </div>
-        <div id="containerHasilOutlier" style="max-height: 360px; overflow-y: auto;">
+
+        <!-- Tabel Hasil Outlier -->
+        <div id="containerHasilOutlier" style="max-height: 320px; overflow-y: auto;">
           <!-- Diisi tabel outlier -->
         </div>
+
+        <!-- Panel Tindakan Lanjutan Penanganan Outlier (Muncul jika ada outlier) -->
+        <div id="containerAksiOutlier" style="display: none; background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; flex-direction: column; gap: 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-light); padding-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="material-icons-round" style="color: #8b5cf6; font-size: 20px;">bolt</span>
+              <div>
+                <strong style="font-size: 13.5px; color: var(--text-primary);">Pilihan Tindakan Lanjutan Praproses Outlier:</strong>
+                <div style="font-size: 11.5px; color: var(--text-muted);">Pilih salah satu metode ilmiah berikut untuk menindaklanjuti baris pencilan yang terpilih di atas:</div>
+              </div>
+            </div>
+            <div id="badgeSelectedOutliersCount" class="badge-chip badge-warning" style="font-weight: 700;">
+              0 Baris Terpilih
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+            <!-- Tindakan A: Trimming / Hapus Baris -->
+            <div style="background: var(--bg-surface-secondary, rgba(255,255,255,0.03)); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 6px; color: var(--color-danger); font-weight: 700; font-size: 13px; margin-bottom: 4px;">
+                  <span class="material-icons-round" style="font-size: 17px;">delete_sweep</span>
+                  1. Pemangkasan (Data Trimming)
+                </div>
+                <p style="font-size: 11.5px; color: var(--text-secondary); margin: 0; line-height: 1.5;">
+                  Menghapus baris observasi responden yang terindikasi outlier dari dataset. Efektif jika responden menjawab asal-asalan (*unengaged responses*).
+                </p>
+              </div>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button class="btn btn-sm btn-primary" id="btnHapusOutlierBuatBaru" style="flex: 1; font-size: 11.5px; background: #ef4444; border-color: #ef4444; white-space: nowrap;">
+                  <span class="material-icons-round" style="font-size: 14px;">add_circle</span> Simpan Dataset Baru (Aman)
+                </button>
+                <button class="btn btn-sm btn-outline" id="btnHapusOutlierTimpa" style="font-size: 11.5px; color: #ef4444; border-color: rgba(239,68,68,0.4); white-space: nowrap;" title="Timpa dataset aktif">
+                  <span class="material-icons-round" style="font-size: 14px;">sync</span> Timpa Dataset Ini
+                </button>
+              </div>
+            </div>
+
+            <!-- Tindakan B: Winsorizing / Capping -->
+            <div style="background: var(--bg-surface-secondary, rgba(255,255,255,0.03)); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 6px; color: #8b5cf6; font-weight: 700; font-size: 13px; margin-bottom: 4px;">
+                  <span class="material-icons-round" style="font-size: 17px;">auto_fix_high</span>
+                  2. Winsorizing (Penyesuaian Batas Ekstrem)
+                </div>
+                <p style="font-size: 11.5px; color: var(--text-secondary); margin: 0; line-height: 1.5;">
+                  Mengganti nilai pencilan dengan batas toleransi terdekat ($\bar{X} \pm \text{threshold} \times s$). <strong>Jumlah responden ($N$) tetap 100% utuh</strong> (Barnett & Lewis, 1994; Hair et al., 2022).
+                </p>
+              </div>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button class="btn btn-sm btn-primary" id="btnWinsorizeBuatBaru" style="flex: 1; font-size: 11.5px; background: #8b5cf6; border-color: #8b5cf6; white-space: nowrap;">
+                  <span class="material-icons-round" style="font-size: 14px;">add_circle</span> Winsorize & Simpan Baru
+                </button>
+                <button class="btn btn-sm btn-outline" id="btnWinsorizeTimpa" style="font-size: 11.5px; color: #8b5cf6; border-color: rgba(139,92,246,0.4); white-space: nowrap;" title="Timpa dataset aktif">
+                  <span class="material-icons-round" style="font-size: 14px;">sync</span> Timpa Dataset Ini
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer" style="display: flex; justify-content: space-between;">
         <button class="btn btn-ghost modal-close">Tutup</button>
+        <button class="btn btn-outline" id="btnEksporOutlierExcel" style="gap: 4px;">
+          <span class="material-icons-round" style="font-size: 16px; color: #10b981;">file_download</span> Ekspor Baris Outlier ke Excel
+        </button>
       </div>
     </div>
   </div>
@@ -2316,35 +2389,212 @@
             </div>
           </div>
 
-          <!-- Tab Content 2: Rumus & Metodologi -->
+          <!-- Tab Content 2: Rumus, Alur Hitung & Metodologi -->
           <div class="subtab-panel tersembunyi" id="subtab-rumusUji">
-            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; display: flex; flex-direction: column; gap: 14px;">
-              <h4 style="margin: 0; font-size: 14px; color: var(--color-primary);">1. Uji Validitas Butir (Korelasi Pearson Product Moment)</h4>
-              <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0; line-height: 1.6;">
-                Digunakan untuk menguji apakah setiap butir pernyataan kuesioner berkorelasi linier positif dan signifikan dengan skor total konstruk.
-              </p>
-              <div style="background: var(--bg-input); padding: 10px 14px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 12px; border-left: 3px solid var(--color-primary);">
-                r_xy = [ N &sum;XY - (&sum;X)(&sum;Y) ] / &radic;[ [ N &sum;X&sup2; - (&sum;X)&sup2; ] [ N &sum;Y&sup2; - (&sum;Y)&sup2; ] ]
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-md); padding: 12px 16px; display: flex; align-items: flex-start; gap: 10px;">
+                <span class="material-icons-round" style="color: #3b82f6; font-size: 20px; margin-top: 2px;">info</span>
+                <div style="font-size: 12.5px; line-height: 1.6; color: var(--text-secondary);">
+                  <strong style="color: var(--text-primary);">Alur Sistematis Pengujian Instrumen Penelitian (Kuesioner):</strong>
+                  Pengujian instrumen dilakukan untuk memastikan bahwa alat ukur yang digunakan memenuhi prinsip <em>keabsahan (validitas)</em> dan <em>keandalan (reliabilitas)</em> sebelum data digunakan dalam estimasi model struktural PLS-SEM.
+                </div>
               </div>
-              <p style="font-size: 12px; color: var(--text-muted); margin: 0;">
-                <strong>Kriteria Keputusan:</strong> Butir dinyatakan <em>Valid</em> jika <strong>r-Hitung &gt; r-Tabel</strong> pada taraf signifikansi &alpha; = 0.05 ($df = N - 2$) dan nilai $p &lt; 0.05$ (Sugiyono, 2019; Azwar, 2018).
-              </p>
 
-              <h4 style="margin: 10px 0 0 0; font-size: 14px; color: var(--color-primary);">2. Korelasi Butir-Total Terkoreksi (Corrected Item-Total Correlation)</h4>
-              <div style="background: var(--bg-input); padding: 10px 14px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 12px; border-left: 3px solid #8b5cf6;">
-                r_i(total-i) = [ r_i,total &middot; s_total - s_i ] / &radic;[ s_total&sup2; + s_i&sup2; - 2 &middot; r_i,total &middot; s_total &middot; s_i ]
+              <!-- Tahap 1: Penjumlahan Skor Total Konstruk -->
+              <div class="rumus-step-card">
+                <div class="rumus-step-header">
+                  <span class="rumus-step-badge">Tahap 1</span>
+                  <h4>Agregasi Skor Total Konstruk (Komposit Responden)</h4>
+                </div>
+                <p class="rumus-step-desc">
+                  Untuk setiap responden ke-<em>j</em> (<em>j</em> = 1, 2, ..., <em>N</em>), skor dari <em>k</em> butir pertanyaan yang mengukur konstruk yang sama dijumlahkan untuk menghasilkan skor total komposit (<em>Y<sub>j</sub></em>):
+                </p>
+                <div class="rumus-formula-box">
+                  <div class="formula-line">
+                    <em>Y<sub>j</sub></em> = &sum;<sub>i=1</sub><sup>k</sup> <em>X<sub>ij</sub></em> = <em>X<sub>1j</sub></em> + <em>X<sub>2j</sub></em> + ... + <em>X<sub>kj</sub></em>
+                  </div>
+                </div>
+                <div class="rumus-keterangan">
+                  <strong>Keterangan:</strong> <em>X<sub>ij</sub></em> adalah skor respon butir ke-<em>i</em> dari responden ke-<em>j</em>; <em>k</em> adalah banyaknya butir indikator; <em>Y<sub>j</sub></em> adalah skor total konstruk untuk responden ke-<em>j</em>.
+                </div>
               </div>
-              <p style="font-size: 12px; color: var(--text-muted); margin: 0;">
-                <strong>Kriteria Keputusan:</strong> Mencegah korelasi semu (*spurious correlation*) karena skor butir $i$ tidak diikutsertakan dalam skor total. Butir memiliki daya beda yang baik jika <strong>r_koreksi &ge; 0.300</strong> (Azwar, 2018; Nunnally & Bernstein, 1994).
-              </p>
 
-              <h4 style="margin: 10px 0 0 0; font-size: 14px; color: var(--color-primary);">3. Uji Reliabilitas (Cronbach's Alpha) & Alpha if Item Deleted</h4>
-              <div style="background: var(--bg-input); padding: 10px 14px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 12px; border-left: 3px solid #10b981;">
-                &alpha; = [ k / (k - 1) ] &times; [ 1 - ( &sum; s_i&sup2; / s_total&sup2; ) ]
+              <!-- Tahap 2: Komputasi Statistik Deskriptif & Varians -->
+              <div class="rumus-step-card">
+                <div class="rumus-step-header">
+                  <span class="rumus-step-badge">Tahap 2</span>
+                  <h4>Komputasi Rata-rata dan Varians Butir serta Total</h4>
+                </div>
+                <p class="rumus-step-desc">
+                  Menghitung rata-rata skor (X̄<sub>i</sub>), varians setiap butir (<em>s<sub>i</sub><sup>2</sup></em>), dan varians skor total konstruk (<em>s<sub>Y</sub><sup>2</sup></em>) dengan rumus sampel tak bias (<em>N</em> &minus; 1):
+                </p>
+                <div class="rumus-formula-box" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Varians Butir ke-<em>i</em> (<em>s<sub>i</sub><sup>2</sup></em>):</div>
+                    <div class="formula-line">
+                      <em>s<sub>i</sub><sup>2</sup></em> = 
+                      <span class="math-frac">
+                        <span class="math-num">&sum; (<em>X<sub>ij</sub></em> &minus; X̄<sub>i</sub>)<sup>2</sup></span>
+                        <span class="math-den"><em>N</em> &minus; 1</span>
+                      </span>
+                      =
+                      <span class="math-frac">
+                        <span class="math-num"><em>N</em> &sum;<em>X<sub>i</sub><sup>2</sup></em> &minus; (&sum;<em>X<sub>i</sub></em>)<sup>2</sup></span>
+                        <span class="math-den"><em>N</em>(<em>N</em> &minus; 1)</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Varians Skor Total Konstruk (<em>s<sub>Y</sub><sup>2</sup></em>):</div>
+                    <div class="formula-line">
+                      <em>s<sub>Y</sub><sup>2</sup></em> = 
+                      <span class="math-frac">
+                        <span class="math-num">&sum; (<em>Y<sub>j</sub></em> &minus; Ȳ)<sup>2</sup></span>
+                        <span class="math-den"><em>N</em> &minus; 1</span>
+                      </span>
+                      =
+                      <span class="math-frac">
+                        <span class="math-num"><em>N</em> &sum;<em>Y<sup>2</sup></em> &minus; (&sum;<em>Y</em>)<sup>2</sup></span>
+                        <span class="math-den"><em>N</em>(<em>N</em> &minus; 1)</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p style="font-size: 12px; color: var(--text-muted); margin: 0;">
-                <strong>Kriteria Keputusan:</strong> Konstruk dinyatakan reliabel jika koefisien <strong>Cronbach's Alpha &ge; 0.700</strong> (Hair et al., 2022; Ghozali, 2021). Kolom <em>Alpha if Item Deleted</em> menunjukkan nilai reliabilitas jika butir tertentu dihapus (membantu mengidentifikasi butir penggugur).
-              </p>
+
+              <!-- Tahap 3: Uji Validitas Butir (Pearson Product Moment) -->
+              <div class="rumus-step-card">
+                <div class="rumus-step-header">
+                  <span class="rumus-step-badge">Tahap 3</span>
+                  <h4>Uji Validitas Butir — Korelasi Pearson Product Moment (<em>r<sub>hitung</sub></em>)</h4>
+                </div>
+                <p class="rumus-step-desc">
+                  Mengukur derajat asosiasi linier antara butir pernyataan ke-<em>i</em> dengan skor total konstruk <em>Y</em>. Menggunakan rumus korelasi momen hasil-kali Pearson:
+                </p>
+                <div class="rumus-formula-box">
+                  <div class="formula-line">
+                    <em>r<sub>XY</sub></em> = 
+                    <span class="math-frac">
+                      <span class="math-num"><em>N</em> &sum;<em>XY</em> &minus; (&sum;<em>X</em>)(&sum;<em>Y</em>)</span>
+                      <span class="math-den">&radic;[ [ <em>N</em> &sum;<em>X<sup>2</sup></em> &minus; (&sum;<em>X</em>)<sup>2</sup> ] &middot; [ <em>N</em> &sum;<em>Y<sup>2</sup></em> &minus; (&sum;<em>Y</em>)<sup>2</sup> ] ]</span>
+                    </span>
+                  </div>
+                </div>
+                <p class="rumus-step-desc" style="margin-top: 8px;">
+                  Signifikansi korelasi diuji menggunakan transformasi statistik <em>t</em>-Student dengan derajat kebebasan <em>df</em> = <em>N</em> &minus; 2:
+                </p>
+                <div class="rumus-formula-box">
+                  <div class="formula-line">
+                    <em>t</em> = 
+                    <span class="math-frac">
+                      <span class="math-num"><em>r<sub>XY</sub></em> &radic;(<em>N</em> &minus; 2)</span>
+                      <span class="math-den">&radic;(1 &minus; <em>r<sub>XY</sub><sup>2</sup></em>)</span>
+                    </span>
+                    &nbsp;&nbsp; | &nbsp;&nbsp; <em>df</em> = <em>N</em> &minus; 2
+                  </div>
+                </div>
+                <div class="rumus-keterangan" style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10b981;">
+                  <strong>Kriteria Keputusan Validitas:</strong>
+                  <ul style="margin: 4px 0 0 16px; padding: 0;">
+                    <li><strong>VALID:</strong> Jika nilai <strong><em>r<sub>hitung</sub></em> &gt; <em>r<sub>tabel</sub></em></strong> pada taraf signifikansi &alpha; (default: 0.05, <em>df</em> = <em>N</em> &minus; 2) dan nilai probabilitas <strong><em>p</em> &lt; 0.05</strong>. Butir sahih dan layak dianalisis lebih lanjut (Sugiyono, 2019; Azwar, 2018).</li>
+                    <li><strong>GUGUR (TIDAK VALID):</strong> Jika <em>r<sub>hitung</sub></em> &le; <em>r<sub>tabel</sub></em> atau <em>p</em> &ge; 0.05. Butir tidak mampu mengukur apa yang seharusnya diukur dan direkomendasikan untuk didrop.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Tahap 4: Koreksi Bias Korelasi Butir-Total -->
+              <div class="rumus-step-card">
+                <div class="rumus-step-header">
+                  <span class="rumus-step-badge">Tahap 4</span>
+                  <h4>Korelasi Butir-Total Terkoreksi (Corrected Item-Total Correlation)</h4>
+                </div>
+                <p class="rumus-step-desc">
+                  Korelasi Pearson biasa rentan terhadap bias overestimasi (<em>spurious correlation</em>) karena butir <em>i</em> ikut dijumlahkan ke dalam skor total <em>Y</em>. Metode Henrysson (1963) mengeliminasi butir <em>i</em> dari skor total (<em>Y<sub>&minus;i</sub></em> = <em>Y</em> &minus; <em>X<sub>i</sub></em>):
+                </p>
+                <div class="rumus-formula-box">
+                  <div class="formula-line">
+                    <em>r<sub>i(Y&minus;i)</sub></em> = 
+                    <span class="math-frac">
+                      <span class="math-num"><em>r<sub>iY</sub></em> <em>s<sub>Y</sub></em> &minus; <em>s<sub>i</sub></em></span>
+                      <span class="math-den">&radic;[ <em>s<sub>Y</sub><sup>2</sup></em> + <em>s<sub>i</sub><sup>2</sup></em> &minus; 2 <em>r<sub>iY</sub></em> <em>s<sub>Y</sub></em> <em>s<sub>i</sub></em> ]</span>
+                    </span>
+                  </div>
+                </div>
+                <div class="rumus-keterangan" style="background: rgba(139, 92, 246, 0.08); border-left: 3px solid #8b5cf6;">
+                  <strong>Kriteria Daya Beda Butir:</strong> Menurut Ebel & Frisbie (1991) serta Azwar (2018), butir kuesioner memiliki daya pembeda yang memuaskan jika koefisien <strong><em>r<sub>i(Y&minus;i)</sub></em> &ge; 0.300</strong>. Butir dengan nilai di bawah 0.300 dianggap memiliki daya pembeda lemah dan berpotensi menjadi kontributor kebisingan (*noise*).
+                </div>
+              </div>
+
+              <!-- Tahap 5: Uji Reliabilitas Cronbach's Alpha -->
+              <div class="rumus-step-card">
+                <div class="rumus-step-header">
+                  <span class="rumus-step-badge">Tahap 5</span>
+                  <h4>Uji Reliabilitas Skala — Koefisien Cronbach's Alpha (&alpha;)</h4>
+                </div>
+                <p class="rumus-step-desc">
+                  Menguji konsistensi internal dari seluruh butir dalam merefleksikan konstruk laten secara serempak:
+                </p>
+                <div class="rumus-formula-box">
+                  <div class="formula-line">
+                    &alpha; = 
+                    <span class="math-frac">
+                      <span class="math-num"><em>k</em></span>
+                      <span class="math-den"><em>k</em> &minus; 1</span>
+                    </span>
+                    &times;
+                    [ 1 &minus; 
+                    <span class="math-frac">
+                      <span class="math-num">&sum;<sub>i=1</sub><sup>k</sup> <em>s<sub>i</sub><sup>2</sup></em></span>
+                      <span class="math-den"><em>s<sub>Y</sub><sup>2</sup></em></span>
+                    </span>
+                    ]
+                  </div>
+                </div>
+                <div class="rumus-keterangan">
+                  <strong>Klasifikasi Nilai Reliabilitas (Hair et al., 2022; George & Mallery, 2020):</strong>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-top: 6px;">
+                    <span class="badge-chip badge-success" style="padding: 4px 8px; font-size: 11px;">&alpha; &ge; 0.900 : Istimewa / Excellent</span>
+                    <span class="badge-chip badge-success" style="padding: 4px 8px; font-size: 11px;">0.800 &le; &alpha; &lt; 0.900 : Baik / Good</span>
+                    <span class="badge-chip badge-primary" style="padding: 4px 8px; font-size: 11px;">0.700 &le; &alpha; &lt; 0.800 : Dapat Diterima (Ambang Batas Riset)</span>
+                    <span class="badge-chip badge-warning" style="padding: 4px 8px; font-size: 11px;">0.600 &le; &alpha; &lt; 0.700 : Meragukan (Riset Eksplorasi)</span>
+                    <span class="badge-chip badge-danger" style="padding: 4px 8px; font-size: 11px;">&alpha; &lt; 0.600 : Tidak Reliabel (Ditolak)</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tahap 6: Evaluasi Alpha if Item Deleted -->
+              <div class="rumus-step-card">
+                <div class="rumus-step-header">
+                  <span class="rumus-step-badge">Tahap 6</span>
+                  <h4>Diagnostik Butir Penggugur — Cronbach's Alpha if Item Deleted (&alpha;<sub>&minus;i</sub>)</h4>
+                </div>
+                <p class="rumus-step-desc">
+                  Menghitung ulang reliabilitas skala dengan mengeluarkan butir ke-<em>i</em> (<em>k</em> &minus; 1 butir tersisa):
+                </p>
+                <div class="rumus-formula-box">
+                  <div class="formula-line">
+                    &alpha;<sub>&minus;i</sub> = 
+                    <span class="math-frac">
+                      <span class="math-num"><em>k</em> &minus; 1</span>
+                      <span class="math-den"><em>k</em> &minus; 2</span>
+                    </span>
+                    &times;
+                    [ 1 &minus; 
+                    <span class="math-frac">
+                      <span class="math-num">&sum;<sub>m &ne; i</sub> <em>s<sub>m</sub><sup>2</sup></em></span>
+                      <span class="math-den"><em>s<sub>Y &minus; i</sub><sup>2</sup></em></span>
+                    </span>
+                    ]
+                  </div>
+                </div>
+                <div class="rumus-keterangan" style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid #f59e0b;">
+                  <strong>Panduan Tindakan Perbaikan Instrumen:</strong>
+                  <ul style="margin: 4px 0 0 16px; padding: 0;">
+                    <li>Jika $\alpha_{-i} > \alpha_{\text{total}}$, berarti butir ke-$i$ justru menurunkan reliabilitas keseluruhan instrumen. Menghapus butir $i$ akan meningkatkan konsistensi skala.</li>
+                    <li>Jika $\alpha_{-i} \le \alpha_{\text{total}}$, berarti butir ke-$i$ memperkuat reliabilitas instrumen dan harus dipertahankan.</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2583,11 +2833,16 @@
 
         <!-- Output Tables & Panels -->
         <div id="containerHasilDeskriptif" style="display: none; flex-direction: column; gap: 14px;">
-          <!-- Subtabs -->
-          <div class="hasil-tabs" style="margin-bottom: 0; padding-bottom: 4px; border-bottom: 1px solid var(--border-color);">
-            <button class="hasil-tab active" data-deskriptiftab="tabelDeskriptif">📊 Tabel Statistik Deskriptif Lengkap</button>
-            <button class="hasil-tab" data-deskriptiftab="tabelNormalitas">📈 Evaluasi Normalitas Univariat</button>
-            <button class="hasil-tab" data-deskriptiftab="drafDeskriptif">📝 Draf Narasi Laporan</button>
+          <!-- Subtabs & Panduan Kolom Action Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; gap: 10px; flex-wrap: wrap;">
+            <div class="hasil-tabs" style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">
+              <button class="hasil-tab active" data-deskriptiftab="tabelDeskriptif">📊 Tabel Statistik Deskriptif Lengkap</button>
+              <button class="hasil-tab" data-deskriptiftab="tabelNormalitas">📈 Evaluasi Normalitas Univariat</button>
+              <button class="hasil-tab" data-deskriptiftab="drafDeskriptif">📝 Draf Narasi Laporan</button>
+            </div>
+            <button class="btn btn-sm btn-outline" id="btnBukaPanduanKolomDeskriptif" style="font-size: 11.5px; gap: 5px; border-color: #10b981; color: #10b981;" title="Buka penjelasan rumus, definisi, dan interpretasi tiap kolom statistik">
+              <span class="material-icons-round" style="font-size: 15px;">help_outline</span> Penjelasan & Rumus Kolom
+            </button>
           </div>
 
           <!-- Panel 1: Tabel Deskriptif -->
@@ -2597,18 +2852,18 @@
                 <thead>
                   <tr>
                     <th>Variabel / Indikator</th>
-                    <th>N</th>
-                    <th>Mean</th>
-                    <th>SE Mean</th>
-                    <th>Median</th>
-                    <th>Modus</th>
-                    <th>StDev</th>
-                    <th>Varians</th>
-                    <th>Min</th>
-                    <th>Max</th>
-                    <th>Range</th>
-                    <th>TCR (%)</th>
-                    <th>Kategori Capaian</th>
+                    <th>N <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('n', event)" title="Penjelasan N (Jumlah Sampel)"><span class="material-icons-round">info</span></button></th>
+                    <th>Mean <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('mean', event)" title="Penjelasan Mean (Rata-rata)"><span class="material-icons-round">info</span></button></th>
+                    <th>SE Mean <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('se_mean', event)" title="Penjelasan Standard Error of Mean"><span class="material-icons-round">info</span></button></th>
+                    <th>Median <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('median', event)" title="Penjelasan Median (Nilai Tengah)"><span class="material-icons-round">info</span></button></th>
+                    <th>Modus <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('modus', event)" title="Penjelasan Modus (Nilai Terbanyak)"><span class="material-icons-round">info</span></button></th>
+                    <th>StDev <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('stdev', event)" title="Penjelasan Standar Deviasi"><span class="material-icons-round">info</span></button></th>
+                    <th>Varians <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('varians', event)" title="Penjelasan Varians Sampel"><span class="material-icons-round">info</span></button></th>
+                    <th>Min <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('min', event)" title="Penjelasan Skor Minimum"><span class="material-icons-round">info</span></button></th>
+                    <th>Max <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('max', event)" title="Penjelasan Skor Maksimum"><span class="material-icons-round">info</span></button></th>
+                    <th>Range <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('range', event)" title="Penjelasan Rentang Skor"><span class="material-icons-round">info</span></button></th>
+                    <th>TCR (%) <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('tcr', event)" title="Penjelasan Tingkat Capaian Responden"><span class="material-icons-round">info</span></button></th>
+                    <th>Kategori Capaian <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('kategori', event)" title="Penjelasan Kategori Capaian"><span class="material-icons-round">info</span></button></th>
                   </tr>
                 </thead>
                 <tbody id="tbodyDeskriptifLengkap"></tbody>
@@ -2623,14 +2878,14 @@
                 <thead>
                   <tr>
                     <th>Variabel / Indikator</th>
-                    <th>N</th>
-                    <th>Skewness</th>
-                    <th>Std. Error Skew</th>
-                    <th>Z-Score Skew</th>
-                    <th>Kurtosis</th>
-                    <th>Std. Error Kurt</th>
-                    <th>Z-Score Kurt</th>
-                    <th>Distribusi Univariat</th>
+                    <th>N <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('n', event)" title="Penjelasan N (Jumlah Sampel)"><span class="material-icons-round">info</span></button></th>
+                    <th>Skewness <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('skewness', event)" title="Penjelasan Kemiringan Kurva"><span class="material-icons-round">info</span></button></th>
+                    <th>Std. Error Skew <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('se_skew', event)" title="Penjelasan SE Kemiringan"><span class="material-icons-round">info</span></button></th>
+                    <th>Z-Score Skew <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('z_skew', event)" title="Penjelasan Uji Z Kemiringan"><span class="material-icons-round">info</span></button></th>
+                    <th>Kurtosis <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('kurtosis', event)" title="Penjelasan Keruncingan Kurva"><span class="material-icons-round">info</span></button></th>
+                    <th>Std. Error Kurt <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('se_kurt', event)" title="Penjelasan SE Keruncingan"><span class="material-icons-round">info</span></button></th>
+                    <th>Z-Score Kurt <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('z_kurt', event)" title="Penjelasan Uji Z Keruncingan"><span class="material-icons-round">info</span></button></th>
+                    <th>Distribusi Univariat <button class="th-info-btn" onclick="tampilkanInfoKolomDeskriptif('distribusi', event)" title="Penjelasan Kriteria Normalitas"><span class="material-icons-round">info</span></button></th>
                   </tr>
                 </thead>
                 <tbody id="tbodyNormalitasUnivariat"></tbody>
@@ -2663,6 +2918,243 @@
             <span class="material-icons-round" style="font-size: 16px; color: #10b981;">file_download</span> Ekspor Tabel ke Excel
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL PANDUAN KOLOM STATISTIK DESKRIPTIF ============ -->
+  <div class="modal-overlay tersembunyi" id="modalPanduanKolomDeskriptif">
+    <div class="modal modal-xl" style="max-width: 1000px; width: 95vw;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(16, 185, 129, 0.12); color: #10b981; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+            <span class="material-icons-round">menu_book</span>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Glosarium & Panduan Kolom Statistik Deskriptif & Normalitas</h3>
+            <span style="font-size: 11.5px; color: var(--text-muted);">Definisi matematis, rumus, makna statistik, dan standar acuan interpretasi</span>
+          </div>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close"><span class="material-icons-round">close</span></button>
+      </div>
+
+      <div class="modal-body" style="max-height: 75vh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 18px 22px;">
+        <!-- Search filter box -->
+        <div style="display: flex; align-items: center; gap: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 8px 12px;">
+          <span class="material-icons-round" style="color: var(--text-muted); font-size: 18px;">search</span>
+          <input type="text" id="inputFilterPanduanDeskriptif" class="form-input" placeholder="Cari nama kolom atau istilah (misal: SE Mean, Z-Score, TCR, Kurtosis, Skewness)..." style="border: none; padding: 0; background: transparent; font-size: 12.5px; outline: none;">
+        </div>
+
+        <div id="containerListPanduanDeskriptif" style="display: grid; grid-template-columns: 1fr; gap: 12px;">
+          <!-- 1. N -->
+          <div class="panduan-kolom-card" data-keyword="n sampel responden ukuran amatan">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-umum">N</span>
+              <span class="panduan-card-title">N (Ukuran Sampel / Jumlah Responden Valid)</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Total banyaknya amatan atau responden yang memberikan jawaban valid pada butir indikator tersebut (tidak kosong / non-missing).</p>
+              <div class="panduan-formula-chip"><em>N</em> = Jumlah responden dengan isian valid</div>
+              <p><strong>Interpretasi:</strong> Dalam pemodelan SEM, Hair et al. (2022) menganjurkan ukuran sampel minimal 100 responden atau rasio 5&ndash;10 responden per parameter indikator yang diestimasi.</p>
+            </div>
+          </div>
+
+          <!-- 2. Mean -->
+          <div class="panduan-kolom-card" data-keyword="mean rata rata nilai tengah pemusatan">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-pemusatan">Mean</span>
+              <span class="panduan-card-title">Mean (Rata-Rata Hitung Aritmatika)</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Titik berat atau rata-rata skor jawaban responden pada indikator/konstruk.</p>
+              <div class="panduan-formula-chip">
+                X̄ = <span class="math-frac"><span class="math-num">&sum;<sub>j=1</sub><sup>N</sup> <em>X<sub>j</sub></em></span><span class="math-den"><em>N</em></span></span>
+              </div>
+              <p><strong>Interpretasi:</strong> Menunjukkan kecenderungan umum persepsi responden. Pada skala Likert 1&ndash;5, skor rata-rata di atas 3.00 mengindikasikan kecenderungan persetujuan positif responden terhadap indikator.</p>
+            </div>
+          </div>
+
+          <!-- 3. SE Mean -->
+          <div class="panduan-kolom-card" data-keyword="se mean standard error galat baku rata rata presisi">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-pemusatan">SE Mean</span>
+              <span class="panduan-card-title">SE Mean (Standard Error of the Mean / Galat Baku Rata-Rata)</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Pengukuran variabilitas dan presisi dari rata-rata sampel dalam mengestimasi rata-rata populasi yang sebenarnya. Menjawab pertanyaan seberapa akurat mean sampel mewakili parameter populasi.</p>
+              <div class="panduan-formula-chip">
+                SE<sub>Mean</sub> = <span class="math-frac"><span class="math-num"><em>s</em></span><span class="math-den">&radic;<em>N</em></span></span>
+              </div>
+              <p><strong>Interpretasi & Panduan:</strong> Semakin kecil nilai SE Mean, semakin tinggi tingkat ketepatan dan keterpercayaan mean sampel. Digunakan untuk membentuk Selang Kepercayaan 95%: X̄ &plusmn; 1.96 &times; SE<sub>Mean</sub>.</p>
+            </div>
+          </div>
+
+          <!-- 4. Median -->
+          <div class="panduan-kolom-card" data-keyword="median nilai tengah kuartil">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-pemusatan">Median</span>
+              <span class="panduan-card-title">Median (Nilai Tengah Data)</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Skor observasi yang berada tepat di posisi tengah (persentil ke-50) saat seluruh data responden diurutkan dari nilai terendah ke tertinggi.</p>
+              <p><strong>Interpretasi:</strong> Sangat tahan terhadap nilai pencilan ekstrem (<em>robust to outliers</em>). Jika nilai Mean dan Median hampir identik, hal ini mengindikasikan distribusi data simetris.</p>
+            </div>
+          </div>
+
+          <!-- 5. Modus -->
+          <div class="panduan-kolom-card" data-keyword="modus mode frekuensi terbanyak">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-pemusatan">Modus</span>
+              <span class="panduan-card-title">Modus (Skor Terbanyak / Paling Sering Muncul)</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Kategori skor pada skala pengukuran yang dipilih oleh frekuensi responden terbanyak.</p>
+              <p><strong>Interpretasi:</strong> Memberikan gambaran pilihan tipikal yang paling populer di kalangan responden penelitian.</p>
+            </div>
+          </div>
+
+          <!-- 6. StDev -->
+          <div class="panduan-kolom-card" data-keyword="stdev standar deviasi simpangan baku dispersi sebaran">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-sebaran">StDev</span>
+              <span class="panduan-card-title">StDev (Standar Deviasi / Simpangan Baku)</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Ukuran sebaran atau dispersi amatan data di sekitar rata-rata hitung.</p>
+              <div class="panduan-formula-chip">
+                <em>s</em> = &radic;[ <span class="math-frac"><span class="math-num">&sum; (<em>X<sub>j</sub></em> &minus; X̄)<sup>2</sup></span><span class="math-den"><em>N</em> &minus; 1</span></span> ]
+              </div>
+              <p><strong>Interpretasi:</strong> Semakin kecil nilai StDev, jawaban responden semakin homogen / seragam. Semakin besar nilai StDev, persepsi responden semakin heterogen / bervariasi.</p>
+            </div>
+          </div>
+
+          <!-- 7. Varians -->
+          <div class="panduan-kolom-card" data-keyword="varians variance kuadrat deviasi">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-sebaran">Varians</span>
+              <span class="panduan-card-title">Varians (Kuadrat Simpangan Baku)</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Rata-rata kuadrat jarak deviasi setiap observasi terhadap mean sampel.</p>
+              <div class="panduan-formula-chip">
+                <em>s<sup>2</sup></em> = <span class="math-frac"><span class="math-num">&sum; (<em>X<sub>j</sub></em> &minus; X̄)<sup>2</sup></span><span class="math-den"><em>N</em> &minus; 1</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 8. Min & Max -->
+          <div class="panduan-kolom-card" data-keyword="min max minimum maksimum terendah tertinggi">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-sebaran">Min & Max</span>
+              <span class="panduan-card-title">Skor Minimum (Min) & Skor Maksimum (Max)</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Nilai terendah dan tertinggi yang riil diberikan oleh responden dalam dataset.</p>
+              <p><strong>Interpretasi:</strong> Berfungsi mendeteksi adanya salah input data (<em>data entry error</em>), misalnya ada skor 6 pada kuesioner skala 1&ndash;5.</p>
+            </div>
+          </div>
+
+          <!-- 9. Range -->
+          <div class="panduan-kolom-card" data-keyword="range rentang jangkauan">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-sebaran">Range</span>
+              <span class="panduan-card-title">Range (Rentang / Jangkauan Data)</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Selisih antara nilai maksimum dan nilai minimum data: <em>R</em> = <em>X<sub>max</sub></em> &minus; <em>X<sub>min</sub></em>.</p>
+            </div>
+          </div>
+
+          <!-- 10. TCR -->
+          <div class="panduan-kolom-card" data-keyword="tcr tingkat capaian responden persentase kuesioner kategori">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-capaian">TCR (%)</span>
+              <span class="panduan-card-title">TCR (%) (Tingkat Capaian Responden)</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Persentase capaian rata-rata empiris jawaban responden terhadap nilai skala teoritis maksimum yang dapat dicapai.</p>
+              <div class="panduan-formula-chip">
+                TCR = ( <span class="math-frac"><span class="math-num">X̄</span><span class="math-den">Skala Maksimum</span></span> ) &times; 100%
+              </div>
+              <p><strong>Kriteria Interpretasi Kategori Capaian (Arikunto, 2019; Sugiyono, 2018):</strong></p>
+              <ul style="margin: 4px 0 0 16px; padding: 0; line-height: 1.6;">
+                <li>&ge; 81%: <strong>Sangat Baik / Sangat Tinggi</strong></li>
+                <li>66% &ndash; 80%: <strong>Baik / Tinggi</strong></li>
+                <li>51% &ndash; 65%: <strong>Cukup / Sedang</strong></li>
+                <li>36% &ndash; 50%: <strong>Kurang / Rendah</strong></li>
+                <li>&lt; 36%: <strong>Sangat Kurang / Sangat Rendah</strong></li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 11. Skewness & Z-Score Skew -->
+          <div class="panduan-kolom-card" data-keyword="skewness z skew z-score kemiringan kurva normalitas univariat se_skew">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-normalitas">Skewness & Z-Score</span>
+              <span class="panduan-card-title">Skewness, Std. Error Skewness, & Z-Score Skewness</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Pengukuran derajat ketidaksimetrisan (kemiringan) kurva distribusi data di sekitar mean.</p>
+              <div class="panduan-formula-chip" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center;">
+                <div>
+                  SE<sub>skew</sub> = &radic;[ <span class="math-frac"><span class="math-num">6<em>N</em>(<em>N</em> &minus; 1)</span><span class="math-den">(<em>N</em> &minus; 2)(<em>N</em> + 1)(<em>N</em> + 3)</span></span> ]
+                </div>
+                <div>
+                  <em>Z<sub>skew</sub></em> = <span class="math-frac"><span class="math-num">Skewness</span><span class="math-den">SE<sub>skew</sub></span></span>
+                </div>
+              </div>
+              <p><strong>Kriteria Keputusan Normalitas Univariat:</strong></p>
+              <ul style="margin: 4px 0 0 16px; padding: 0; line-height: 1.6;">
+                <li>Jika <strong>&minus;1.96 &le; <em>Z<sub>skew</sub></em> &le; +1.96</strong> (&alpha; = 0.05), kemiringan kurva tidak berbeda nyata dari distribusi normal (Hair et al., 2022).</li>
+                <li>Jika <em>Z<sub>skew</sub></em> &gt; +1.96: Kurva menceng positif ke kanan (<em>positively skewed</em>).</li>
+                <li>Jika <em>Z<sub>skew</sub></em> &lt; &minus;1.96: Kurva menceng negatif ke kiri (<em>negatively skewed</em>).</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 12. Kurtosis & Z-Score Kurt -->
+          <div class="panduan-kolom-card" data-keyword="kurtosis z kurt z-score keruncingan kurva normalitas univariat se_kurt">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-normalitas">Kurtosis & Z-Score</span>
+              <span class="panduan-card-title">Kurtosis, Std. Error Kurtosis, & Z-Score Kurtosis</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Definisi:</strong> Pengukuran derajat keruncingan (peakedness) atau kerataan kurva distribusi data relatif terhadap distribusi normal mesokurtik.</p>
+              <div class="panduan-formula-chip" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center;">
+                <div>
+                  SE<sub>kurt</sub> = 2 &times; SE<sub>skew</sub> &times; &radic;[ <span class="math-frac"><span class="math-num"><em>N<sup>2</sup></em> &minus; 1</span><span class="math-den">(<em>N</em> &minus; 3)(<em>N</em> + 5)</span></span> ]
+                </div>
+                <div>
+                  <em>Z<sub>kurt</sub></em> = <span class="math-frac"><span class="math-num">Kurtosis</span><span class="math-den">SE<sub>kurt</sub></span></span>
+                </div>
+              </div>
+              <p><strong>Kriteria Keputusan Normalitas Univariat:</strong></p>
+              <ul style="margin: 4px 0 0 16px; padding: 0; line-height: 1.6;">
+                <li>Jika <strong>&minus;1.96 &le; <em>Z<sub>kurt</sub></em> &le; +1.96</strong> (&alpha; = 0.05), puncak kurva sesuai dengan asumsi normal univariat.</li>
+                <li>Jika <em>Z<sub>kurt</sub></em> &gt; +1.96: Kurva bersifat runcing tajam (<em>leptokurtik</em>).</li>
+                <li>Jika <em>Z<sub>kurt</sub></em> &lt; &minus;1.96: Kurva bersifat mendatar tumpul (<em>platikurtik</em>).</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 13. Kesimpulan Distribusi Univariat -->
+          <div class="panduan-kolom-card" data-keyword="distribusi univariat normalitas kesimpulan asumsi sem normal">
+            <div class="panduan-card-header">
+              <span class="panduan-card-tag tag-normalitas">Distribusi Univariat</span>
+              <span class="panduan-card-title">Kesimpulan Distribusi Univariat untuk PLS-SEM</span>
+            </div>
+            <div class="panduan-card-body">
+              <p><strong>Kaidah Evaluasi:</strong> Dinyatakan <strong>Normal Univariat</strong> jika kedua nilai Z-Score Skewness dan Kurtosis memenuhi interval [&minus;1.96, +1.96]. Jika salah satu melebihi ambang batas, data dikategorikan <em>Cenderung Asimetris / Non-Normal</em>.</p>
+              <p style="background: rgba(59, 130, 246, 0.08); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #3b82f6;">
+                💡 <strong>Catatan Metodologi PLS-SEM (Hair et al., 2022; Rigdon et al., 2017):</strong> Metode PLS-SEM bersifat <em>non-parametrik</em> (bebas asumsi normalitas sebaran data multivariat). Pengujian normalitas univariat disajikan untuk transparansi karakteristik empiris data penelitian Anda.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary modal-close">Tutup Panduan</button>
       </div>
     </div>
   </div>

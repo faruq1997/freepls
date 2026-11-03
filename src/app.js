@@ -6728,7 +6728,14 @@ function initDataPreprocessingHandlers() {
       }
     });
 
+    dataViewerState.detectedOutliers = outliers;
+    dataViewerState.outlierStats = stats;
+    dataViewerState.outlierThreshold = threshold;
+
+    const aksiContainer = document.getElementById('containerAksiOutlier');
+
     if (outliers.length === 0) {
+      if (aksiContainer) aksiContainer.style.display = 'none';
       container.innerHTML = `
         <div class="empty-state" style="padding: 30px; text-align: center;">
           <span class="material-icons-round" style="font-size: 40px; color: #10b981; margin-bottom: 8px;">verified</span>
@@ -6739,14 +6746,20 @@ function initDataPreprocessingHandlers() {
       return;
     }
 
+    if (aksiContainer) aksiContainer.style.display = 'flex';
+
     container.innerHTML = `
-      <div style="margin-bottom: 10px; font-size: 12px; color: var(--text-secondary);">
-        Ditemukan <strong>${outliers.length} baris</strong> data dengan indikasi pencilan ekstrem (|Z| &ge; ${threshold}):
+      <div style="margin-bottom: 10px; font-size: 12px; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center;">
+        <span>Ditemukan <strong>${outliers.length} baris</strong> data dengan indikasi pencilan ekstrem (|Z| &ge; ${threshold}):</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Centang baris yang ingin ditindaklanjuti</span>
       </div>
       <table class="data-table" style="font-size: 12px;">
         <thead>
           <tr>
-            <th style="width: 70px;">Baris #</th>
+            <th style="width: 40px; text-align: center;">
+              <input type="checkbox" id="checkSemuaOutlier" checked title="Pilih Semua / Batal Semua">
+            </th>
+            <th style="width: 75px;">Baris #</th>
             <th>Kolom & Nilai Pencilan</th>
             <th>Nilai Z-Score</th>
             <th>Diagnosa</th>
@@ -6755,6 +6768,9 @@ function initDataPreprocessingHandlers() {
         <tbody>
           ${outliers.map(o => `
             <tr>
+              <td style="text-align: center;">
+                <input type="checkbox" class="check-outlier-item" data-row-idx="${o.rowIdx}" checked>
+              </td>
               <td style="font-weight: 700; text-align: center;">Baris ${o.rowIdx}</td>
               <td>
                 ${o.flaggedCols.map(f => `<span class="badge-chip badge-warning" style="margin: 2px;"><strong>${escapeHtml(f.col)}</strong> = ${f.val}</span>`).join(' ')}
@@ -6768,7 +6784,232 @@ function initDataPreprocessingHandlers() {
         </tbody>
       </table>
     `;
+
+    const updateOutlierSelectionCount = () => {
+      const checkedCount = document.querySelectorAll('.check-outlier-item:checked').length;
+      const badge = document.getElementById('badgeSelectedOutliersCount');
+      if (badge) badge.textContent = `${checkedCount} dari ${outliers.length} Baris Terpilih`;
+      const btnA = document.getElementById('btnHapusOutlierBuatBaru');
+      const btnB = document.getElementById('btnHapusOutlierTimpa');
+      const btnC = document.getElementById('btnWinsorizeBuatBaru');
+      const btnD = document.getElementById('btnWinsorizeTimpa');
+      [btnA, btnB, btnC, btnD].forEach(b => { if (b) b.disabled = (checkedCount === 0); });
+    };
+
+    document.getElementById('checkSemuaOutlier')?.addEventListener('change', (e) => {
+      document.querySelectorAll('.check-outlier-item').forEach(cb => { cb.checked = e.target.checked; });
+      updateOutlierSelectionCount();
+    });
+
+    document.querySelectorAll('.check-outlier-item').forEach(cb => {
+      cb.addEventListener('change', updateOutlierSelectionCount);
+    });
+
+    updateOutlierSelectionCount();
   };
+
+  // Handler Aksi Pemangkasan Outlier (Trimming)
+  const eksekusiHapusOutlier = async (buatDatasetBaru = true) => {
+    const ds = dataViewerState.activeDataset;
+    if (!ds || !dataViewerState.allRows.length) return;
+
+    const checkedBoxes = Array.from(document.querySelectorAll('.check-outlier-item:checked'));
+    if (checkedBoxes.length === 0) {
+      showToast('Pilih setidaknya satu baris outlier yang ingin dihapus', 'peringatan');
+      return;
+    }
+
+    const selectedRowIndices = new Set(checkedBoxes.map(cb => parseInt(cb.dataset.rowIdx, 10)));
+    const count = selectedRowIndices.size;
+
+    const ok = await konfirmasiDialog({
+      title: buatDatasetBaru ? 'Hapus Outlier & Buat Dataset Baru' : 'Hapus Outlier & Timpa Dataset',
+      message: buatDatasetBaru
+        ? `Apakah Anda yakin ingin memangkas ${count} baris outlier? Hasilnya akan disimpan sebagai dataset baru sehingga data asli tetap aman.`
+        : `PERINGATAN: ${count} baris outlier akan dihapus langsung dari dataset "${ds.nama}". Tindakan ini tidak dapat dibatalkan.`,
+      okText: buatDatasetBaru ? 'Buat Dataset Bebas Outlier' : 'Ya, Timpa Dataset',
+      isDanger: !buatDatasetBaru,
+      icon: 'delete_sweep'
+    });
+
+    if (!ok) return;
+
+    showLoading('Memproses Pemangkasan Data Outlier...', 600, 'Menyaring Observasi & Menyimpan Matriks Bersih', 'delete_sweep');
+
+    try {
+      const cleanRows = dataViewerState.allRows.filter((_, idx) => !selectedRowIndices.has(idx + 1));
+      const cols = dataViewerState.columns;
+
+      if (buatDatasetBaru) {
+        const baseName = (ds.nama || 'Dataset').replace(/\s*\(.*\)$/, '').trim();
+        const newName = `${baseName}_Clean_N${cleanRows.length}`;
+        await window.api.datasetTambah({
+          proyek_id: state.proyekAktif.id,
+          nama: newName,
+          kolom: cols,
+          data: cleanRows,
+          jumlah_baris: cleanRows.length,
+          jumlah_kolom: cols.length
+        });
+        hideModal('modalDeteksiOutlier');
+        showToast(`Dataset baru "${newName}" (${cleanRows.length} baris) berhasil disimpan!`, 'sukses');
+      } else {
+        await window.api.datasetSimpanData({
+          id: ds.id,
+          data: cleanRows,
+          jumlah_baris: cleanRows.length,
+          jumlah_kolom: cols.length
+        });
+        hideModal('modalDeteksiOutlier');
+        showToast(`${count} baris outlier berhasil dipangkas dari "${ds.nama}"!`, 'sukses');
+      }
+
+      await loadDatasets();
+      if (buatDatasetBaru) {
+        const datasets = await window.api.datasetDaftar(state.proyekAktif.id);
+        if (datasets.length > 0) previewDataset(datasets[datasets.length - 1].id);
+      } else {
+        previewDataset(ds.id);
+      }
+    } catch (err) {
+      console.error('Gagal memproses penghapusan outlier:', err);
+      showToast('Gagal memproses outlier', 'bahaya');
+    } finally {
+      hideLoading();
+    }
+  };
+
+  // Handler Aksi Winsorizing (Capping)
+  const eksekusiWinsorizingOutlier = async (buatDatasetBaru = true) => {
+    const ds = dataViewerState.activeDataset;
+    if (!ds || !dataViewerState.allRows.length) return;
+
+    const checkedBoxes = Array.from(document.querySelectorAll('.check-outlier-item:checked'));
+    if (checkedBoxes.length === 0) {
+      showToast('Pilih setidaknya satu baris outlier yang ingin di-winsorize', 'peringatan');
+      return;
+    }
+
+    const selectedRowIndices = new Set(checkedBoxes.map(cb => parseInt(cb.dataset.rowIdx, 10)));
+    const threshold = dataViewerState.outlierThreshold || 3.0;
+    const stats = dataViewerState.outlierStats || {};
+
+    const ok = await konfirmasiDialog({
+      title: buatDatasetBaru ? 'Winsorizing & Buat Dataset Baru' : 'Winsorizing & Timpa Dataset',
+      message: buatDatasetBaru
+        ? `Nilai pencilan pada ${selectedRowIndices.size} baris akan disesuaikan ke batas Z = ±${threshold}. Ukuran sampel N tetap utuh 100% dan hasil disimpan sebagai dataset baru.`
+        : `Nilai pencilan pada ${selectedRowIndices.size} baris akan langsung disesuaikan ke batas Z = ±${threshold} pada dataset "${ds.nama}".`,
+      okText: 'Terapkan Winsorizing',
+      isDanger: false,
+      icon: 'auto_fix_high'
+    });
+
+    if (!ok) return;
+
+    showLoading('Menerapkan Winsorizing (Capping)...', 600, 'Menyesuaikan Nilai Ekstrem ke Batas Toleransi Multivariat', 'auto_fix_high');
+
+    try {
+      const rowsCopy = JSON.parse(JSON.stringify(dataViewerState.allRows));
+      const cols = dataViewerState.columns;
+      let totalCapped = 0;
+
+      dataViewerState.detectedOutliers.forEach(o => {
+        if (!selectedRowIndices.has(o.rowIdx)) return;
+        const targetRow = rowsCopy[o.rowIdx - 1];
+        if (!targetRow) return;
+
+        o.flaggedCols.forEach(f => {
+          const s = stats[f.col];
+          if (s && s.stdev > 0) {
+            const capMin = s.mean - threshold * s.stdev;
+            const capMax = s.mean + threshold * s.stdev;
+            const currentVal = parseFloat(targetRow[f.col]);
+            if (!isNaN(currentVal)) {
+              if (currentVal < capMin) {
+                targetRow[f.col] = Math.round(capMin * 1000) / 1000;
+                totalCapped++;
+              } else if (currentVal > capMax) {
+                targetRow[f.col] = Math.round(capMax * 1000) / 1000;
+                totalCapped++;
+              }
+            }
+          }
+        });
+      });
+
+      if (buatDatasetBaru) {
+        const baseName = (ds.nama || 'Dataset').replace(/\s*\(.*\)$/, '').trim();
+        const newName = `${baseName}_Winsorized`;
+        await window.api.datasetTambah({
+          proyek_id: state.proyekAktif.id,
+          nama: newName,
+          kolom: cols,
+          data: rowsCopy,
+          jumlah_baris: rowsCopy.length,
+          jumlah_kolom: cols.length
+        });
+        hideModal('modalDeteksiOutlier');
+        showToast(`Dataset baru "${newName}" berhasil dibuat (${totalCapped} nilai disesuaikan)!`, 'sukses');
+      } else {
+        await window.api.datasetSimpanData({
+          id: ds.id,
+          data: rowsCopy,
+          jumlah_baris: rowsCopy.length,
+          jumlah_kolom: cols.length
+        });
+        hideModal('modalDeteksiOutlier');
+        showToast(`Winsorizing berhasil diterapkan (${totalCapped} nilai disesuaikan)!`, 'sukses');
+      }
+
+      await loadDatasets();
+      if (buatDatasetBaru) {
+        const datasets = await window.api.datasetDaftar(state.proyekAktif.id);
+        if (datasets.length > 0) previewDataset(datasets[datasets.length - 1].id);
+      } else {
+        previewDataset(ds.id);
+      }
+    } catch (err) {
+      console.error('Gagal menerapkan winsorizing:', err);
+      showToast('Gagal menerapkan winsorizing', 'bahaya');
+    } finally {
+      hideLoading();
+    }
+  };
+
+  // Handler Ekspor Laporan Baris Outlier
+  const eksekusiEksporOutlier = async () => {
+    const ds = dataViewerState.activeDataset;
+    if (!ds || !dataViewerState.detectedOutliers?.length) {
+      showToast('Tidak ada data outlier untuk diekspor', 'info');
+      return;
+    }
+
+    const exportRows = dataViewerState.detectedOutliers.map(o => {
+      const rowObj = {
+        'Nomor_Baris': o.rowIdx,
+        'Kolom_Pencilan': o.flaggedCols.map(f => `${f.col}=${f.val}`).join(', '),
+        'Z_Score': o.flaggedCols.map(f => `${f.col}(Z=${f.z})`).join(', '),
+        'Diagnosa': 'Outlier Ekstrem (|Z| >= ' + (dataViewerState.outlierThreshold || 3.0) + ')'
+      };
+      Object.keys(o.rowData || {}).forEach(k => {
+        rowObj[`Data_${k}`] = o.rowData[k];
+      });
+      return rowObj;
+    });
+
+    const fileName = `${(ds.nama || 'Dataset').replace(/[^a-zA-Z0-9_-]/g, '_')}_Outliers_Report.xlsx`;
+    const res = await window.api.eksporHasil({ data: exportRows, namaFile: fileName });
+    if (res) {
+      showToast(`Laporan outlier berhasil diekspor: ${fileName}`, 'sukses');
+    }
+  };
+
+  // Pasang Event Listeners Tindakan Outlier
+  document.getElementById('btnHapusOutlierBuatBaru')?.addEventListener('click', () => eksekusiHapusOutlier(true));
+  document.getElementById('btnHapusOutlierTimpa')?.addEventListener('click', () => eksekusiHapusOutlier(false));
+  document.getElementById('btnWinsorizeBuatBaru')?.addEventListener('click', () => eksekusiWinsorizingOutlier(true));
+  document.getElementById('btnWinsorizeTimpa')?.addEventListener('click', () => eksekusiWinsorizingOutlier(false));
+  document.getElementById('btnEksporOutlierExcel')?.addEventListener('click', eksekusiEksporOutlier);
 
   document.getElementById('btnBukaDeteksiOutlier')?.addEventListener('click', () => {
     dropdownWrap?.classList.remove('open');
@@ -9481,7 +9722,68 @@ function initDescriptiveStatsHandlers() {
       showToast('Tabel statistik deskriptif berhasil diekspor ke Excel!', 'sukses');
     }
   });
+
+  // Handler Buka Panduan Glosarium Kolom
+  document.getElementById('btnBukaPanduanKolomDeskriptif')?.addEventListener('click', () => {
+    tampilkanInfoKolomDeskriptif();
+  });
+
+  // Filter input pada modal panduan kolom
+  document.getElementById('inputFilterPanduanDeskriptif')?.addEventListener('input', (e) => {
+    const q = (e.target.value || '').toLowerCase().trim();
+    const cards = document.querySelectorAll('#containerListPanduanDeskriptif .panduan-kolom-card');
+    cards.forEach(card => {
+      const kw = (card.dataset.keyword || '').toLowerCase();
+      const txt = card.textContent.toLowerCase();
+      if (!q || kw.includes(q) || txt.includes(q)) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  });
 }
+
+function tampilkanInfoKolomDeskriptif(kolomKey = '', event = null) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+
+  showModal('modalPanduanKolomDeskriptif');
+
+  const filterInput = document.getElementById('inputFilterPanduanDeskriptif');
+  if (filterInput) filterInput.value = '';
+
+  const cards = document.querySelectorAll('#containerListPanduanDeskriptif .panduan-kolom-card');
+  cards.forEach(c => {
+    c.style.display = 'flex';
+    c.style.borderColor = '';
+    c.style.boxShadow = '';
+  });
+
+  if (kolomKey) {
+    const key = kolomKey.toLowerCase().replace(/_/g, ' ');
+    const targetCard = Array.from(cards).find(c => {
+      const kw = (c.dataset.keyword || '').toLowerCase();
+      return kw.includes(key);
+    });
+
+    if (targetCard) {
+      setTimeout(() => {
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetCard.style.borderColor = '#10b981';
+        targetCard.style.boxShadow = '0 0 16px rgba(16, 185, 129, 0.4)';
+        setTimeout(() => {
+          targetCard.style.borderColor = '';
+          targetCard.style.boxShadow = '';
+        }, 2500);
+      }, 120);
+    }
+  }
+}
+
+window.tampilkanInfoKolomDeskriptif = tampilkanInfoKolomDeskriptif;
 
 async function populateDeskriptifItemCheckboxes(datasetId) {
   const ds = await window.api.datasetAmbil(datasetId);

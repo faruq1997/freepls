@@ -2865,7 +2865,8 @@ body:has(.fullscreen-canvas) .toast-container {
 }
 
 #modalKonfirmasi,
-#modalRenameVersi {
+#modalRenameVersi,
+#modalPanduanKolomDeskriptif {
   z-index: 10100 !important;
 }
 
@@ -3770,6 +3771,198 @@ body:has(.fullscreen-canvas) .toast-container {
   display: flex !important;
   flex-direction: column !important;
   animation: fadeIn 0.2s ease;
+}
+
+/* ============ TH INFO BUTTON & GLOSARIUM PANDUAN KOLOM ============ */
+.th-info-btn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin-left: 3px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.th-info-btn:hover {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  transform: scale(1.18);
+}
+
+.th-info-btn .material-icons-round {
+  font-size: 13px !important;
+}
+
+/* ============ RUMUS UJI INSTRUMEN CARDS ============ */
+.rumus-step-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.2s ease;
+}
+
+.rumus-step-card:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.rumus-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rumus-step-badge {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+}
+
+.rumus-step-header h4 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.rumus-step-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.rumus-formula-box {
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.rumus-keterangan {
+  background: var(--bg-surface-secondary, rgba(255, 255, 255, 0.03));
+  border-left: 3px solid var(--color-primary);
+  border-radius: 4px 6px 6px 4px;
+  padding: 8px 12px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+/* ============ PANDUAN KOLOM DESKRIPTIF CARDS ============ */
+.panduan-kolom-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.panduan-kolom-card:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.panduan-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panduan-card-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.tag-umum { background: rgba(100, 116, 139, 0.15); color: #94a3b8; }
+.tag-pemusatan { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.tag-sebaran { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.tag-capaian { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.tag-normalitas { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+
+.panduan-card-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.panduan-card-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ============ NATIVE MATH FRACTIONS & FORMULA TYPOGRAPHY ============ */
+.math-frac {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: middle;
+  text-align: center;
+  padding: 0 4px;
+  line-height: 1.15;
+}
+
+.math-num {
+  border-bottom: 1.5px solid currentColor;
+  padding-bottom: 2px;
+  display: block;
+}
+
+.math-den {
+  padding-top: 2px;
+  display: block;
+}
+
+.math-root {
+  display: inline-flex;
+  align-items: center;
+}
+
+.math-root-sign {
+  font-size: 1.25em;
+  margin-right: 1px;
+}
+
+.math-root-content {
+  border-top: 1.5px solid currentColor;
+  padding-top: 1px;
+}
+
+.formula-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13.5px;
+  padding: 6px 0;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 /* ============ RESPONSIVE BREAKPOINTS (DATA, ANALISIS, HASIL & LAPORAN) ============ */
