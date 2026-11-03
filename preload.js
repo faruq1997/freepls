@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
   proyekVersiSimpan: (data) => ipcRenderer.invoke('proyek-versi-simpan', data),
   proyekVersiDaftar: (proyekId) => ipcRenderer.invoke('proyek-versi-daftar', proyekId),
   proyekVersiAmbil: (id) => ipcRenderer.invoke('proyek-versi-ambil', id),
+  proyekVersiUpdate: (data) => ipcRenderer.invoke('proyek-versi-update', data),
   proyekVersiHapus: (id) => ipcRenderer.invoke('proyek-versi-hapus', id),
   
   // Dataset

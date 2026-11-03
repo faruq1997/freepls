@@ -225,7 +225,15 @@ ipcMain.handle('proyek-versi-simpan', (_, { proyek_id, nama_versi, catatan, mode
 });
 
 ipcMain.handle('proyek-versi-daftar', (_, proyek_id) => {
-  return dbAll('SELECT id, proyek_id, nama_versi, catatan, tanggal_dibuat FROM proyek_versi WHERE proyek_id = ? ORDER BY id DESC', [proyek_id]);
+  const list = dbAll('SELECT * FROM proyek_versi WHERE proyek_id = ? ORDER BY id DESC', [proyek_id]);
+  return list.map(v => {
+    if (v.model_data && typeof v.model_data === 'string') {
+      try {
+        v.model_data = JSON.parse(v.model_data);
+      } catch (e) {}
+    }
+    return v;
+  });
 });
 
 ipcMain.handle('proyek-versi-ambil', (_, id) => {
@@ -236,6 +244,24 @@ ipcMain.handle('proyek-versi-ambil', (_, id) => {
     } catch(e) {}
   }
   return versi;
+});
+
+ipcMain.handle('proyek-versi-update', (_, { id, nama_versi, catatan }) => {
+  const fields = [];
+  const params = [];
+  if (nama_versi !== undefined) {
+    fields.push('nama_versi = ?');
+    params.push(nama_versi);
+  }
+  if (catatan !== undefined) {
+    fields.push('catatan = ?');
+    params.push(catatan);
+  }
+  if (fields.length > 0) {
+    params.push(id);
+    dbRun(`UPDATE proyek_versi SET ${fields.join(', ')} WHERE id = ?`, params);
+  }
+  return true;
 });
 
 ipcMain.handle('proyek-versi-hapus', (_, id) => {

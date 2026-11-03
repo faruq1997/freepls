@@ -732,7 +732,7 @@ async function setActiveProject(proyek, forceVersiId = null) {
 
   if (forceVersiId) {
     const selectedV = state.versiList.find(v => v.id === forceVersiId);
-    if (selectedV) {
+    if (selectedV && selectedV.model_data) {
       state.versiAktifId = selectedV.id;
       modelToLoad = selectedV.model_data;
       activeVersiName = selectedV.nama_versi;
@@ -740,9 +740,13 @@ async function setActiveProject(proyek, forceVersiId = null) {
   } else if (state.versiList.length > 0) {
     // ATURAN DEFAULT: Jika user belum pilih versi, versi TERAKHIR yang otomatis dimuat sebagai default
     const latestV = state.versiList[0];
-    state.versiAktifId = latestV.id;
-    modelToLoad = latestV.model_data;
-    activeVersiName = latestV.nama_versi;
+    if (latestV && latestV.model_data) {
+      state.versiAktifId = latestV.id;
+      modelToLoad = latestV.model_data;
+      activeVersiName = latestV.nama_versi;
+    } else {
+      state.versiAktifId = null;
+    }
   } else {
     state.versiAktifId = null;
   }
@@ -932,11 +936,11 @@ async function bukaModalRiwayatVersi() {
     const isLatest = (idx === 0);
     const isActive = (state.versiAktifId === v.id);
     let modelObj = {};
-    try {
-      modelObj = typeof v.model_data === 'string' ? JSON.parse(v.model_data) : (v.model_data || {});
-    } catch {}
-    const totalVar = modelObj.variabels?.length || 0;
-    const totalJalur = modelObj.jalurs?.length || 0;
+    if (v.model_data) {
+      modelObj = typeof v.model_data === 'string' ? JSON.parse(v.model_data) : v.model_data;
+    }
+    const totalVar = Array.isArray(modelObj.variabels) ? modelObj.variabels.length : 0;
+    const totalJalur = Array.isArray(modelObj.jalurs) ? modelObj.jalurs.length : 0;
     
     return `
       <div class="versi-card-item ${isActive ? 'active-version' : ''}">
@@ -956,11 +960,14 @@ async function bukaModalRiwayatVersi() {
             <span>• ${totalJalur} Jalur</span>
           </div>
         </div>
-        <div style="display: flex; gap: 6px; margin-left: 12px;">
+        <div style="display: flex; gap: 6px; margin-left: 12px; align-items: center;">
           <button class="btn btn-sm ${isActive ? 'btn-outline' : 'btn-primary'}" onclick="muatVersiSnapshot(${v.id})" title="Terapkan dan buka versi model ini">
             <span class="material-icons-round" style="font-size: 15px;">folder_open</span> ${isActive ? 'Aktif' : 'Buka'}
           </button>
-          <button class="btn btn-sm btn-icon btn-ghost" onclick="hapusVersiSnapshot(${v.id}, '${escapeHtml(v.nama_versi)}')" title="Hapus snapshot versi ini" style="color: var(--color-danger);">
+          <button class="btn btn-sm btn-icon btn-ghost" onclick="renameVersiSnapshot(${v.id})" title="Ubah nama versi">
+            <span class="material-icons-round" style="font-size: 16px;">edit</span>
+          </button>
+          <button class="btn btn-sm btn-icon btn-ghost" onclick="hapusVersiSnapshot(${v.id})" title="Hapus snapshot versi ini" style="color: var(--color-danger);">
             <span class="material-icons-round" style="font-size: 16px;">delete</span>
           </button>
         </div>
@@ -1005,19 +1012,32 @@ async function simpanVersiSnapshot() {
 }
 
 async function muatVersiSnapshot(versiId) {
-  const v = state.versiList.find(item => item.id === versiId);
-  if (!v) return;
-  
-  state.versiAktifId = v.id;
+  let v = state.versiList.find(item => item.id === versiId);
+  if (!v || !v.model_data) {
+    v = await window.api.proyekVersiAmbil(versiId);
+  }
+  if (!v) {
+    showToast('Snapshot versi tidak ditemukan', 'bahaya');
+    return;
+  }
   
   let modelObj = {};
   try {
     modelObj = typeof v.model_data === 'string' ? JSON.parse(v.model_data) : (v.model_data || {});
-  } catch {}
+  } catch (e) {
+    console.error('Gagal parse model_data snapshot:', e);
+  }
+
+  // Guard: cegah model terhapus jika data snapshot rusak / kosong
+  if (!modelObj.variabels && !modelObj.jalurs) {
+    showToast('Data model untuk versi ini tidak lengkap atau kosong', 'peringatan');
+    return;
+  }
   
-  state.variabels = modelObj.variabels || [];
-  state.jalurs = modelObj.jalurs || [];
-  state.catatans = modelObj.catatans || [];
+  state.versiAktifId = v.id;
+  state.variabels = Array.isArray(modelObj.variabels) ? modelObj.variabels : [];
+  state.jalurs = Array.isArray(modelObj.jalurs) ? modelObj.jalurs : [];
+  state.catatans = Array.isArray(modelObj.catatans) ? modelObj.catatans : [];
   
   const labelVersi = document.getElementById('labelVersiAktif');
   if (labelVersi) labelVersi.textContent = `Versi: ${v.nama_versi}`;
@@ -1033,7 +1053,9 @@ async function muatVersiSnapshot(versiId) {
   showToast(`Versi "${v.nama_versi}" berhasil dimuat ke editor!`, 'sukses');
 }
 
-async function hapusVersiSnapshot(versiId, namaVersi) {
+async function hapusVersiSnapshot(versiId) {
+  const v = state.versiList.find(item => item.id === versiId);
+  const namaVersi = v ? v.nama_versi : 'Snapshot';
   const ok = await konfirmasiDialog({
     title: 'Hapus Snapshot Versi',
     message: `Apakah Anda yakin ingin menghapus versi "${namaVersi}"? Tindakan ini tidak dapat dibatalkan.`,
@@ -1054,6 +1076,36 @@ async function hapusVersiSnapshot(versiId, namaVersi) {
     await bukaModalRiwayatVersi();
   }
 }
+
+async function renameVersiSnapshot(versiId) {
+  const v = state.versiList.find(item => item.id === versiId);
+  const namaSaatIni = v ? v.nama_versi : '';
+  const namaBaru = prompt('Ubah nama versi:', namaSaatIni);
+  if (namaBaru === null) return;
+  const trimmed = namaBaru.trim();
+  if (!trimmed) {
+    showToast('Nama versi tidak boleh kosong', 'peringatan');
+    return;
+  }
+  if (trimmed === namaSaatIni) return;
+
+  try {
+    await window.api.proyekVersiUpdate({ id: versiId, nama_versi: trimmed });
+    if (state.versiAktifId === versiId) {
+      const labelVersi = document.getElementById('labelVersiAktif');
+      if (labelVersi) labelVersi.textContent = `Versi: ${trimmed}`;
+    }
+    showToast(`Versi diubah menjadi "${trimmed}"`, 'sukses');
+    await bukaModalRiwayatVersi();
+  } catch (err) {
+    console.error('Gagal mengubah nama versi:', err);
+    showToast('Gagal mengubah nama versi', 'bahaya');
+  }
+}
+
+window.muatVersiSnapshot = muatVersiSnapshot;
+window.hapusVersiSnapshot = hapusVersiSnapshot;
+window.renameVersiSnapshot = renameVersiSnapshot;
 
 // ============ EXPORT / IMPORT .FREEPLS FILE ============
 async function eksporProyekFile() {

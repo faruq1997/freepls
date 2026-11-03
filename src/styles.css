@@ -2864,6 +2864,10 @@ body:has(.fullscreen-canvas) .toast-container {
   animation: overlayFadeIn 0.2s ease;
 }
 
+#modalKonfirmasi {
+  z-index: 10100 !important;
+}
+
 @keyframes overlayFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
