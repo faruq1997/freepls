@@ -169,7 +169,8 @@ function updateProjectStateUI() {
 
   // Analisis buttons
   const analisisButtons = [
-    'btnJalankanPLS', 'btnJalankanBootstrap'
+    'btnJalankanPLS', 'btnJalankanBootstrap',
+    'btnJalankanPLSc', 'btnJalankanIPMA', 'btnJalankanMGA', 'btnJalankanPLSpredict', 'btnJalankanHarman', 'btnEksporAPA'
   ];
   analisisButtons.forEach(id => {
     const el = document.getElementById(id);
@@ -406,6 +407,10 @@ function navigateTo(halaman) {
     }, 60);
   }
   if (halaman === 'data' && state.proyekAktif) loadDatasets();
+  if (halaman === 'analisis' && state.proyekAktif) {
+    populateIPMASelect();
+    populateMGASelect();
+  }
   if (halaman === 'hasil') {
     updateResultsStatusBadge();
     if (state.proyekAktif) {
@@ -784,6 +789,8 @@ async function setActiveProject(proyek, forceVersiId = null) {
   saveHistoryState('Buka Proyek');
 
   updateProjectStateUI();
+  populateIPMASelect();
+  populateMGASelect();
   showToast(`Proyek "${proyek.nama}" dibuka (${activeVersiName})`, 'sukses');
   navigateTo('editor');
 }
@@ -10370,22 +10377,63 @@ function renderSimpleSlopeSvg(modResult, containerId) {
 
 // ============ FITUR BARU: PLSc, IPMA, MGA, PLSpredict, Harman, APA ============
 
+function showNotifikasi(msg, type = 'info') {
+  const typeMap = {
+    warning: 'peringatan',
+    error: 'error',
+    success: 'sukses',
+    info: 'info',
+    peringatan: 'peringatan',
+    sukses: 'sukses'
+  };
+  showToast(msg, typeMap[type] || 'info');
+}
+window.showNotifikasi = showNotifikasi;
+
 function getActiveModelData() {
-  if (!state.proyekAktif) { showNotifikasi('Pilih proyek terlebih dahulu.', 'warning'); return null; }
+  if (!state.proyekAktif) {
+    showToast('Buka atau buat proyek terlebih dahulu sebelum menjalankan analisis.', 'peringatan');
+    return null;
+  }
   const variabels = state.variabels || [];
   const jalurs    = state.jalurs    || [];
-  if (!variabels.length) { showNotifikasi('Model belum memiliki variabel.', 'warning'); return null; }
+  if (!variabels.length) {
+    showToast('Model belum memiliki variabel. Tambahkan variabel di Editor Model terlebih dahulu.', 'peringatan');
+    return null;
+  }
   return { variabels, jalurs };
 }
 
 async function getActiveDataset() {
-  if (!state.proyekAktif) return null;
+  if (!state.proyekAktif) {
+    showToast('Buka proyek terlebih dahulu.', 'peringatan');
+    return null;
+  }
+  if (dataViewerState.allRows && dataViewerState.allRows.length > 0) {
+    return dataViewerState.allRows;
+  }
   try {
     const datasets = await window.api.datasetDaftar(state.proyekAktif.id);
-    if (!datasets.length) { showNotifikasi('Proyek belum memiliki dataset.', 'warning'); return null; }
-    const full = await window.api.datasetAmbil(datasets[0].id);
-    return full?.data || null;
-  } catch { return null; }
+    if (!datasets || !datasets.length) {
+      showToast('Proyek belum memiliki dataset. Impor dataset di Menu Data terlebih dahulu.', 'peringatan');
+      return null;
+    }
+    const targetId = dataViewerState.activeDatasetId || datasets[0].id;
+    const full = await window.api.datasetAmbil(targetId);
+    if (full && Array.isArray(full.data) && full.data.length > 0) {
+      dataViewerState.activeDatasetId = full.id;
+      dataViewerState.activeDataset = full;
+      dataViewerState.columns = Array.isArray(full.kolom) ? full.kolom : [];
+      dataViewerState.allRows = full.data;
+      return full.data;
+    }
+    showToast('Dataset kosong atau tidak dapat dimuat.', 'peringatan');
+    return null;
+  } catch (err) {
+    console.error('Error getActiveDataset:', err);
+    showToast('Gagal memuat dataset: ' + (err.message || err), 'error');
+    return null;
+  }
 }
 
 function renderTable(rows, title) {
@@ -10413,56 +10461,119 @@ document.getElementById('btnJalankanPLSc')?.addEventListener('click', async () =
   if (!model) return;
   const data = await getActiveDataset();
   if (!data) return;
-  showNotifikasi('Menjalankan PLSc...', 'info');
+  showToast('Menjalankan Consistent PLS (PLSc)...', 'info');
   try {
     const engine = new PLSEngine();
     engine.setData(data, model.variabels, model.jalurs);
     const hasil = engine.runPLSc();
     const el = document.getElementById('hasilPLSc');
 
-    const rhoRows = Object.entries(hasil.rhoA || {}).map(([k,v]) => ({ 'Konstruk': k, 'ρ_A': Number(v).toFixed(4), 'Interpretasi': v >= 0.7 ? '✅ Reliabel' : '⚠️ Perlu perhatian' }));
+    const rhoRows = Object.entries(hasil.rhoA || {}).map(([k,v]) => ({
+      'Konstruk': k,
+      'ρ_A': Number(v).toFixed(4),
+      'Interpretasi': v >= 0.7 ? '✅ Reliabel (>= 0.70)' : '⚠️ Perlu perhatian (< 0.70)'
+    }));
     const pathRows = Object.entries(hasil.pathCoefficientsPlsc || {}).map(([k,v]) => {
       const [from,to] = k.split(' → ');
       const orig = hasil.pathCoefficients?.[k] ?? '-';
-      return { 'Jalur': k, 'β PLSc': Number(v).toFixed(4), 'β PLS Asli': typeof orig === 'number' ? Number(orig).toFixed(4) : orig, 'ΔR²': Number((hasil.rSquaredPlsc?.[to] ?? 0) - (hasil.rSquared?.[to] ?? 0)).toFixed(4) };
+      const deltaR2 = (hasil.rSquaredPlsc?.[to] ?? 0) - (hasil.rSquared?.[to] ?? 0);
+      return {
+        'Jalur': k,
+        'β PLSc (Terkoreksi)': Number(v).toFixed(4),
+        'β PLS Asli': typeof orig === 'number' ? Number(orig).toFixed(4) : orig,
+        'ΔR²': Number(deltaR2).toFixed(4)
+      };
     });
 
     el.innerHTML = `
       <div class="alert-box alert-info" style="margin-bottom:12px">
         <span class="material-icons-round">info</span>
-        <span>PLSc mengoreksi <em>attenuation bias</em> menggunakan Dijkstra-Henseler ρ_A. Koefisien PLSc umumnya lebih tinggi dari PLS biasa karena menggunakan korelasi laten yang terkoreksi.</span>
+        <span>Consistent PLS (PLSc) mengoreksi <em>attenuation bias</em> menggunakan Dijkstra-Henseler ρ_A. Koefisien jalur PLSc merefleksikan estimasi konsisten parameter populasi (mendekati CB-SEM).</span>
       </div>
-      ${renderTable(rhoRows, 'ρ_A per Konstruk Reflektif')}
-      ${renderTable(pathRows, 'Path Coefficients: PLSc vs PLS')}
+      ${renderTable(rhoRows, 'Koefisien Reliabilitas Dijkstra-Henseler (ρ_A)')}
+      ${renderTable(pathRows, 'Perbandingan Koefisien Jalur: PLSc vs Standar PLS')}
     `;
     showModal('modalPLSc');
-  } catch(e) { showNotifikasi('Error PLSc: ' + e.message, 'error'); }
+    showToast('Analisis Consistent PLS (PLSc) berhasil!', 'sukses');
+  } catch(e) {
+    console.error('Error PLSc:', e);
+    showToast('Gagal menjalankan PLSc: ' + e.message, 'error');
+  }
 });
 
 // ── IPMA ──────────────────────────────────────────────────────────────────────
-function populateIPMASelect() {
+async function populateIPMASelect() {
   const sel = document.getElementById('ipmaTargetVar');
   if (!sel) return;
-  sel.innerHTML = '<option value="">— pilih variabel endogen —</option>';
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">— pilih variabel target —</option>';
   const jalurs = state.jalurs || [];
-  const endogen = (state.variabels || []).filter(v => jalurs.some(j => j.ke === v.nama));
-  endogen.forEach(v => { const o = document.createElement('option'); o.value = v.nama; o.textContent = v.nama; sel.appendChild(o); });
+  const allVars = state.variabels || [];
+  if (!allVars.length) return;
+
+  const endogen = allVars.filter(v => jalurs.some(j => j.ke === v.nama));
+  if (endogen.length > 0) {
+    const optGroupEndo = document.createElement('optgroup');
+    optGroupEndo.label = 'Variabel Endogen (Target Jalur)';
+    endogen.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v.nama;
+      o.textContent = v.nama;
+      optGroupEndo.appendChild(o);
+    });
+    sel.appendChild(optGroupEndo);
+  }
+
+  const eksogen = allVars.filter(v => !jalurs.some(j => j.ke === v.nama));
+  if (eksogen.length > 0) {
+    const optGroupEkso = document.createElement('optgroup');
+    optGroupEkso.label = 'Variabel Eksogen / Lainnya';
+    eksogen.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v.nama;
+      o.textContent = v.nama;
+      optGroupEkso.appendChild(o);
+    });
+    sel.appendChild(optGroupEkso);
+  }
+
+  if (currentVal && allVars.some(v => v.nama === currentVal)) {
+    sel.value = currentVal;
+  } else if (endogen.length > 0) {
+    sel.value = endogen[0].nama;
+  } else if (allVars.length > 0) {
+    sel.value = allVars[0].nama;
+  }
 }
 
 document.getElementById('btnJalankanIPMA')?.addEventListener('click', async () => {
   const target = document.getElementById('ipmaTargetVar')?.value;
-  if (!target) { showNotifikasi('Pilih variabel target IPMA terlebih dahulu.', 'warning'); return; }
+  if (!target) {
+    showToast('Pilih variabel target IPMA terlebih dahulu pada dropdown.', 'peringatan');
+    return;
+  }
   const model = getActiveModelData();
   if (!model) return;
   const data = await getActiveDataset();
   if (!data) return;
-  showNotifikasi('Menghitung IPMA...', 'info');
+  showToast(`Menghitung IPMA untuk target "${target}"...`, 'info');
   try {
     const engine = new PLSEngine();
     engine.setData(data, model.variabels, model.jalurs);
     engine.runPLS();
     const { ipma } = engine.calculateIPMA(target);
     const el = document.getElementById('hasilIPMA');
+
+    if (!ipma || !ipma.length) {
+      el.innerHTML = `
+        <div class="alert-box alert-warning" style="margin-bottom:12px">
+          <span class="material-icons-round">warning</span>
+          <span>Tidak ditemukan variabel prediktor (antecedent) yang memiliki jalur langsung atau tidak langsung menuju target <strong>${escapeHtml(target)}</strong>. Pastikan model memiliki jalur struktural yang mengarah ke variabel ini.</span>
+        </div>
+      `;
+      showModal('modalIPMA');
+      return;
+    }
 
     const rows = ipma.map(r => ({
       'Variabel': r.variabel,
@@ -10471,59 +10582,125 @@ document.getElementById('btnJalankanIPMA')?.addEventListener('click', async () =
       'Prioritas': r.prioritas,
     }));
 
-    // Simple scatter plot SVG
-    const w = 380, h = 260, pad = 50;
-    const minI = Math.min(...ipma.map(r => r.importance)), maxI = Math.max(...ipma.map(r => r.importance));
+    // Scatter plot SVG
+    const w = 420, h = 280, pad = 50;
+    const minI = Math.min(0, ...ipma.map(r => r.importance));
+    const maxI = Math.max(0.1, ...ipma.map(r => r.importance));
     const iRange = (maxI - minI) || 1;
     const scaleX = (v) => pad + ((v - 0) / 100) * (w - pad * 2);
     const scaleY = (v) => h - pad - ((v - minI) / iRange) * (h - pad * 2);
+    const midX = scaleX(50);
+    const midY = scaleY((maxI + minI) / 2);
+
     const points = ipma.map(r => {
       const cx = scaleX(r.performance), cy = scaleY(r.importance);
-      return `<circle cx="${cx}" cy="${cy}" r="7" fill="#f59e0b" opacity="0.85"/>
-              <text x="${cx}" y="${cy - 11}" font-size="10" text-anchor="middle" fill="var(--text-primary)">${escapeHtml(r.variabel)}</text>`;
+      return `<circle cx="${cx}" cy="${cy}" r="7" fill="#f59e0b" stroke="#ffffff" stroke-width="2" opacity="0.9"/>
+              <text x="${cx}" y="${cy - 10}" font-size="11" font-weight="600" text-anchor="middle" fill="var(--text-primary)">${escapeHtml(r.variabel)}</text>`;
     }).join('');
 
     el.innerHTML = `
       <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
-        <svg width="${w}" height="${h}" style="flex-shrink:0;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-input)">
-          <text x="${w/2}" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text-primary)">IPMA Map → ${escapeHtml(target)}</text>
-          <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${h-pad}" stroke="var(--border-color)" stroke-width="1"/>
-          <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="var(--border-color)" stroke-width="1"/>
-          <text x="${w/2}" y="${h-8}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Performance (0–100)</text>
-          <text transform="rotate(-90)" x="${-(h/2)}" y="14" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Importance (Total Effect)</text>
-          ${points}
-        </svg>
-        <div style="flex:1;min-width:260px">${renderTable(rows, 'Tabel IPMA')}</div>
+        <div style="flex-shrink:0;">
+          <svg width="${w}" height="${h}" style="border:1px solid var(--border-color);border-radius:8px;background:var(--bg-input)">
+            <!-- Garis kuadran -->
+            <line x1="${midX}" y1="${pad}" x2="${midX}" y2="${h-pad}" stroke="var(--border-color)" stroke-dasharray="3,3"/>
+            <line x1="${pad}" y1="${midY}" x2="${w-pad}" y2="${midY}" stroke="var(--border-color)" stroke-dasharray="3,3"/>
+            
+            <text x="${w/2}" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text-primary)">Matriks IPMA → ${escapeHtml(target)}</text>
+            <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${h-pad}" stroke="var(--border-color)" stroke-width="1.5"/>
+            <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="var(--border-color)" stroke-width="1.5"/>
+            <text x="${w/2}" y="${h-10}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-secondary)">Performance (0–100)</text>
+            <text transform="rotate(-90)" x="${-(h/2)}" y="16" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-secondary)">Importance (Total Effect)</text>
+            ${points}
+          </svg>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:6px;max-width:${w}px">
+            Kuadran Kiri Atas: <strong>Prioritas Utama</strong> (Importance tinggi, Performance rendah).
+          </div>
+        </div>
+        <div style="flex:1;min-width:280px">${renderTable(rows, 'Tabel Importance & Performance')}</div>
       </div>`;
     showModal('modalIPMA');
-  } catch(e) { showNotifikasi('Error IPMA: ' + e.message, 'error'); }
+    showToast('IPMA berhasil dihitung!', 'sukses');
+  } catch(e) {
+    console.error('Error IPMA:', e);
+    showToast('Gagal menghitung IPMA: ' + e.message, 'error');
+  }
 });
 
 // ── MGA ───────────────────────────────────────────────────────────────────────
-function populateMGASelect() {
+async function populateMGASelect() {
   const sel = document.getElementById('mgaKolomGrup');
   if (!sel) return;
-  sel.innerHTML = '<option value="">— pilih kolom —</option>';
-  // Kolom dari dataset aktif — ambil dari dataset state jika ada
-  if (state._kolomDataset) {
-    state._kolomDataset.forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = k; sel.appendChild(o); });
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">— pilih kolom grup —</option>';
+
+  let cols = dataViewerState.columns || [];
+  if ((!cols || !cols.length) && state.proyekAktif) {
+    try {
+      const datasets = await window.api.datasetDaftar(state.proyekAktif.id);
+      if (datasets && datasets.length) {
+        const full = await window.api.datasetAmbil(dataViewerState.activeDatasetId || datasets[0].id);
+        if (full) {
+          cols = Array.isArray(full.kolom) ? full.kolom : [];
+          dataViewerState.columns = cols;
+          dataViewerState.allRows = Array.isArray(full.data) ? full.data : [];
+          dataViewerState.activeDataset = full;
+          dataViewerState.activeDatasetId = full.id;
+        }
+      }
+    } catch (e) {
+      console.warn('Gagal memuat kolom untuk MGA:', e);
+    }
+  }
+
+  if (!cols || !cols.length) return;
+
+  cols.forEach(k => {
+    const o = document.createElement('option');
+    o.value = k;
+    o.textContent = k;
+    sel.appendChild(o);
+  });
+
+  if (currentVal && cols.includes(currentVal)) {
+    sel.value = currentVal;
   }
 }
 
 document.getElementById('btnJalankanMGA')?.addEventListener('click', async () => {
   const kolomGrup = document.getElementById('mgaKolomGrup')?.value;
-  if (!kolomGrup) { showNotifikasi('Pilih kolom grup (berisi nilai 1 atau 2).', 'warning'); return; }
+  if (!kolomGrup) {
+    showToast('Pilih kolom grup perbandingan terlebih dahulu.', 'peringatan');
+    return;
+  }
   const model = getActiveModelData();
   if (!model) return;
   const data = await getActiveDataset();
   if (!data || !data.length) return;
 
-  const g1 = data.filter(r => String(r[kolomGrup]) === '1');
-  const g2 = data.filter(r => String(r[kolomGrup]) === '2');
-  if (g1.length < 5 || g2.length < 5) { showNotifikasi(`Grup terlalu kecil: Grup 1 (n=${g1.length}), Grup 2 (n=${g2.length}). Min 5 per grup.`, 'warning'); return; }
+  const distinctVals = [...new Set(data.map(r => r[kolomGrup]).filter(v => v !== null && v !== undefined && String(v).trim() !== ''))];
+  if (distinctVals.length < 2) {
+    showToast(`Kolom "${kolomGrup}" hanya memiliki ${distinctVals.length} kategori nilai. MGA membutuhkan minimal 2 kelompok.`, 'peringatan');
+    return;
+  }
+
+  let val1 = distinctVals[0];
+  let val2 = distinctVals[1];
+  if (distinctVals.includes('1') && distinctVals.includes('2')) {
+    val1 = '1';
+    val2 = '2';
+  }
+
+  const g1 = data.filter(r => String(r[kolomGrup]) === String(val1));
+  const g2 = data.filter(r => String(r[kolomGrup]) === String(val2));
+
+  if (g1.length < 5 || g2.length < 5) {
+    showToast(`Ukuran sampel grup terlalu kecil: Grup "${val1}" (n=${g1.length}), Grup "${val2}" (n=${g2.length}). Minimal 5 sampel per grup.`, 'peringatan');
+    return;
+  }
 
   const nBs = parseInt(document.getElementById('mgaJumlahBootstrap')?.value) || 500;
-  showNotifikasi(`Menjalankan MGA (n1=${g1.length}, n2=${g2.length}, B=${nBs})... mungkin butuh beberapa detik.`, 'info');
+  showToast(`Menjalankan MGA (${val1} vs ${val2}, B=${nBs})... Mohon tunggu.`, 'info');
   try {
     const engine = new PLSEngine();
     engine.setData([], model.variabels, model.jalurs);
@@ -10531,22 +10708,28 @@ document.getElementById('btnJalankanMGA')?.addEventListener('click', async () =>
 
     const rows = Object.values(hasil.mga).map(r => ({
       'Jalur': r.path,
-      'β Grup 1': r.group1.beta.toFixed(4),
-      'β Grup 2': r.group2.beta.toFixed(4),
-      'Δβ': r.diff.toFixed(4),
+      [`β Grup ${val1}`]: r.group1.beta.toFixed(4),
+      [`β Grup ${val2}`]: r.group2.beta.toFixed(4),
+      '|Δβ|': Math.abs(r.diff).toFixed(4),
       't-stat': r.tStatistic.toFixed(4),
       'p-value': r.pValue.toFixed(4),
-      'Signifikan?': r.significant ? '✅ Ya' : 'Tidak',
+      'Signifikan?': r.significant ? '✅ Signifikan' : 'Tidak',
       'Kesimpulan': r.kesimpulan,
     }));
+
     document.getElementById('hasilMGA').innerHTML = `
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">
-        Grup 1: n=${hasil.group1.n} &nbsp;|&nbsp; Grup 2: n=${hasil.group2.n} &nbsp;|&nbsp; Metode: Henseler Parametric MGA
-      </p>
-      ${renderTable(rows, 'Perbandingan Path Coefficients Antar Kelompok')}
+      <div class="alert-box alert-info" style="margin-bottom:12px">
+        <span class="material-icons-round">info</span>
+        <span>Perbandingan Multi-Group Analysis menguji apakah koefisien jalur berbeda nyata secara statistik antara <strong>Grup "${escapeHtml(String(val1))}" (n=${hasil.group1.n})</strong> dan <strong>Grup "${escapeHtml(String(val2))}" (n=${hasil.group2.n})</strong> menggunakan Uji Parametrik Henseler.</span>
+      </div>
+      ${renderTable(rows, 'Hasil Uji Beda Jalur Antar Kelompok (MGA)')}
     `;
     showModal('modalMGA');
-  } catch(e) { showNotifikasi('Error MGA: ' + e.message, 'error'); }
+    showToast('Analisis MGA berhasil diselesaikan!', 'sukses');
+  } catch(e) {
+    console.error('Error MGA:', e);
+    showToast('Gagal menjalankan MGA: ' + e.message, 'error');
+  }
 });
 
 // ── PLSpredict ────────────────────────────────────────────────────────────────
@@ -10556,7 +10739,7 @@ document.getElementById('btnJalankanPLSpredict')?.addEventListener('click', asyn
   const data = await getActiveDataset();
   if (!data) return;
   const kFolds = parseInt(document.getElementById('plspredictKFolds')?.value) || 10;
-  showNotifikasi(`Menjalankan PLSpredict (${kFolds}-fold)...`, 'info');
+  showToast(`Menjalankan PLSpredict (${kFolds}-fold cross validation)...`, 'info');
   try {
     const engine = new PLSEngine();
     engine.setData(data, model.variabels, model.jalurs);
@@ -10564,22 +10747,27 @@ document.getElementById('btnJalankanPLSpredict')?.addEventListener('click', asyn
 
     const rows = Object.entries(hasil.prediksi).map(([varName, res]) => ({
       'Variabel Endogen': varName,
-      'n': res.n,
-      'RMSE': res.rmse.toFixed(4),
-      'RMSE Naive': res.rmseNaive.toFixed(4),
+      'N': res.n,
+      'RMSE PLS': res.rmse.toFixed(4),
+      'RMSE Naive (LM)': res.rmseNaive.toFixed(4),
       'MAE': res.mae.toFixed(4),
       'Q²_predict': res.q2predict.toFixed(4),
-      'Relevansi Prediktif': res.relevansiPrediktif,
+      'Kekuatan Prediksi': res.relevansiPrediktif,
     }));
+
     document.getElementById('hasilPLSpredict').innerHTML = `
       <div class="alert-box alert-info" style="margin-bottom:12px">
         <span class="material-icons-round">info</span>
-        <span>Q²_predict &gt; 0 <strong>dan</strong> RMSE &lt; Naive = relevansi prediktif terkonfirmasi. ${hasil.kFolds}-fold cross-validation digunakan.</span>
+        <span>PLSpredict menguji kemampuan prediksi <em>out-of-sample</em> (${hasil.kFolds}-fold CV). Model memiliki relevansi prediktif jika Q²_predict &gt; 0 dan kesalahan prediksi PLS lebih rendah daripada model naive (RMSE PLS &lt; RMSE Naive) mengacu pada Hair et al. (2019).</span>
       </div>
-      ${renderTable(rows, 'Hasil PLSpredict per Variabel Endogen')}
+      ${renderTable(rows, 'Evaluasi Prediksi Out-of-Sample per Variabel Endogen')}
     `;
     showModal('modalPLSpredict');
-  } catch(e) { showNotifikasi('Error PLSpredict: ' + e.message, 'error'); }
+    showToast('PLSpredict selesai dihitung!', 'sukses');
+  } catch(e) {
+    console.error('Error PLSpredict:', e);
+    showToast('Gagal menjalankan PLSpredict: ' + e.message, 'error');
+  }
 });
 
 // ── Harman CMV ────────────────────────────────────────────────────────────────
@@ -10588,7 +10776,7 @@ document.getElementById('btnJalankanHarman')?.addEventListener('click', async ()
   if (!model) return;
   const data = await getActiveDataset();
   if (!data) return;
-  showNotifikasi('Menghitung Harman Single Factor Test...', 'info');
+  showToast('Menghitung Harman Single Factor Test (CMV)...', 'info');
   try {
     const engine = new PLSEngine();
     engine.setData(data, model.variabels, model.jalurs);
@@ -10602,10 +10790,10 @@ document.getElementById('btnJalankanHarman')?.addEventListener('click', async ()
     }));
 
     document.getElementById('hasilHarman').innerHTML = `
-      <div style="text-align:center;padding:20px 0;">
+      <div style="text-align:center;padding:16px 0;">
         <span class="material-icons-round" style="font-size:48px;color:${color}">${icon}</span>
         <div style="font-size:32px;font-weight:800;color:${color};margin:8px 0">${hasil.varianceFirstFactor.toFixed(1)}%</div>
-        <div style="font-size:14px;color:var(--text-secondary)">Variansi yang dijelaskan faktor pertama (threshold 50%)</div>
+        <div style="font-size:14px;color:var(--text-secondary)">Variansi Kumulatif Faktor Pertama (Ambang Batas Maksimal 50%)</div>
       </div>
       <div class="alert-box" style="background:${hasil.isProblematic ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)'};border-color:${color};margin-bottom:16px">
         <span class="material-icons-round" style="color:${color}">${icon}</span>
@@ -10613,12 +10801,16 @@ document.getElementById('btnJalankanHarman')?.addEventListener('click', async ()
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
         <div class="stat-mini"><label>Eigenvalue F1</label><span>${hasil.eigenvalueF1.toFixed(4)}</span></div>
-        <div class="stat-mini"><label>Jumlah Indikator</label><span>${hasil.jumlahIndikator}</span></div>
+        <div class="stat-mini"><label>Total Indikator</label><span>${hasil.jumlahIndikator}</span></div>
       </div>
-      ${renderTable(loadRows.slice(0,10), 'Loadings 10 Teratas pada Faktor Pertama')}
+      ${renderTable(loadRows.slice(0, 15), 'Loading 15 Indikator Tertinggi pada Faktor Pertama')}
     `;
     showModal('modalHarman');
-  } catch(e) { showNotifikasi('Error Harman: ' + e.message, 'error'); }
+    showToast('Uji Harman CMV berhasil dievaluasi!', 'sukses');
+  } catch(e) {
+    console.error('Error Harman:', e);
+    showToast('Gagal menjalankan Uji Harman: ' + e.message, 'error');
+  }
 });
 
 // ── APA Export ────────────────────────────────────────────────────────────────
@@ -10627,7 +10819,7 @@ document.getElementById('btnEksporAPA')?.addEventListener('click', async () => {
   if (!model) return;
   const data = await getActiveDataset();
   if (!data) return;
-  showNotifikasi('Membuat tabel APA 7...', 'info');
+  showToast('Membuat tabel format APA 7...', 'info');
   try {
     const engine = new PLSEngine();
     engine.setData(data, model.variabels, model.jalurs);
@@ -10635,13 +10827,13 @@ document.getElementById('btnEksporAPA')?.addEventListener('click', async () => {
     const hasil = engine.formatAPA();
 
     const makeCsvBtn = (csv, label) =>
-      `<button class="btn btn-sm btn-outline" style="margin-bottom:8px" onclick="navigator.clipboard.writeText(${JSON.stringify(csv)}).then(()=>showNotifikasi('CSV disalin!','success'))">
-        <span class="material-icons-round">content_copy</span> Salin CSV ${escapeHtml(label)}
+      `<button class="btn btn-sm btn-outline" style="margin-bottom:8px" onclick="navigator.clipboard.writeText(${JSON.stringify(csv)}).then(()=>showNotifikasi('Tabel ${escapeHtml(label)} disalin ke clipboard!','success'))">
+        <span class="material-icons-round">content_copy</span> Salin Tabel ${escapeHtml(label)} (CSV)
       </button>`;
 
     document.getElementById('hasilAPA').innerHTML = `
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">
-        Salin CSV ke Excel/Google Sheets, lalu format sesuai APA 7. Ganti "Table X" dengan nomor tabel naskah Anda.
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+        Tabel siap disalin ke Microsoft Word / Google Docs / LaTeX dengan standar APA Style 7th Edition:
       </p>
       ${['tabel1_outerLoadings','tabel2_reliabilitas','tabel3_htmt','tabel4_pathCoefficients'].map(key => {
         const t = hasil[key];
@@ -10652,10 +10844,17 @@ document.getElementById('btnEksporAPA')?.addEventListener('click', async () => {
       }).join('')}
     `;
     showModal('modalAPA');
-  } catch(e) { showNotifikasi('Error APA: ' + e.message, 'error'); }
+    showToast('Tabel APA 7 siap ditampilkan!', 'sukses');
+  } catch(e) {
+    console.error('Error APA:', e);
+    showToast('Gagal memformat APA 7: ' + e.message, 'error');
+  }
 });
 
-// Populate selects saat halaman analisis dibuka
+// Inisialisasi awal saat halaman analisis dibuka
 document.querySelector('[data-halaman="analisis"]')?.addEventListener('click', () => {
-  setTimeout(() => { populateIPMASelect(); populateMGASelect(); }, 100);
+  setTimeout(() => {
+    populateIPMASelect();
+    populateMGASelect();
+  }, 50);
 });
