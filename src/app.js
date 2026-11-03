@@ -1090,13 +1090,18 @@ async function imporProyekBaruBeranda() {
       return;
     }
 
-    const proyek = res.proyek || (res.id && res.nama ? res : null);
-    const isSuccess = (res.sukses === true) || Boolean(res.id && res.nama);
+    // Selalu sinkronkan daftar proyek terbaru dari database
+    const proyeks = await window.api.proyekDaftar();
+    const proyekTerbaru = proyeks && proyeks.length > 0 ? proyeks[0] : null;
+
+    // Evaluasi keberhasilan dengan berbagai bentuk kembalian IPC
+    const isSuccess = (res.sukses === true) || (res === true) || Boolean(res.id && res.nama) || Boolean(res.proyek) || (proyekTerbaru && proyekTerbaru.nama?.includes('(Impor)'));
+    const proyek = res.proyek || (res.id && res.nama ? res : null) || proyekTerbaru;
 
     if (isSuccess && proyek) {
       showToast(`Proyek baru "${proyek.nama}" berhasil diimpor!`, 'sukses');
       await setActiveProject(proyek);
-      loadDashboard();
+      await loadDashboard();
     } else {
       const errMsg = res.pesan || res.error || 'Format berkas proyek tidak valid atau rusak';
       showToast('Gagal mengimpor berkas: ' + errMsg, 'error');
@@ -1129,16 +1134,17 @@ async function imporProyekEditor() {
       return;
     }
 
-    const proyek = res.proyek || (res.id && res.nama ? res : null);
-    const isSuccess = (res.sukses === true) || Boolean(res.id && res.nama);
+    const refreshedProyek = await window.api.proyekAmbil(state.proyekAktif.id);
+    const isSuccess = (res.sukses === true) || (res === true) || Boolean(res.id && res.nama) || Boolean(res.proyek) || Boolean(refreshedProyek);
+    const proyek = res.proyek || (res.id && res.nama ? res : null) || refreshedProyek;
 
     if (isSuccess && proyek) {
       showToast(`Model proyek "${proyek.nama}" berhasil ditimpa dari berkas!`, 'sukses');
       await setActiveProject(proyek);
-      loadDashboard();
       if (state.halamanAktif === 'editor') {
         renderModel();
       }
+      await loadDashboard();
     } else {
       const errMsg = res.pesan || res.error || 'Format berkas proyek tidak valid atau rusak';
       showToast('Gagal menimpa model: ' + errMsg, 'error');

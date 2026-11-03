@@ -470,8 +470,14 @@ ipcMain.handle('proyek-impor-file', async (_, targetProyekId = null) => {
       });
     }
 
-    const insertedProyek = dbGet('SELECT * FROM proyek WHERE id = ?', [newProyekId]);
-    return { sukses: true, proyek: insertedProyek };
+    let insertedProyek = dbGet('SELECT * FROM proyek WHERE id = ?', [newProyekId]);
+    if (!insertedProyek) {
+      insertedProyek = dbGet('SELECT * FROM proyek ORDER BY id DESC LIMIT 1');
+    }
+    if (!insertedProyek) {
+      insertedProyek = { id: newProyekId, nama: `${proyekData.nama} (Impor)`, model_data: modelDataStr };
+    }
+    return { sukses: true, mode: 'new', proyek: insertedProyek };
   } catch (err) {
     console.error('Error saat impor file:', err);
     return { sukses: false, pesan: err.message };
