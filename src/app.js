@@ -402,9 +402,11 @@ function navigateTo(halaman) {
   // Refresh data based on page
   if (halaman === 'beranda') loadDashboard();
   if (halaman === 'editor' && state.proyekAktif) {
+    renderModel();
+    requestAnimationFrame(() => renderModel());
     setTimeout(() => {
       renderModel();
-    }, 60);
+    }, 80);
   }
   if (halaman === 'data' && state.proyekAktif) loadDatasets();
   if (halaman === 'analisis' && state.proyekAktif) {
@@ -1399,15 +1401,18 @@ function fitDiagramToCanvas() {
 
   const scaleX = (cw - padding * 2) / modelWidth;
   const scaleY = (ch - padding * 2) / modelHeight;
-  const targetZoom = Math.min(1.4, Math.max(0.4, Math.min(scaleX, scaleY)));
+  let targetZoom = Math.min(1.4, Math.max(0.4, Math.min(scaleX, scaleY)));
+  if (!isFinite(targetZoom) || isNaN(targetZoom)) targetZoom = 1.0;
 
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
 
   state.zoom = targetZoom;
+  const panX = Math.round(cw / 2 - centerX * targetZoom);
+  const panY = Math.round(ch / 2 - centerY * targetZoom);
   state.pan = {
-    x: Math.round(cw / 2 - centerX * targetZoom),
-    y: Math.round(ch / 2 - centerY * targetZoom)
+    x: isFinite(panX) ? panX : 0,
+    y: isFinite(panY) ? panY : 0
   };
 
   updateZoomLabel();
@@ -4511,8 +4516,28 @@ function renderModel() {
   const wrapper = canvas.parentElement;
   if (!wrapper) return;
   
-  canvas.width = wrapper.clientWidth || 1000;
-  canvas.height = wrapper.clientHeight || 600;
+  const w = wrapper.clientWidth;
+  const h = wrapper.clientHeight;
+  if (w > 0 && h > 0) {
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+  } else {
+    if (!canvas.width || canvas.width === 0) canvas.width = 1000;
+    if (!canvas.height || canvas.height === 0) canvas.height = 600;
+  }
+
+  // Sanitize pan and zoom to prevent canvas content disappearing due to NaN / Infinity
+  if (!state.pan || typeof state.pan.x !== 'number' || isNaN(state.pan.x) || !isFinite(state.pan.x)) {
+    state.pan = { x: 0, y: 0 };
+  }
+  if (typeof state.pan.y !== 'number' || isNaN(state.pan.y) || !isFinite(state.pan.y)) {
+    state.pan.y = 0;
+  }
+  if (typeof state.zoom !== 'number' || isNaN(state.zoom) || !isFinite(state.zoom) || state.zoom <= 0.05) {
+    state.zoom = 1.0;
+  }
   
   const ctx = canvas.getContext('2d');
   const style = getComputedStyle(document.body);
@@ -4811,9 +4836,13 @@ function setupCanvasInteractions() {
     const my = (rawY - state.pan.y) / state.zoom;
     
     if (state.isPanning) {
-      state.pan.x = rawX - state.panStart.x;
-      state.pan.y = rawY - state.panStart.y;
-      renderModel();
+      if (state.panStart) {
+        const nx = rawX - state.panStart.x;
+        const ny = rawY - state.panStart.y;
+        state.pan.x = isFinite(nx) ? nx : 0;
+        state.pan.y = isFinite(ny) ? ny : 0;
+        renderModel();
+      }
       return;
     }
 
@@ -5093,10 +5122,19 @@ function setupCanvasInteractions() {
     const mouseY = e.clientY - rect.top;
 
     const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
-    const newZoom = Math.min(3.0, Math.max(0.3, state.zoom * zoomFactor));
+    const curZoom = (isFinite(state.zoom) && state.zoom > 0) ? state.zoom : 1.0;
+    const newZoom = Math.min(3.0, Math.max(0.3, curZoom * zoomFactor));
 
-    state.pan.x = mouseX - (mouseX - state.pan.x) * (newZoom / state.zoom);
-    state.pan.y = mouseY - (mouseY - state.pan.y) * (newZoom / state.zoom);
+    const curPanX = isFinite(state.pan?.x) ? state.pan.x : 0;
+    const curPanY = isFinite(state.pan?.y) ? state.pan.y : 0;
+
+    const newPanX = mouseX - (mouseX - curPanX) * (newZoom / curZoom);
+    const newPanY = mouseY - (mouseY - curPanY) * (newZoom / curZoom);
+
+    state.pan = {
+      x: isFinite(newPanX) ? newPanX : 0,
+      y: isFinite(newPanY) ? newPanY : 0
+    };
     state.zoom = newZoom;
 
     updateZoomLabel();
