@@ -2648,7 +2648,10 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     if (selectMediator) {
       selectMediator.innerHTML = '<option value="">-- Pilih Variabel Mediator (Z) --</option>' + options;
     }
-    
+
+    // Auto-isi variabel asal dari node yang sedang dipilih di canvas
+    if (state.selectedNode) selectDari.value = state.selectedNode;
+
     showModal('modalTambahJalur');
   });
   
