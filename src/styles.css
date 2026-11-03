@@ -3150,6 +3150,24 @@ body:has(.fullscreen-canvas) .toast-container {
   color: var(--color-success);
 }
 
+.dataset-chip.disabled {
+  background: var(--bg-hover) !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-muted) !important;
+  cursor: not-allowed !important;
+  opacity: 0.55;
+  transform: none !important;
+  pointer-events: auto;
+}
+
+.dataset-chip.disabled:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--border-light) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 /* ============ TIPE GARIS SELECTOR ============ */
 .tipe-garis-card {
   transition: all var(--transition-fast);

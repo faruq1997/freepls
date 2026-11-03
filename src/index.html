@@ -2662,6 +2662,35 @@
     </div>
   </div>
 
+  <!-- ============ MODAL EDIT INDIKATOR ============ -->
+  <div class="modal-overlay tersembunyi" id="modalEditIndikator">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: var(--color-primary);">edit</span>
+          <h3 id="modalEditIndikatorTitle">Ubah Nama Indikator</h3>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editIndikatorVarId">
+        <input type="hidden" id="editIndikatorOldName">
+        <div class="form-group">
+          <label for="inputEditNamaIndikator">Nama Indikator Baru</label>
+          <input type="text" class="form-input" id="inputEditNamaIndikator" placeholder="Contoh: SQ1, Sat1, Y1_1...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-close">Batal</button>
+        <button class="btn btn-primary" id="btnSimpanEditIndikator">
+          <span class="material-icons-round">check</span> Simpan
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ MODAL RIWAYAT VERSI PROYEK ============ -->
   <div class="modal-overlay tersembunyi" id="modalRiwayatVersi">
     <div class="modal modal-lg">
@@ -4090,6 +4119,24 @@
     <button class="context-item context-item-danger" id="ctxBtnHapus">
       <span class="material-icons-round">delete</span>
       <span>Hapus dari Diagram</span>
+    </button>
+  </div>
+
+  <!-- ============ CANVAS INDIKATOR CONTEXT MENU ============ -->
+  <div class="canvas-context-menu tersembunyi" id="indikatorCanvasContextMenu">
+    <div class="context-menu-header" id="indCtxHeaderTitle">Indikator</div>
+    <button class="context-item" id="indCtxBtnEdit">
+      <span class="material-icons-round" style="color: var(--color-primary);">edit</span>
+      <span>Ubah Nama Indikator</span>
+    </button>
+    <button class="context-item" id="indCtxBtnSalin">
+      <span class="material-icons-round" style="color: var(--text-secondary);">content_copy</span>
+      <span>Salin Nama Indikator</span>
+    </button>
+    <div class="context-menu-divider"></div>
+    <button class="context-item context-item-danger" id="indCtxBtnHapus">
+      <span class="material-icons-round">delete</span>
+      <span>Hapus Indikator</span>
     </button>
   </div>
 

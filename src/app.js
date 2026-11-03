@@ -2687,6 +2687,7 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     tokens.forEach(tok => tambahIndikatorInput(tok));
     document.getElementById('batchInputContainer').classList.add('tersembunyi');
     document.getElementById('inputBatchIndikator').value = '';
+    updateDatasetChipsInModal();
     showToast(`${tokens.length} indikator diterapkan`, 'sukses');
   });
 
@@ -2712,16 +2713,17 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     // Auto populate suggestion chips from dataset if available
     updateDatasetChipsInModal();
 
-    // Default 3 indicator fields (bisa dikosongkan jika konseptual)
-    tambahIndikatorInput();
-    tambahIndikatorInput();
+    // Default 1 indicator field
     tambahIndikatorInput();
     
     showModal('modalTambahVariabel');
     setTimeout(() => document.getElementById('inputNamaVariabel').focus(), 150);
   });
   
-  document.getElementById('btnTambahIndikator').addEventListener('click', () => tambahIndikatorInput());
+  document.getElementById('btnTambahIndikator').addEventListener('click', () => {
+    tambahIndikatorInput();
+    updateDatasetChipsInModal();
+  });
   
   document.getElementById('btnSimpanVariabel').addEventListener('click', () => {
     const nama = document.getElementById('inputNamaVariabel').value.trim();
@@ -2952,43 +2954,159 @@ window.terapkanTemplateModel = terapkanTemplateModel;
   });
 }
 
-function updateDatasetChipsInModal() {
+async function updateDatasetChipsInModal(editingVarId = null) {
   const container = document.getElementById('datasetColumnsSuggestion');
   const list = document.getElementById('datasetChipsList');
   if (!container || !list) return;
 
-  if (state.datasets && state.datasets.length > 0) {
-    const ds = state.datasets[0];
-    const cols = ds.kolom || [];
-    if (cols.length > 0) {
-      container.classList.remove('tersembunyi');
-      list.innerHTML = cols.map(c => `
-        <span class="dataset-chip" onclick="tambahIndikatorDariChip('${escapeHtml(c)}')">
-          <span class="material-icons-round" style="font-size: 13px;">add</span> ${escapeHtml(c)}
-        </span>
-      `).join('');
-      return;
+  // Collect all indicators already assigned to OTHER variables (with variable name)
+  const usedElsewhere = new Map();
+  (state.variabels || []).forEach(v => {
+    if (editingVarId && v.id === editingVarId) return;
+    (v.indikator || []).forEach(ind => usedElsewhere.set(ind, v.nama));
+  });
+
+  // Also count indicators already added in the current modal form
+  const inForm = new Set();
+  document.querySelectorAll('#indikatorContainer .form-input').forEach(inp => {
+    const val = inp.value.trim();
+    if (val) inForm.add(val);
+  });
+
+  let cols = [];
+  if (state.datasets && state.datasets.length > 0 && state.datasets[0].kolom) {
+    cols = state.datasets[0].kolom;
+  } else if (dataViewerState && dataViewerState.columns && dataViewerState.columns.length > 0) {
+    cols = dataViewerState.columns;
+  } else if (state.proyekAktif) {
+    try {
+      const dss = await window.api.datasetDaftar(state.proyekAktif.id);
+      if (dss && dss.length > 0) {
+        state.datasets = dss;
+        cols = dss[0].kolom || [];
+      }
+    } catch (e) {
+      console.warn('Gagal memuat dataset kolom:', e);
     }
+  }
+
+  if (cols && cols.length > 0) {
+    container.classList.remove('tersembunyi');
+    list.innerHTML = cols.map(c => {
+      const usedByOther = usedElsewhere.has(c);
+      const varOwner = usedElsewhere.get(c);
+      const alreadyInForm = inForm.has(c);
+      if (usedByOther) {
+        return `<span class="dataset-chip disabled" title="Sudah dipakai pada variabel '${escapeHtml(varOwner)}'">
+          <span class="material-icons-round" style="font-size:13px;opacity:.6;">lock</span> ${escapeHtml(c)}
+        </span>`;
+      }
+      return `<span class="dataset-chip${alreadyInForm ? ' selected' : ''}" onclick="tambahIndikatorDariChip('${escapeHtml(c)}')" title="${alreadyInForm ? 'Sudah ditambahkan di form ini' : 'Klik untuk jadikan indikator'}">
+        <span class="material-icons-round" style="font-size:13px;">${alreadyInForm ? 'check' : 'add'}</span> ${escapeHtml(c)}
+      </span>`;
+    }).join('');
+    return;
   }
   container.classList.add('tersembunyi');
 }
 
 function tambahIndikatorDariChip(name) {
+  // If already in form, do nothing
+  const existing = [...document.querySelectorAll('#indikatorContainer .form-input')].find(i => i.value.trim() === name);
+  if (existing) {
+    existing.focus();
+    showToast(`Indikator "${name}" sudah ada dalam daftar`, 'info');
+    return;
+  }
   tambahIndikatorInput(name);
+  updateDatasetChipsInModal();
   showToast(`Indikator "${name}" ditambahkan`, 'info');
+}
+
+// ── Indikator row right-click context menu ──────────────────────────────────
+let _indikatorCtxTarget = null;
+
+function showIndikatorContextMenu(e, row) {
+  e.preventDefault();
+  e.stopPropagation();
+  _indikatorCtxTarget = row;
+
+  let menu = document.getElementById('indikatorRowContextMenu');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.id = 'indikatorRowContextMenu';
+    menu.style.cssText = `
+      position:fixed;z-index:99999;background:var(--bg-modal);border:1px solid var(--border-color);
+      border-radius:var(--radius-md);padding:4px 0;min-width:170px;box-shadow:0 8px 28px rgba(0,0,0,.45);
+    `;
+    menu.innerHTML = `
+      <div id="indCtxRename" style="display:flex;align-items:center;gap:10px;padding:8px 14px;font-size:13px;cursor:pointer;color:var(--text-primary);" class="ind-ctx-item">
+        <span class="material-icons-round" style="font-size:17px;color:var(--color-primary)">edit</span> Ubah Nama
+      </div>
+      <div id="indCtxDelete" style="display:flex;align-items:center;gap:10px;padding:8px 14px;font-size:13px;cursor:pointer;color:var(--color-danger);" class="ind-ctx-item">
+        <span class="material-icons-round" style="font-size:17px;">delete</span> Hapus Baris
+      </div>
+    `;
+    document.body.appendChild(menu);
+
+    menu.querySelector('#indCtxRename').addEventListener('click', () => {
+      closeIndikatorCtxMenu();
+      if (!_indikatorCtxTarget) return;
+      const inp = _indikatorCtxTarget.querySelector('.form-input');
+      if (inp) { inp.focus(); inp.select(); }
+    });
+
+    menu.querySelector('#indCtxDelete').addEventListener('click', () => {
+      closeIndikatorCtxMenu();
+      if (!_indikatorCtxTarget) return;
+      _indikatorCtxTarget.remove();
+      updateDatasetChipsInModal();
+    });
+
+    // Hover states
+    menu.querySelectorAll('.ind-ctx-item').forEach(item => {
+      item.addEventListener('mouseenter', () => item.style.background = 'var(--bg-hover)');
+      item.addEventListener('mouseleave', () => item.style.background = '');
+    });
+
+    document.addEventListener('click', (ev) => {
+      if (!menu.contains(ev.target)) closeIndikatorCtxMenu();
+    }, { capture: true });
+  }
+
+  const mx = Math.min(e.clientX, window.innerWidth - 190);
+  const my = Math.min(e.clientY, window.innerHeight - 90);
+  menu.style.left = mx + 'px';
+  menu.style.top = my + 'px';
+  menu.style.display = 'block';
+}
+
+function closeIndikatorCtxMenu() {
+  const menu = document.getElementById('indikatorRowContextMenu');
+  if (menu) menu.style.display = 'none';
+  _indikatorCtxTarget = null;
 }
 
 function tambahIndikatorInput(defaultValue = '') {
   const container = document.getElementById('indikatorContainer');
   const row = document.createElement('div');
   row.className = 'indikator-row';
+  row.title = 'Klik kanan untuk ubah nama atau hapus';
   row.innerHTML = `
     <input type="text" class="form-input" placeholder="Nama indikator (misal: SQ1, Sat1)" value="${escapeHtml(defaultValue)}">
-    <button type="button" class="btn-hapus" onclick="this.parentElement.remove()" title="Hapus baris">
+    <button type="button" class="btn-hapus" title="Hapus baris">
       <span class="material-icons-round">close</span>
     </button>
   `;
+  row.querySelector('.btn-hapus').addEventListener('click', () => {
+    row.remove();
+    updateDatasetChipsInModal();
+  });
+  row.addEventListener('contextmenu', (e) => showIndikatorContextMenu(e, row));
+  row.querySelector('.form-input').addEventListener('input', () => updateDatasetChipsInModal());
+  row.querySelector('.form-input').addEventListener('change', () => updateDatasetChipsInModal());
   container.appendChild(row);
+  if (defaultValue) row.querySelector('.form-input').focus();
 }
 
 function updateAutosaveIndicator(status = 'saved') {
@@ -5009,6 +5127,19 @@ function setupCanvasInteractions() {
         return;
       }
     }
+
+    // Indikator pada Canvas -> Buka Context Menu Indikator (Update / Hapus)
+    if (state.showIndikator !== false) {
+      for (const v of state.variabels) {
+        const indPositions = getIndicatorPositions(v);
+        const clickedInd = indPositions.find(p => mx >= p.x && mx <= p.x + p.w && my >= p.y && my <= p.y + p.h);
+        if (clickedInd) {
+          hideCanvasContextMenu();
+          showCanvasIndicatorContextMenu(e.clientX, e.clientY, v, clickedInd.name);
+          return;
+        }
+      }
+    }
     
     // Variabel Laten -> Buka Context Menu Interaktif
     const R = PLS_STYLE.latentRadius;
@@ -5085,6 +5216,150 @@ function hideCanvasContextMenu() {
   if (menu && !menu.classList.contains('tersembunyi')) {
     menu.classList.add('tersembunyi');
   }
+  hideCanvasIndicatorContextMenu();
+}
+
+let activeIndikatorContext = null;
+
+function showCanvasIndicatorContextMenu(clientX, clientY, variable, indicatorName) {
+  const menu = document.getElementById('indikatorCanvasContextMenu');
+  if (!menu || !variable || !indicatorName) return;
+
+  activeIndikatorContext = {
+    variableId: variable.id,
+    indicatorName: indicatorName
+  };
+
+  const title = document.getElementById('indCtxHeaderTitle');
+  if (title) title.textContent = `Indikator: ${indicatorName}`;
+
+  // Position context menu
+  const menuWidth = 200;
+  const menuHeight = 150;
+  let posX = clientX;
+  let posY = clientY;
+
+  if (posX + menuWidth > window.innerWidth) {
+    posX = window.innerWidth - menuWidth - 10;
+  }
+  if (posY + menuHeight > window.innerHeight) {
+    posY = window.innerHeight - menuHeight - 10;
+  }
+
+  menu.style.left = `${posX}px`;
+  menu.style.top = `${posY}px`;
+  menu.classList.remove('tersembunyi');
+}
+
+function hideCanvasIndicatorContextMenu() {
+  const menu = document.getElementById('indikatorCanvasContextMenu');
+  if (menu && !menu.classList.contains('tersembunyi')) {
+    menu.classList.add('tersembunyi');
+  }
+}
+
+function bukaModalEditIndikator(variableId, indicatorName) {
+  const v = state.variabels.find(vv => vv.id === variableId);
+  if (!v) return;
+
+  document.getElementById('editIndikatorVarId').value = variableId;
+  document.getElementById('editIndikatorOldName').value = indicatorName;
+  const inp = document.getElementById('inputEditNamaIndikator');
+  inp.value = indicatorName;
+  const title = document.getElementById('modalEditIndikatorTitle');
+  if (title) title.textContent = `Ubah Indikator (${v.nama})`;
+
+  showModal('modalEditIndikator');
+  setTimeout(() => {
+    inp.focus();
+    inp.select();
+  }, 100);
+}
+
+function setupCanvasIndicatorContextMenuHandlers() {
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('indikatorCanvasContextMenu');
+    if (menu && !menu.contains(e.target)) {
+      hideCanvasIndicatorContextMenu();
+    }
+  });
+
+  document.getElementById('indCtxBtnEdit')?.addEventListener('click', () => {
+    if (!activeIndikatorContext) return;
+    const { variableId, indicatorName } = activeIndikatorContext;
+    hideCanvasIndicatorContextMenu();
+    bukaModalEditIndikator(variableId, indicatorName);
+  });
+
+  document.getElementById('indCtxBtnSalin')?.addEventListener('click', async () => {
+    if (!activeIndikatorContext) return;
+    const { indicatorName } = activeIndikatorContext;
+    hideCanvasIndicatorContextMenu();
+    try {
+      await navigator.clipboard.writeText(indicatorName);
+      showToast(`Nama indikator "${indicatorName}" disalin`, 'sukses');
+    } catch {
+      showToast(indicatorName, 'info');
+    }
+  });
+
+  document.getElementById('indCtxBtnHapus')?.addEventListener('click', () => {
+    if (!activeIndikatorContext) return;
+    const { variableId, indicatorName } = activeIndikatorContext;
+    hideCanvasIndicatorContextMenu();
+
+    const v = state.variabels.find(vv => vv.id === variableId);
+    if (!v) return;
+
+    v.indikator = (v.indikator || []).filter(ind => ind !== indicatorName);
+    renderModel();
+    saveModelToDb('Hapus Indikator');
+    if (state.selectedNode === variableId) {
+      showVariableProperties(v);
+    }
+    showToast(`Indikator "${indicatorName}" dihapus dari "${v.nama}"`, 'sukses');
+  });
+
+  document.getElementById('btnSimpanEditIndikator')?.addEventListener('click', () => {
+    const varId = parseInt(document.getElementById('editIndikatorVarId').value);
+    const oldName = document.getElementById('editIndikatorOldName').value;
+    const newName = document.getElementById('inputEditNamaIndikator').value.trim();
+
+    if (!newName) {
+      showToast('Nama indikator tidak boleh kosong', 'peringatan');
+      return;
+    }
+
+    const v = state.variabels.find(vv => vv.id === varId);
+    if (!v) return;
+
+    if (newName !== oldName && (v.indikator || []).includes(newName)) {
+      showToast(`Indikator "${newName}" sudah ada pada variabel "${v.nama}"`, 'peringatan');
+      return;
+    }
+
+    const idx = (v.indikator || []).indexOf(oldName);
+    if (idx !== -1) {
+      v.indikator[idx] = newName;
+    } else {
+      v.indikator.push(newName);
+    }
+
+    hideModal('modalEditIndikator');
+    renderModel();
+    saveModelToDb('Ubah Nama Indikator');
+    if (state.selectedNode === varId) {
+      showVariableProperties(v);
+    }
+    showToast(`Indikator diubah menjadi "${newName}"`, 'sukses');
+  });
+
+  document.getElementById('inputEditNamaIndikator')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('btnSimpanEditIndikator')?.click();
+    }
+  });
 }
 
 function setupCanvasContextMenuHandlers() {
@@ -5150,6 +5425,7 @@ function setupCanvasContextMenuHandlers() {
 document.addEventListener('DOMContentLoaded', () => {
   setupCanvasInteractions();
   setupCanvasContextMenuHandlers();
+  setupCanvasIndicatorContextMenuHandlers();
 });
 
 // ============ HIGH-RESOLUTION EXPORT ENGINE (600+ DPI) ============
