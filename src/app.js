@@ -1058,15 +1058,17 @@ async function eksporProyekFile() {
     showToast('Pilih proyek terlebih dahulu', 'peringatan');
     return;
   }
-  showLoading('Mengekspor Berkas Proyek .freepls...', 600, 'Kompresi Diagram Model, Dataset & Konfigurasi Analisis', 'file_download');
   try {
     const res = await window.api.proyekEksporFile(state.proyekAktif.id);
-    hideLoading();
     if (res && res.sukses) {
-      showToast('Proyek berhasil diekspor ke file .freepls!', 'sukses');
+      const fileName = res.filePath ? res.filePath.split(/[\\/]/).pop() : 'proyek.freepls';
+      showToast(`Proyek berhasil disimpan: ${fileName}`, 'sukses');
+    } else if (res && res.canceled) {
+      // Dialog penyimpanan dibatalkan oleh pengguna
+    } else {
+      showToast('Gagal mengekspor berkas proyek', 'error');
     }
   } catch (e) {
-    hideLoading();
     showToast('Gagal ekspor proyek: ' + e.message, 'error');
   }
 }
@@ -2801,7 +2803,8 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     state.selectedPath = null;
     state.selectedCatatan = null;
     renderModel();
-    document.getElementById('panelBody').innerHTML = '<p class="text-muted">Pilih variabel atau jalur untuk melihat propertinya</p>';
+    const pb = document.getElementById('panelBody');
+    if (pb) pb.innerHTML = '<p class="text-muted">Pilih variabel atau jalur untuk melihat propertinya</p>';
   });
 }
 
@@ -5633,7 +5636,8 @@ async function hapusJalur(id) {
     state.selectedPath = null;
     renderModel();
     await saveModelToDb();
-    document.getElementById('panelBody').innerHTML = '<p class="text-muted">Pilih variabel atau jalur untuk melihat propertinya</p>';
+    const pbPath = document.getElementById('panelBody');
+    if (pbPath) pbPath.innerHTML = '<p class="text-muted">Pilih variabel atau jalur untuk melihat propertinya</p>';
     showToast('Jalur struktural dihapus', 'sukses');
   }
 }
@@ -5666,7 +5670,8 @@ async function hapusVariabel(id) {
     state.selectedNode = null;
     renderModel();
     saveModelToDb();
-    document.getElementById('panelBody').innerHTML = '<p class="text-muted">Pilih variabel untuk melihat propertinya</p>';
+    const pbVar = document.getElementById('panelBody');
+    if (pbVar) pbVar.innerHTML = '<p class="text-muted">Pilih variabel untuk melihat propertinya</p>';
     showToast(`Variabel "${v.nama}" dihapus`, 'sukses');
   }
 }

@@ -282,19 +282,35 @@ ipcMain.handle('proyek-ekspor-file', async (_, proyekId) => {
     }))
   };
 
-  const safeName = (proyek.nama || 'Proyek').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const safeName = (proyek.nama || 'Proyek_FreePLS').replace(/[^a-zA-Z0-9_-]/g, '_');
+  let defaultFolder;
+  try {
+    defaultFolder = app.getPath('documents') || app.getPath('desktop');
+  } catch (e) {
+    defaultFolder = app.getPath('desktop');
+  }
+  const defaultPath = path.join(defaultFolder, `${safeName}.freepls`);
+
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: 'Ekspor Proyek FreePLS',
-    defaultPath: `${safeName}.freepls`,
+    title: 'Simpan Berkas Proyek FreePLS (.freepls)',
+    defaultPath: defaultPath,
     filters: [
-      { name: 'FreePLS Project File (*.freepls)', extensions: ['freepls', 'openpls', 'smartpls', 'json'] }
+      { name: 'Berkas Proyek FreePLS (*.freepls)', extensions: ['freepls'] },
+      { name: 'Semua Berkas (*.*)', extensions: ['*'] }
     ]
   });
 
-  if (result.canceled) return false;
+  if (result.canceled || !result.filePath) {
+    return { sukses: false, canceled: true };
+  }
 
-  fs.writeFileSync(result.filePath, JSON.stringify(bundle, null, 2), 'utf-8');
-  return true;
+  let targetPath = result.filePath;
+  if (!path.extname(targetPath)) {
+    targetPath += '.freepls';
+  }
+
+  fs.writeFileSync(targetPath, JSON.stringify(bundle, null, 2), 'utf-8');
+  return { sukses: true, filePath: targetPath };
 });
 
 ipcMain.handle('proyek-impor-file', async () => {

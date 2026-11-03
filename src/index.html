@@ -299,28 +299,6 @@
                   <span class="material-icons-round dropdown-chevron">expand_more</span>
                 </button>
                 <div class="dropdown-menu">
-                  <div class="dropdown-header">FITUR MODELING LANJUTAN</div>
-                  <!-- Duplikat Variabel (Ctrl+D) -->
-                  <button class="dropdown-item" id="btnDuplikatVariabel">
-                    <div class="dropdown-icon-box" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">
-                      <span class="material-icons-round">content_copy</span>
-                    </div>
-                    <div class="dropdown-text">
-                      <div class="dropdown-title">Duplikat Variabel (Ctrl+D)</div>
-                      <span class="dropdown-item-desc">Kloning variabel & indikator terpilih</span>
-                    </div>
-                  </button>
-                  <!-- Rotasi Orientasi Indikator Cepat -->
-                  <button class="dropdown-item" id="btnRotasiIndikatorCepat">
-                    <div class="dropdown-icon-box" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
-                      <span class="material-icons-round">rotate_right</span>
-                    </div>
-                    <div class="dropdown-text">
-                      <div class="dropdown-title">Putar Posisi Indikator (Alt+R)</div>
-                      <span class="dropdown-item-desc">Kiri → Atas → Kanan → Bawah</span>
-                    </div>
-                  </button>
-                  <div class="dropdown-divider"></div>
                   <!-- Catatan Canvas -->
                   <button class="dropdown-item" id="btnTambahCatatan">
                     <div class="dropdown-icon-box note-box">
@@ -366,12 +344,7 @@
               </div>
             </div>
 
-            <div class="toolbar-bottom-right">
-              <button class="btn btn-sm btn-ghost" id="btnTogglePanelProperties" title="Buka / Sembunyikan Panel Properti Variabel & Jalur" style="gap: 5px; font-weight: 600;">
-                <span class="material-icons-round" style="color: var(--color-primary); font-size: 16px;">tune</span>
-                <span>Panel Properti</span>
-              </button>
-            </div>
+            <div class="toolbar-bottom-right"></div>
           </div>
         </div>
         
@@ -385,12 +358,6 @@
             <!-- Floating Button Buka Sidebar Kiri (Muncul jika sidebar disembunyikan) -->
             <button class="btn btn-icon btn-primary floating-canvas-btn floating-btn-sidebar" id="btnFloatingOpenSidebar" title="Tampilkan Sidebar Navigasi" style="position: absolute; top: 12px; left: 12px; z-index: 20; box-shadow: var(--shadow-lg);">
               <span class="material-icons-round">menu</span>
-            </button>
-
-            <!-- Floating Button Buka Panel Properti Kanan (Muncul jika panel disembunyikan) -->
-            <button class="btn btn-sm btn-primary floating-canvas-btn floating-btn-panel" id="btnFloatingOpenPanel" title="Buka Panel Properti" style="position: absolute; top: 12px; right: 12px; z-index: 20; box-shadow: var(--shadow-lg); gap: 4px;">
-              <span class="material-icons-round" style="font-size: 16px;">tune</span>
-              <span>Properti</span>
             </button>
 
             <!-- Floating Zoom, Fit View & Fullscreen Controls (Pojok Kanan Bawah Canvas) -->
@@ -420,21 +387,6 @@
               <button class="btn-close-hint" id="btnCloseNavHint" title="Sembunyikan Petunjuk">
                 <span class="material-icons-round" style="font-size: 14px;">close</span>
               </button>
-            </div>
-          </div>
-
-          <div class="editor-panel" id="editorPanel">
-            <div class="panel-header">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span class="material-icons-round" style="font-size: 18px; color: var(--color-primary);">tune</span>
-                <h3>Properti</h3>
-              </div>
-              <button class="btn btn-icon btn-ghost" id="btnTutupPanel" title="Sembunyikan Panel Properti">
-                <span class="material-icons-round">close</span>
-              </button>
-            </div>
-            <div class="panel-body" id="panelBody">
-              <p class="text-muted">Pilih variabel atau jalur untuk melihat propertinya</p>
             </div>
           </div>
         </div>
