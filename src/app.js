@@ -1074,17 +1074,19 @@ async function eksporProyekFile() {
 }
 
 async function imporProyekFile() {
-  showLoading('Mengimpor Berkas Proyek .freepls...', 700, 'Restorasi Diagram Model, Matriks Data & Variabel Laten', 'file_upload');
   try {
     const res = await window.api.proyekImporFile();
-    hideLoading();
-    if (res && res.sukses && res.proyek) {
+    if (!res || res.canceled) {
+      return;
+    }
+    if (res.sukses && res.proyek) {
       showToast(`Proyek "${res.proyek.nama}" berhasil diimpor!`, 'sukses');
       await setActiveProject(res.proyek);
       loadDashboard();
+    } else {
+      showToast('Gagal mengimpor berkas proyek', 'error');
     }
   } catch (e) {
-    hideLoading();
     showToast('Gagal impor: ' + e.message, 'error');
   }
 }
@@ -1297,8 +1299,9 @@ function initEditorHandlers() {
   document.getElementById('btnVersiModel')?.addEventListener('click', () => bukaModalRiwayatVersi());
   document.getElementById('btnSimpanVersiSnapshot')?.addEventListener('click', () => simpanVersiSnapshot());
 
-  // Export Project Bundle Handler
+  // Export & Import Project Bundle Handler
   document.getElementById('btnEksporProyekFile')?.addEventListener('click', () => eksporProyekFile());
+  document.getElementById('btnImporProyekFile')?.addEventListener('click', () => imporProyekFile());
 
   // Sticky Note Handlers
   document.getElementById('btnTambahCatatan')?.addEventListener('click', () => bukaModalEditCatatan());
@@ -1327,31 +1330,6 @@ function initEditorHandlers() {
   document.getElementById('btnCanvasFullscreen')?.addEventListener('click', () => toggleCanvasFullscreen());
   document.getElementById('btnCloseNavHint')?.addEventListener('click', () => {
     document.getElementById('canvasNavHint')?.classList.add('tersembunyi');
-  });
-
-  // Toggle Panel Properties dari Toolbar Bawah & Tombol Floating
-  const togglePanel = () => {
-    const panel = document.getElementById('editorPanel');
-    const btnToggle = document.getElementById('btnTogglePanelProperties');
-    if (!panel) return;
-    panel.classList.toggle('collapsed');
-    const isCollapsed = panel.classList.contains('collapsed');
-    if (btnToggle) {
-      btnToggle.classList.toggle('active', !isCollapsed);
-    }
-    setTimeout(() => {
-      if (state.proyekAktif) renderModel();
-    }, 60);
-  };
-
-  document.getElementById('btnTogglePanelProperties')?.addEventListener('click', togglePanel);
-  document.getElementById('btnFloatingOpenPanel')?.addEventListener('click', () => {
-    const panel = document.getElementById('editorPanel');
-    panel?.classList.remove('collapsed');
-    document.getElementById('btnTogglePanelProperties')?.classList.add('active');
-    setTimeout(() => {
-      if (state.proyekAktif) renderModel();
-    }, 60);
   });
 
   // Global Keyboard Navigation & Action Shortcuts (Ctrl+A, Delete, Zoom, Fullscreen)
@@ -5172,6 +5150,12 @@ function showVariableProperties(v) {
   const panel = document.getElementById('panelBody');
   if (!panel) return;
   
+  const editorPanel = document.getElementById('editorPanel');
+  if (editorPanel && editorPanel.classList.contains('collapsed')) {
+    editorPanel.classList.remove('collapsed');
+    document.getElementById('btnTogglePanelProperties')?.classList.add('active');
+  }
+  
   let loadingsHtml = '';
   if (state.hasilPLS && state.hasilPLS.outerLoadings[v.nama]) {
     const loadings = state.hasilPLS.outerLoadings[v.nama];
@@ -5448,6 +5432,12 @@ window.flipPropPathCurvature = function(id) {
 function showPathProperties(jalur) {
   const panel = document.getElementById('panelBody');
   if (!panel) return;
+  
+  const editorPanel = document.getElementById('editorPanel');
+  if (editorPanel && editorPanel.classList.contains('collapsed')) {
+    editorPanel.classList.remove('collapsed');
+    document.getElementById('btnTogglePanelProperties')?.classList.add('active');
+  }
   
   const fromVar = state.variabels.find(v => v.id == jalur.dari_variabel_id || v.nama === jalur.dari);
   const toVar = state.variabels.find(v => v.id == jalur.ke_variabel_id || v.nama === jalur.ke);

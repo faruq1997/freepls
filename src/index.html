@@ -340,11 +340,26 @@
                       <span class="dropdown-item-desc">Simpan backup lengkap (.freepls)</span>
                     </div>
                   </button>
+                  <!-- Impor File Project -->
+                  <button class="dropdown-item" id="btnImporProyekFile">
+                    <div class="dropdown-icon-box" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
+                      <span class="material-icons-round">file_upload</span>
+                    </div>
+                    <div class="dropdown-text">
+                      <div class="dropdown-title">Impor File Proyek</div>
+                      <span class="dropdown-item-desc">Buka file cadangan (.freepls)</span>
+                    </div>
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div class="toolbar-bottom-right"></div>
+            <div class="toolbar-bottom-right">
+              <button class="btn btn-sm btn-ghost active" id="btnTogglePanelProperties" title="Buka / Sembunyikan Panel Properti Variabel & Jalur" style="gap: 5px; font-weight: 600;">
+                <span class="material-icons-round" style="color: var(--color-primary); font-size: 16px;">tune</span>
+                <span>Properti</span>
+              </button>
+            </div>
           </div>
         </div>
         
@@ -387,6 +402,21 @@
               <button class="btn-close-hint" id="btnCloseNavHint" title="Sembunyikan Petunjuk">
                 <span class="material-icons-round" style="font-size: 14px;">close</span>
               </button>
+            </div>
+          </div>
+
+          <div class="editor-panel" id="editorPanel">
+            <div class="panel-header">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="material-icons-round" style="font-size: 18px; color: var(--color-primary);">tune</span>
+                <h3>Properti</h3>
+              </div>
+              <button class="btn btn-icon btn-ghost" id="btnTutupPanel" title="Sembunyikan Panel Properti">
+                <span class="material-icons-round">close</span>
+              </button>
+            </div>
+            <div class="panel-body" id="panelBody">
+              <p class="text-muted">Pilih variabel atau jalur untuk melihat propertinya</p>
             </div>
           </div>
         </div>

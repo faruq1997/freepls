@@ -315,14 +315,17 @@ ipcMain.handle('proyek-ekspor-file', async (_, proyekId) => {
 
 ipcMain.handle('proyek-impor-file', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Impor File Proyek FreePLS',
+    title: 'Impor File Proyek FreePLS (.freepls)',
     filters: [
-      { name: 'FreePLS Project File (*.freepls, *.openpls, *.smartpls, *.json)', extensions: ['freepls', 'openpls', 'smartpls', 'json'] }
+      { name: 'Berkas Proyek FreePLS (*.freepls, *.openpls, *.smartpls, *.json)', extensions: ['freepls', 'openpls', 'smartpls', 'json'] },
+      { name: 'Semua Berkas (*.*)', extensions: ['*'] }
     ],
     properties: ['openFile']
   });
 
-  if (result.canceled) return null;
+  if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+    return { sukses: false, canceled: true };
+  }
 
   try {
     const raw = fs.readFileSync(result.filePaths[0], 'utf-8');
@@ -377,7 +380,8 @@ ipcMain.handle('proyek-impor-file', async () => {
       });
     }
 
-    return dbGet('SELECT * FROM proyek WHERE id = ?', [newProyekId]);
+    const insertedProyek = dbGet('SELECT * FROM proyek WHERE id = ?', [newProyekId]);
+    return { sukses: true, proyek: insertedProyek };
   } catch (err) {
     throw new Error('Gagal mengimpor file: ' + err.message);
   }
