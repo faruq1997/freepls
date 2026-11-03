@@ -1077,25 +1077,45 @@ async function hapusVersiSnapshot(versiId) {
   }
 }
 
-async function renameVersiSnapshot(versiId) {
+function renameVersiSnapshot(versiId) {
   const v = state.versiList.find(item => item.id === versiId);
-  const namaSaatIni = v ? v.nama_versi : '';
-  const namaBaru = prompt('Ubah nama versi:', namaSaatIni);
-  if (namaBaru === null) return;
-  const trimmed = namaBaru.trim();
-  if (!trimmed) {
+  if (!v) return;
+
+  const idEl = document.getElementById('inputRenameVersiId');
+  const namaEl = document.getElementById('inputRenameNamaVersi');
+  const catatanEl = document.getElementById('inputRenameCatatanVersi');
+
+  if (idEl) idEl.value = v.id;
+  if (namaEl) namaEl.value = v.nama_versi || '';
+  if (catatanEl) catatanEl.value = v.catatan || '';
+
+  showModal('modalRenameVersi');
+  setTimeout(() => {
+    namaEl?.focus();
+    namaEl?.select();
+  }, 60);
+}
+
+async function simpanRenameVersi() {
+  const idVal = document.getElementById('inputRenameVersiId')?.value;
+  const id = idVal ? parseInt(idVal, 10) : null;
+  const namaBaru = document.getElementById('inputRenameNamaVersi')?.value.trim();
+  const catatanBaru = document.getElementById('inputRenameCatatanVersi')?.value.trim();
+
+  if (!id) return;
+  if (!namaBaru) {
     showToast('Nama versi tidak boleh kosong', 'peringatan');
     return;
   }
-  if (trimmed === namaSaatIni) return;
 
   try {
-    await window.api.proyekVersiUpdate({ id: versiId, nama_versi: trimmed });
-    if (state.versiAktifId === versiId) {
+    await window.api.proyekVersiUpdate({ id, nama_versi: namaBaru, catatan: catatanBaru });
+    if (state.versiAktifId === id) {
       const labelVersi = document.getElementById('labelVersiAktif');
-      if (labelVersi) labelVersi.textContent = `Versi: ${trimmed}`;
+      if (labelVersi) labelVersi.textContent = `Versi: ${namaBaru}`;
     }
-    showToast(`Versi diubah menjadi "${trimmed}"`, 'sukses');
+    hideModal('modalRenameVersi');
+    showToast(`Versi berhasil diubah menjadi "${namaBaru}"`, 'sukses');
     await bukaModalRiwayatVersi();
   } catch (err) {
     console.error('Gagal mengubah nama versi:', err);
@@ -1106,6 +1126,7 @@ async function renameVersiSnapshot(versiId) {
 window.muatVersiSnapshot = muatVersiSnapshot;
 window.hapusVersiSnapshot = hapusVersiSnapshot;
 window.renameVersiSnapshot = renameVersiSnapshot;
+window.simpanRenameVersi = simpanRenameVersi;
 
 // ============ EXPORT / IMPORT .FREEPLS FILE ============
 async function eksporProyekFile() {
@@ -1422,6 +1443,19 @@ function initEditorHandlers() {
   // Versioning Handlers
   document.getElementById('btnVersiModel')?.addEventListener('click', () => bukaModalRiwayatVersi());
   document.getElementById('btnSimpanVersiSnapshot')?.addEventListener('click', () => simpanVersiSnapshot());
+  document.getElementById('btnSimpanRenameVersi')?.addEventListener('click', () => simpanRenameVersi());
+  document.getElementById('inputRenameNamaVersi')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      simpanRenameVersi();
+    }
+  });
+  document.getElementById('inputRenameCatatanVersi')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      simpanRenameVersi();
+    }
+  });
 
   // Export & Import Project Bundle Handler
   document.getElementById('btnEksporProyekFile')?.addEventListener('click', () => eksporProyekFile());

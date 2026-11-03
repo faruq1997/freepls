@@ -1787,6 +1787,38 @@
     </div>
   </div>
 
+  <!-- ============ MODAL UBAH NAMA VERSI ============ -->
+  <div class="modal-overlay tersembunyi" id="modalRenameVersi">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: var(--color-primary);">edit</span>
+          <h3>Ubah Nama Versi</h3>
+        </div>
+        <button class="btn btn-icon btn-ghost modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="inputRenameVersiId">
+        <div class="form-group">
+          <label for="inputRenameNamaVersi">Nama Versi</label>
+          <input type="text" class="form-input" id="inputRenameNamaVersi" placeholder="Nama versi...">
+        </div>
+        <div class="form-group">
+          <label for="inputRenameCatatanVersi">Catatan (opsional)</label>
+          <input type="text" class="form-input" id="inputRenameCatatanVersi" placeholder="Catatan perubahan...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-close">Batal</button>
+        <button class="btn btn-primary" id="btnSimpanRenameVersi">
+          <span class="material-icons-round">save</span> Simpan Perubahan
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ MODAL RIWAYAT VERSI PROYEK ============ -->
   <div class="modal-overlay tersembunyi" id="modalRiwayatVersi">
     <div class="modal modal-lg">

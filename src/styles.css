@@ -2864,7 +2864,8 @@ body:has(.fullscreen-canvas) .toast-container {
   animation: overlayFadeIn 0.2s ease;
 }
 
-#modalKonfirmasi {
+#modalKonfirmasi,
+#modalRenameVersi {
   z-index: 10100 !important;
 }
 
