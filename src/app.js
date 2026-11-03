@@ -334,6 +334,14 @@ function initWindowControls() {
   window.addEventListener('resize', () => {
     if (state.proyekAktif) renderModel();
   });
+
+  // ResizeObserver: re-render jika canvas wrapper berubah ukuran (sidebar/panel toggle, split pane)
+  const canvasWrapper = document.getElementById('editorCanvasWrapper');
+  if (canvasWrapper && typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => {
+      if (state.proyekAktif) renderModel();
+    }).observe(canvasWrapper);
+  }
 }
 
 // ============ NAVIGATION ============
@@ -1258,6 +1266,13 @@ function toggleCanvasFullscreen() {
   const icon = document.querySelector('#btnCanvasFullscreen .material-icons-round');
   if (icon) {
     icon.textContent = isFs ? 'fullscreen_exit' : 'fullscreen';
+  }
+
+  // Pindahkan toast ke kiri agar tidak menindih zoom controls saat fullscreen
+  const toast = document.getElementById('toastContainer');
+  if (toast) {
+    toast.style.right = isFs ? 'auto' : '';
+    toast.style.left  = isFs ? 'var(--space-lg)' : '';
   }
   
   setTimeout(() => {
@@ -5218,6 +5233,13 @@ function setPropTipe(tipe) {
   document.getElementById('editPropTipeVar').value = tipe;
   document.getElementById('btnTipeReflektif').className = `btn btn-sm ${tipe === 'reflektif' ? 'btn-primary' : 'btn-outline'}`;
   document.getElementById('btnTipeFormatif').className = `btn btn-sm ${tipe === 'formatif' ? 'btn-primary' : 'btn-outline'}`;
+  // Langsung apply ke variabel yang sedang dipilih dan render ulang
+  const v = state.variabels.find(vv => vv.id === state.selectedNode);
+  if (!v) return;
+  v.tipe = tipe;
+  renderModel();
+  saveModelToDb();
+  showToast(`Tipe "${v.nama}" diubah ke ${tipe === 'reflektif' ? 'Reflektif (→)' : 'Formatif (←)'}`, 'info');
 }
 
 function tambahPropIndikatorRow(val = '') {

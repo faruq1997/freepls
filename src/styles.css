@@ -1586,6 +1586,14 @@ select.form-input {
   border: none !important;
 }
 
+/* Saat fullscreen aktif: pindahkan toast container ke pojok kiri bawah
+   supaya tidak menindih zoom/fullscreen controls di pojok kanan bawah */
+.editor-canvas-wrapper.fullscreen-canvas ~ .toast-container,
+body:has(.fullscreen-canvas) .toast-container {
+  right: auto !important;
+  left: var(--space-lg) !important;
+}
+
 /* Floating canvas buttons */
 .floating-canvas-btn {
   display: none;
