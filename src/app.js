@@ -1079,12 +1079,19 @@ async function imporProyekFile() {
     if (!res || res.canceled) {
       return;
     }
-    if (res.sukses && res.proyek) {
-      showToast(`Proyek "${res.proyek.nama}" berhasil diimpor!`, 'sukses');
-      await setActiveProject(res.proyek);
+    
+    // Kompatibilitas ganda: objek dengan properti proyek, atau objek proyek langsung
+    const proyek = res.proyek || (res.id && res.nama ? res : null);
+    if (proyek && (res.sukses || res.id)) {
+      showToast(`Proyek "${proyek.nama}" berhasil diimpor!`, 'sukses');
+      await setActiveProject(proyek);
       loadDashboard();
+      if (state.halamanAktif === 'editor') {
+        renderModel();
+      }
     } else {
-      showToast('Gagal mengimpor berkas proyek', 'error');
+      const errMsg = res.pesan || res.error || 'Format berkas proyek tidak valid atau rusak';
+      showToast('Gagal mengimpor berkas: ' + errMsg, 'error');
     }
   } catch (e) {
     showToast('Gagal impor: ' + e.message, 'error');

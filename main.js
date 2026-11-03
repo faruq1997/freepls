@@ -329,20 +329,40 @@ ipcMain.handle('proyek-impor-file', async () => {
 
   try {
     const raw = fs.readFileSync(result.filePaths[0], 'utf-8');
-    const bundle = JSON.parse(raw);
+    let bundle;
+    try {
+      bundle = JSON.parse(raw);
+    } catch (parseErr) {
+      return { sukses: false, pesan: 'Berkas tidak dapat dibaca sebagai format JSON yang valid.' };
+    }
 
-    if (!bundle.proyek || !bundle.proyek.nama) {
-      throw new Error('Format file proyek tidak valid');
+    const proyekData = bundle.proyek || (bundle.nama ? bundle : null);
+    if (!proyekData || !proyekData.nama) {
+      return { sukses: false, pesan: 'Format berkas tidak valid: properti nama proyek tidak ditemukan.' };
+    }
+
+    let modelDataStr = null;
+    if (proyekData.model_data) {
+      modelDataStr = typeof proyekData.model_data === 'string'
+        ? proyekData.model_data
+        : JSON.stringify(proyekData.model_data);
+    }
+
+    let pengaturanStr = '{}';
+    if (proyekData.pengaturan) {
+      pengaturanStr = typeof proyekData.pengaturan === 'string'
+        ? proyekData.pengaturan
+        : JSON.stringify(proyekData.pengaturan);
     }
 
     // Insert project
     const resP = dbRun(
       'INSERT INTO proyek (nama, deskripsi, model_data, pengaturan) VALUES (?, ?, ?, ?)',
       [
-        `${bundle.proyek.nama} (Impor)`,
-        bundle.proyek.deskripsi || '',
-        bundle.proyek.model_data ? JSON.stringify(bundle.proyek.model_data) : null,
-        bundle.proyek.pengaturan || '{}'
+        `${proyekData.nama} (Impor)`,
+        typeof proyekData.deskripsi === 'string' ? proyekData.deskripsi : '',
+        modelDataStr,
+        pengaturanStr
       ]
     );
     const newProyekId = resP.lastInsertRowid;
@@ -350,15 +370,17 @@ ipcMain.handle('proyek-impor-file', async () => {
     // Insert datasets
     if (bundle.datasets && Array.isArray(bundle.datasets)) {
       bundle.datasets.forEach(ds => {
+        const kolomStr = typeof ds.kolom === 'string' ? ds.kolom : JSON.stringify(ds.kolom || []);
+        const dataStr = typeof ds.data === 'string' ? ds.data : JSON.stringify(ds.data || []);
         dbRun(
           'INSERT INTO dataset (proyek_id, nama, kolom, data, jumlah_baris, jumlah_kolom) VALUES (?, ?, ?, ?, ?, ?)',
           [
             newProyekId,
-            ds.nama,
-            JSON.stringify(ds.kolom || []),
-            JSON.stringify(ds.data || []),
-            ds.jumlah_baris || 0,
-            ds.jumlah_kolom || 0
+            String(ds.nama || 'Dataset'),
+            kolomStr,
+            dataStr,
+            Number(ds.jumlah_baris) || 0,
+            Number(ds.jumlah_kolom) || 0
           ]
         );
       });
@@ -367,14 +389,31 @@ ipcMain.handle('proyek-impor-file', async () => {
     // Insert versis
     if (bundle.versis && Array.isArray(bundle.versis)) {
       bundle.versis.forEach(v => {
+        const mvStr = typeof v.model_data === 'string' ? v.model_data : JSON.stringify(v.model_data || {});
         dbRun(
           'INSERT INTO proyek_versi (proyek_id, nama_versi, catatan, model_data, tanggal_dibuat) VALUES (?, ?, ?, ?, ?)',
           [
             newProyekId,
-            v.nama_versi,
-            v.catatan || '',
-            JSON.stringify(v.model_data || {}),
-            v.tanggal_dibuat || new Date().toISOString().replace('T', ' ').substring(0, 19)
+            String(v.nama_versi || 'Versi Impor'),
+            String(v.catatan || ''),
+            mvStr,
+            String(v.tanggal_dibuat || new Date().toISOString().replace('T', ' ').substring(0, 19))
+          ]
+        );
+      });
+    }
+
+    // Insert hasil analisis jika ada
+    if (bundle.hasil && Array.isArray(bundle.hasil)) {
+      bundle.hasil.forEach(h => {
+        const dhStr = typeof h.data_hasil === 'string' ? h.data_hasil : JSON.stringify(h.data_hasil || {});
+        dbRun(
+          'INSERT INTO hasil_analisis (proyek_id, tipe, data_hasil, tanggal_analisis) VALUES (?, ?, ?, ?)',
+          [
+            newProyekId,
+            String(h.tipe || 'pls'),
+            dhStr,
+            String(h.tanggal_analisis || new Date().toISOString().replace('T', ' ').substring(0, 19))
           ]
         );
       });
@@ -383,7 +422,8 @@ ipcMain.handle('proyek-impor-file', async () => {
     const insertedProyek = dbGet('SELECT * FROM proyek WHERE id = ?', [newProyekId]);
     return { sukses: true, proyek: insertedProyek };
   } catch (err) {
-    throw new Error('Gagal mengimpor file: ' + err.message);
+    console.error('Error saat impor file:', err);
+    return { sukses: false, pesan: err.message };
   }
 });
 
