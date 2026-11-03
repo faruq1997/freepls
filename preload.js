@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   proyekSimpanModel: (data) => ipcRenderer.invoke('proyek-simpan-model', data),
   proyekHapus: (id) => ipcRenderer.invoke('proyek-hapus', id),
   proyekEksporFile: (proyekId) => ipcRenderer.invoke('proyek-ekspor-file', proyekId),
-  proyekImporFile: () => ipcRenderer.invoke('proyek-impor-file'),
+  proyekImporFile: (targetProyekId = null) => ipcRenderer.invoke('proyek-impor-file', targetProyekId),
 
   // Versioning
   proyekVersiSimpan: (data) => ipcRenderer.invoke('proyek-versi-simpan', data),

@@ -313,9 +313,11 @@ ipcMain.handle('proyek-ekspor-file', async (_, proyekId) => {
   return { sukses: true, filePath: targetPath };
 });
 
-ipcMain.handle('proyek-impor-file', async () => {
+ipcMain.handle('proyek-impor-file', async (_, targetProyekId = null) => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Impor File Proyek FreePLS (.freepls)',
+    title: targetProyekId 
+      ? 'Pilih Berkas Proyek FreePLS (.freepls) untuk Menimpa Model Aktif' 
+      : 'Impor File Proyek FreePLS (.freepls)',
     filters: [
       { name: 'Berkas Proyek FreePLS (*.freepls, *.openpls, *.smartpls, *.json)', extensions: ['freepls', 'openpls', 'smartpls', 'json'] },
       { name: 'Semua Berkas (*.*)', extensions: ['*'] }
@@ -355,7 +357,56 @@ ipcMain.handle('proyek-impor-file', async () => {
         : JSON.stringify(proyekData.pengaturan);
     }
 
-    // Insert project
+    // JIKA TARGET PROYEK ID DIBERIKAN: MODE TIMPA MODEL PROYEK EXISTING
+    if (targetProyekId) {
+      const existing = dbGet('SELECT * FROM proyek WHERE id = ?', [targetProyekId]);
+      if (!existing) {
+        return { sukses: false, pesan: 'Proyek target tidak ditemukan di basis data.' };
+      }
+
+      // Update model_data & pengaturan pada proyek yang ada
+      dbRun(
+        'UPDATE proyek SET model_data = ?, pengaturan = ?, tanggal_diubah = datetime(\'now\',\'localtime\') WHERE id = ?',
+        [modelDataStr, pengaturanStr, targetProyekId]
+      );
+
+      // Salin dataset dari berkas jika ada dan masukkan ke proyek yang ada
+      if (bundle.datasets && Array.isArray(bundle.datasets)) {
+        bundle.datasets.forEach(ds => {
+          const kolomStr = typeof ds.kolom === 'string' ? ds.kolom : JSON.stringify(ds.kolom || []);
+          const dataStr = typeof ds.data === 'string' ? ds.data : JSON.stringify(ds.data || []);
+          dbRun(
+            'INSERT INTO dataset (proyek_id, nama, kolom, data, jumlah_baris, jumlah_kolom) VALUES (?, ?, ?, ?, ?, ?)',
+            [
+              targetProyekId,
+              String(ds.nama || 'Dataset Impor'),
+              kolomStr,
+              dataStr,
+              Number(ds.jumlah_baris) || 0,
+              Number(ds.jumlah_kolom) || 0
+            ]
+          );
+        });
+      }
+
+      // Tambahkan snapshot riwayat versi
+      if (modelDataStr) {
+        dbRun(
+          'INSERT INTO proyek_versi (proyek_id, nama_versi, catatan, model_data) VALUES (?, ?, ?, ?)',
+          [
+            targetProyekId,
+            `Timpa Model (${proyekData.nama || 'Impor'})`,
+            'Model diimpor dan menimpa diagram sebelumnya',
+            modelDataStr
+          ]
+        );
+      }
+
+      const updatedProyek = dbGet('SELECT * FROM proyek WHERE id = ?', [targetProyekId]);
+      return { sukses: true, mode: 'overwrite', proyek: updatedProyek };
+    }
+
+    // JIKA TARGET PROYEK ID TIDAK ADA: MODE PROYEK BARU
     const resP = dbRun(
       'INSERT INTO proyek (nama, deskripsi, model_data, pengaturan) VALUES (?, ?, ?, ?)',
       [

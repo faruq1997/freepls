@@ -618,6 +618,32 @@ body {
   font-size: 14px;
 }
 
+.proyek-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.proyek-ekspor {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.proyek-ekspor:hover {
+  background: #3b82f6;
+  color: white;
+  transform: scale(1.05);
+}
+
 .proyek-hapus {
   width: 30px;
   height: 30px;

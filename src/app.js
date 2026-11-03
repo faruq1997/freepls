@@ -149,7 +149,7 @@ function updateProjectStateUI() {
   const editorButtons = [
     'btnRenameProyek', 'btnVersiModel', 'btnUndo', 'btnRedo',
     'btnAutoLayout', 'btnTambahVariabel', 'btnTambahJalur',
-    'btnTambahCatatan', 'btnToggleIndikator', 'btnEksporProyekFile',
+    'btnTambahCatatan', 'btnToggleIndikator', 'btnEksporProyekFile', 'btnImporProyekFile',
     'btnBukaEksporGambar', 'btnSimpanModel'
   ];
   
@@ -612,7 +612,7 @@ function bukaModalProyekBaru() {
 function initProjectHandlers() {
   document.getElementById('btnProyekBaru')?.addEventListener('click', () => bukaModalProyekBaru());
   document.getElementById('btnImporProyek')?.addEventListener('click', () => showProjectPickerModal());
-  document.getElementById('btnImporSmartPLSFile')?.addEventListener('click', () => imporProyekFile());
+  document.getElementById('btnImporSmartPLSFile')?.addEventListener('click', () => imporProyekBaruBeranda());
   
   // Klik teks "Belum ada proyek" / nama proyek di semua toolbar
   document.querySelectorAll('.proyek-nama-aktif').forEach(el => {
@@ -807,7 +807,10 @@ async function loadDashboard() {
       <div class="proyek-card-header">
         <span class="proyek-card-title">${escapeHtml(p.nama)}</span>
         <div class="proyek-card-actions">
-          <button class="proyek-hapus" onclick="event.stopPropagation(); hapusProyek(${p.id}, '${escapeHtml(p.nama)}')" title="Hapus">
+          <button class="proyek-ekspor" onclick="event.stopPropagation(); eksporProyekTertentu(${p.id}, '${escapeHtml(p.nama)}')" title="Ekspor File Proyek (.freepls)">
+            <span class="material-icons-round">file_download</span>
+          </button>
+          <button class="proyek-hapus" onclick="event.stopPropagation(); hapusProyek(${p.id}, '${escapeHtml(p.nama)}')" title="Hapus Proyek">
             <span class="material-icons-round">delete</span>
           </button>
         </div>
@@ -1055,16 +1058,21 @@ async function hapusVersiSnapshot(versiId, namaVersi) {
 // ============ EXPORT / IMPORT .FREEPLS FILE ============
 async function eksporProyekFile() {
   if (!state.proyekAktif) {
-    showToast('Pilih proyek terlebih dahulu', 'peringatan');
+    showToast('Pilih proyek terlebih dahulu', 'warning');
     return;
   }
+  await eksporProyekTertentu(state.proyekAktif.id, state.proyekAktif.nama);
+}
+
+async function eksporProyekTertentu(proyekId, namaProyek) {
   try {
-    const res = await window.api.proyekEksporFile(state.proyekAktif.id);
-    if (res && res.sukses) {
-      const fileName = res.filePath ? res.filePath.split(/[\\/]/).pop() : 'proyek.freepls';
-      showToast(`Proyek berhasil disimpan: ${fileName}`, 'sukses');
-    } else if (res && res.canceled) {
-      // Dialog penyimpanan dibatalkan oleh pengguna
+    const res = await window.api.proyekEksporFile(proyekId);
+    if (!res || res.canceled) {
+      return;
+    }
+    if (res.sukses) {
+      const fileName = res.filePath ? res.filePath.split(/[\\/]/).pop() : `${namaProyek}.freepls`;
+      showToast(`Proyek "${namaProyek}" berhasil disimpan: ${fileName}`, 'sukses');
     } else {
       showToast('Gagal mengekspor berkas proyek', 'error');
     }
@@ -1072,18 +1080,60 @@ async function eksporProyekFile() {
     showToast('Gagal ekspor proyek: ' + e.message, 'error');
   }
 }
+window.eksporProyekTertentu = eksporProyekTertentu;
 
-async function imporProyekFile() {
+// 1. Impor dari Beranda: Membuat proyek baru di database
+async function imporProyekBaruBeranda() {
   try {
-    const res = await window.api.proyekImporFile();
+    const res = await window.api.proyekImporFile(null);
     if (!res || res.canceled) {
       return;
     }
-    
-    // Kompatibilitas ganda: objek dengan properti proyek, atau objek proyek langsung
+
     const proyek = res.proyek || (res.id && res.nama ? res : null);
-    if (proyek && (res.sukses || res.id)) {
-      showToast(`Proyek "${proyek.nama}" berhasil diimpor!`, 'sukses');
+    const isSuccess = (res.sukses === true) || Boolean(res.id && res.nama);
+
+    if (isSuccess && proyek) {
+      showToast(`Proyek baru "${proyek.nama}" berhasil diimpor!`, 'sukses');
+      await setActiveProject(proyek);
+      loadDashboard();
+    } else {
+      const errMsg = res.pesan || res.error || 'Format berkas proyek tidak valid atau rusak';
+      showToast('Gagal mengimpor berkas: ' + errMsg, 'error');
+    }
+  } catch (e) {
+    showToast('Gagal impor proyek: ' + e.message, 'error');
+  }
+}
+
+// 2. Impor dari Editor: Menimpa diagram model & dataset pada proyek yang sedang aktif
+async function imporProyekEditor() {
+  if (!state.proyekAktif) {
+    showToast('Buka atau buat proyek terlebih dahulu sebelum mengimpor ke editor!', 'warning');
+    return;
+  }
+
+  const ok = await konfirmasiDialog({
+    title: 'Timpa Model Proyek Saat Ini?',
+    message: `Mengimpor berkas .freepls akan menimpa seluruh diagram variabel laten, jalur pengaruh, dan catatan pada proyek "${state.proyekAktif.nama}". Apakah Anda yakin ingin melanjutkan?`,
+    okText: 'Timpa Model',
+    okIcon: 'file_upload',
+    isDanger: true,
+    icon: 'warning_amber'
+  });
+  if (!ok) return;
+
+  try {
+    const res = await window.api.proyekImporFile(state.proyekAktif.id);
+    if (!res || res.canceled) {
+      return;
+    }
+
+    const proyek = res.proyek || (res.id && res.nama ? res : null);
+    const isSuccess = (res.sukses === true) || Boolean(res.id && res.nama);
+
+    if (isSuccess && proyek) {
+      showToast(`Model proyek "${proyek.nama}" berhasil ditimpa dari berkas!`, 'sukses');
       await setActiveProject(proyek);
       loadDashboard();
       if (state.halamanAktif === 'editor') {
@@ -1091,10 +1141,19 @@ async function imporProyekFile() {
       }
     } else {
       const errMsg = res.pesan || res.error || 'Format berkas proyek tidak valid atau rusak';
-      showToast('Gagal mengimpor berkas: ' + errMsg, 'error');
+      showToast('Gagal menimpa model: ' + errMsg, 'error');
     }
   } catch (e) {
-    showToast('Gagal impor: ' + e.message, 'error');
+    showToast('Gagal impor model: ' + e.message, 'error');
+  }
+}
+
+// Helper umum jika dipanggil di tempat lain
+async function imporProyekFile() {
+  if (state.halamanAktif === 'editor' && state.proyekAktif) {
+    await imporProyekEditor();
+  } else {
+    await imporProyekBaruBeranda();
   }
 }
 
@@ -1308,7 +1367,7 @@ function initEditorHandlers() {
 
   // Export & Import Project Bundle Handler
   document.getElementById('btnEksporProyekFile')?.addEventListener('click', () => eksporProyekFile());
-  document.getElementById('btnImporProyekFile')?.addEventListener('click', () => imporProyekFile());
+  document.getElementById('btnImporProyekFile')?.addEventListener('click', () => imporProyekEditor());
 
   // Sticky Note Handlers
   document.getElementById('btnTambahCatatan')?.addEventListener('click', () => bukaModalEditCatatan());
