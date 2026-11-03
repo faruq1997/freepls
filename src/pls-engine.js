@@ -574,6 +574,24 @@ class PLSEngine {
     // ---- Langkah 7: HTMT (Heterotrait-Monotrait Ratio) ----
     const htmt = this.calculateHTMT();
 
+    // ---- Langkah 7b: Cross Loadings (Validitas Diskriminan per Indikator) ----
+    const crossLoadings = {};
+    for (const v of this.variabels) {
+      if (!v.indikator) continue;
+      for (const ind of v.indikator) {
+        const indData = this.getColumnData(ind);
+        crossLoadings[ind] = {
+          konstruk: v.nama,
+          loadings: {}
+        };
+        for (const targetVar of this.variabels) {
+          if (latentScores[targetVar.nama]) {
+            crossLoadings[ind].loadings[targetVar.nama] = this.correlation(indData, latentScores[targetVar.nama]);
+          }
+        }
+      }
+    }
+
     // ---- Langkah 8: VIF (Multicollinearity Test: Outer & Inner) ----
     const vif = this.calculateVIF(latentScores);
 
@@ -613,6 +631,7 @@ class PLSEngine {
       latentScores,
       outerLoadings,
       outerWeights,
+      crossLoadings,
       pathCoefficients,
       rSquared,
       rSquaredAdj,

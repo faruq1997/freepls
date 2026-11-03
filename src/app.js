@@ -7763,6 +7763,70 @@ function displayPLSResults(hasil) {
   }
   outerHtml += '</tbody></table>';
 
+  // 5. Cross Loadings (Validitas Diskriminan per Indikator)
+  if (hasil.crossLoadings && Object.keys(hasil.crossLoadings).length > 0) {
+    outerHtml += `
+      <div class="table-toolbar-box" style="margin-top: 28px;">
+        <h4>
+          <span class="material-icons-round" style="font-size: 18px; color: #10b981; vertical-align: middle;">checklist</span>
+          5. Cross Loadings (Validitas Diskriminan Butir Indikator)
+        </h4>
+        <button class="btn btn-xs btn-outline" onclick="copyTableTSV('tableCrossLoadings')">
+          <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Salin Matriks
+        </button>
+      </div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+        Kriteria Keputusan (Hair et al., 2022): Nilai korelasi butir indikator pada konstruk asalnya (angka tebal berlatar hijau) harus lebih tinggi daripada seluruh nilai korelasi silangnya (<em>cross-loadings</em>) terhadap konstruk laten lainnya.
+      </p>
+      <table class="data-table" id="tableCrossLoadings">
+        <thead>
+          <tr>
+            <th>Indikator</th>
+            <th>Konstruk Asal</th>
+    `;
+    varNames.forEach(vn => outerHtml += `<th>${escapeHtml(vn)}</th>`);
+    outerHtml += `<th>Evaluasi Diskriminan</th></tr></thead><tbody>`;
+
+    for (const [ind, data] of Object.entries(hasil.crossLoadings)) {
+      const ownConstruct = data.konstruk;
+      const ownLoading = data.loadings[ownConstruct] || 0;
+      let isHighestOnOwn = true;
+
+      for (const [targetVar, loadVal] of Object.entries(data.loadings)) {
+        if (targetVar !== ownConstruct && Math.abs(loadVal) >= Math.abs(ownLoading)) {
+          isHighestOnOwn = false;
+        }
+      }
+
+      outerHtml += `
+        <tr>
+          <td style="font-family: monospace; font-weight: 700; color: var(--color-primary);">${escapeHtml(ind)}</td>
+          <td style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(ownConstruct)}</td>
+      `;
+
+      varNames.forEach(vn => {
+        const val = data.loadings[vn] || 0;
+        const isOwn = (vn === ownConstruct);
+        outerHtml += `
+          <td style="${isOwn ? 'font-weight: 800; color: #10b981; background: rgba(16, 185, 129, 0.12); border-radius: 4px;' : 'color: var(--text-secondary);'}">
+            ${val.toFixed(4)}
+          </td>
+        `;
+      });
+
+      outerHtml += `
+        <td>
+          <span class="badge ${isHighestOnOwn ? 'badge-sukses' : 'badge-danger'}">
+            ${isHighestOnOwn ? 'Memenuhi Syarat' : 'Cross-Loading Tinggi'}
+          </span>
+        </td>
+        </tr>
+      `;
+    }
+
+    outerHtml += '</tbody></table>';
+  }
+
   outerModel.innerHTML = outerHtml;
 
   // ---- TAB 3: MODEL STRUKTURAL (INNER MODEL & INNER VIF) ----
@@ -9035,6 +9099,19 @@ function prepareExportData() {
       }
     }
     sheets['HTMT Matrix'] = htmtRows;
+  }
+
+  // Cross Loadings
+  if (state.hasilPLS.crossLoadings) {
+    const crossRows = [];
+    for (const [ind, data] of Object.entries(state.hasilPLS.crossLoadings)) {
+      const row = { 'Indikator': ind, 'Konstruk Asal': data.konstruk };
+      for (const [targetVar, val] of Object.entries(data.loadings)) {
+        row[targetVar] = Number(val.toFixed(4));
+      }
+      crossRows.push(row);
+    }
+    sheets['Cross Loadings'] = crossRows;
   }
   
   // Q² Predictive Relevance
