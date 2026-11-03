@@ -28,6 +28,8 @@ const state = {
   dragCatatanTarget: null,
   isDraggingPathCurvature: false,
   dragCurvaturePath: null,
+  isDraggingPathLabel: false,
+  dragLabelPath: null,
   isAddingPath: false,
   pathFrom: null,
   // Zoom & Pan state
@@ -2722,7 +2724,7 @@ window.terapkanTemplateModel = terapkanTemplateModel;
         });
       }
 
-      // 3. Tambah jalur mediasi tidak langsung X -> Y dengan lengkungan dan garis putus-putus
+      // 3. Tambah jalur mediasi tidak langsung X -> Z -> Y dengan melalui_variabel_id
       const indirectLabel = label || `${dariVar.nama} → ${medVar.nama} → ${keVar.nama}`;
       state.jalurs.push({
         id: Date.now() + 2,
@@ -2730,10 +2732,12 @@ window.terapkanTemplateModel = terapkanTemplateModel;
         ke: keVar.nama,
         dari_variabel_id: dari,
         ke_variabel_id: ke,
+        melalui: medVar.nama,
+        melalui_variabel_id: parseInt(mediator),
         label: indirectLabel,
         tipe_garis: tipeGaris,
         tebal_garis: tebalGaris,
-        kelengkungan: kelengkungan !== 0 ? kelengkungan : 45
+        kelengkungan: kelengkungan !== 0 ? kelengkungan : 0
       });
 
       hideModal('modalTambahJalur');
@@ -3358,9 +3362,11 @@ function validateModelStructure() {
   // 2. Check for isolated constructs (no incoming AND no outgoing paths)
   if (state.variabels.length > 1) {
     state.variabels.forEach(v => {
-      const hasOutgoing = state.jalurs.some(j => j.dari_variabel_id === v.id);
-      const hasIncoming = state.jalurs.some(j => j.ke_variabel_id === v.id);
-      if (!hasOutgoing && !hasIncoming) {
+      const hasOutgoing = state.jalurs.some(j => (j.dari_variabel_id != null && j.dari_variabel_id == v.id) || (j.dari && j.dari === v.nama));
+      const hasIncoming = state.jalurs.some(j => (j.ke_variabel_id != null && j.ke_variabel_id == v.id) || (j.ke && j.ke === v.nama));
+      // Variabel juga dianggap terhubung jika ia jadi mediator (melalui_variabel_id) di jalur manapun
+      const isMediator = state.jalurs.some(j => (j.melalui_variabel_id != null && j.melalui_variabel_id == v.id) || (j.melalui && j.melalui === v.nama));
+      if (!hasOutgoing && !hasIncoming && !isMediator) {
         warnings.push({
           type: 'isolated',
           varId: v.id,
@@ -3588,6 +3594,56 @@ function pointToPathDist(px, py, j) {
     }
   }
   return minDist;
+}
+
+function getPathPointAtT(j, t) {
+  if (j._seg1 && j._seg2) {
+    const seg = (t < 0.5) ? j._seg1 : j._seg2;
+    const tt = (t < 0.5) ? (t * 2) : ((t - 0.5) * 2);
+    const k = (t < 0.5) ? (j.kelengkungan1 || 0) : (j.kelengkungan || 0);
+    if (k !== 0 && seg.cpX !== undefined) {
+      const it = 1 - tt;
+      return {
+        x: it * it * seg.x1 + 2 * it * tt * seg.cpX + tt * tt * seg.x2,
+        y: it * it * seg.y1 + 2 * it * tt * seg.cpY + tt * tt * seg.y2
+      };
+    } else {
+      return {
+        x: seg.x1 + tt * (seg.x2 - seg.x1),
+        y: seg.y1 + tt * (seg.y2 - seg.y1)
+      };
+    }
+  } else if (j._startX !== undefined && j._startY !== undefined && j._endX !== undefined && j._endY !== undefined) {
+    const k = j.kelengkungan || 0;
+    if (k !== 0 && j._cpX !== undefined) {
+      const it = 1 - t;
+      return {
+        x: it * it * j._startX + 2 * it * t * j._cpX + t * t * j._endX,
+        y: it * it * j._startY + 2 * it * t * j._cpY + t * t * j._endY
+      };
+    } else {
+      return {
+        x: j._startX + t * (j._endX - j._startX),
+        y: j._startY + t * (j._endY - j._startY)
+      };
+    }
+  }
+  return { x: 0, y: 0 };
+}
+
+function calculateClosestTOnPath(px, py, j) {
+  let bestT = 0.5;
+  let minDist = Infinity;
+  for (let i = 0; i <= 40; i++) {
+    const t = 0.10 + (i / 40) * 0.80;
+    const pt = getPathPointAtT(j, t);
+    const d = Math.hypot(px - pt.x, py - pt.y);
+    if (d < minDist) {
+      minDist = d;
+      bestT = t;
+    }
+  }
+  return Math.round(bestT * 100) / 100;
 }
 
 function drawPLSDiagram(ctx, options = {}) {
@@ -3878,27 +3934,26 @@ function drawPLSDiagram(ctx, options = {}) {
     }
     
     if (labelText) {
-      let labelMidX = midArcX;
-      let labelMidY = midArcY;
-      
-      if (isPathSelected && !isExport) {
-        labelMidY += (kelengkungan < 0 ? 14 : -14);
-      }
+      // Posisi label berdasarkan label_offset_t (0.0–1.0 sepanjang kurva), default 0.5 (tengah)
+      const t = (jalur.label_offset_t !== undefined) ? jalur.label_offset_t : 0.5;
+      const pt = getPathPointAtT(jalur, t);
+      let labelMidX = pt.x;
+      let labelMidY = pt.y;
 
       ctx.font = '600 12px ' + PLS_STYLE.fontFamily;
       const textMetrics = ctx.measureText(labelText);
       const padX = 6;
       const padY = 3;
-      
+
       ctx.fillStyle = isPathSelected ? (isDark ? '#3b1c4a' : '#fdf2f8') : (isDark ? '#1a1a3e' : '#ffffff');
       ctx.strokeStyle = isPathSelected ? '#f093fb' : (isDark ? '#3d3d7a' : '#d1d5db');
       ctx.lineWidth = isPathSelected ? 1.5 : 1;
-      
+
       const boxX = labelMidX - textMetrics.width / 2 - padX;
       const boxY = labelMidY - 8 - padY;
       const boxW = textMetrics.width + padX * 2;
       const boxH = 16 + padY * 2;
-      
+
       ctx.beginPath();
       if (ctx.roundRect) {
         ctx.roundRect(boxX, boxY, boxW, boxH, 4);
@@ -3907,11 +3962,16 @@ function drawPLSDiagram(ctx, options = {}) {
       }
       ctx.fill();
       ctx.stroke();
-      
+
       ctx.fillStyle = isPathSelected ? '#d946ef' : (isDark ? '#80b3ff' : '#1e3a8a');
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(labelText, labelMidX, labelMidY + 1);
+
+      // Simpan bounding box label untuk hit-testing drag
+      jalur._labelBox = { x: boxX, y: boxY, w: boxW, h: boxH };
+    } else {
+      jalur._labelBox = null;
     }
   }
   
@@ -4394,6 +4454,30 @@ function setupCanvasInteractions() {
       return;
     }
     
+    // 2.5. Cek apakah user mengklik label hipotesis / koefisien pada jalur untuk digeser sepanjang kabel
+    const clickedLabelPath = state.jalurs.slice().reverse().find(j => {
+      if (j._labelBox) {
+        const b = j._labelBox;
+        return mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
+      }
+      return false;
+    });
+
+    if (clickedLabelPath) {
+      state.isDraggingPathLabel = true;
+      state.dragLabelPath = clickedLabelPath;
+      state.selectedPath = clickedLabelPath.id;
+      state.selectedNode = null;
+      state.selectedCatatan = null;
+      state.selectedNodes = [];
+      state.selectedPaths = [clickedLabelPath.id];
+      state.selectedCatatans = [];
+      state.isAllSelected = false;
+      showPathProperties(clickedLabelPath);
+      renderModel();
+      return;
+    }
+
     // 3. Cari titik handle kelengkungan jalur atau jalur struktural yang diklik
     let clickedPath = null;
     state.dragCurvatureSeg = 2;
@@ -4509,6 +4593,15 @@ function setupCanvasInteractions() {
       return;
     }
 
+    // Drag Posisi Label di Sepanjang Kabel Jalur
+    if (state.isDraggingPathLabel && state.dragLabelPath) {
+      const j = state.dragLabelPath;
+      j.label_offset_t = calculateClosestTOnPath(mx, my, j);
+      canvas.style.cursor = 'grab';
+      renderModel();
+      return;
+    }
+
     // Drag Kelengkungan Jalur Secara Langsung dengan Kursor Mouse
     if (state.isDraggingPathCurvature && state.dragCurvaturePath) {
       const j = state.dragCurvaturePath;
@@ -4608,7 +4701,15 @@ function setupCanvasInteractions() {
       }
     }
 
-    const isOverPath = !isOverCatatan && !isOverVar && !isOverHandle && state.jalurs.some(j => {
+    const isOverLabel = !isOverCatatan && !isOverVar && !isOverHandle && state.jalurs.some(j => {
+      if (j._labelBox) {
+        const b = j._labelBox;
+        return mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
+      }
+      return false;
+    });
+
+    const isOverPath = !isOverCatatan && !isOverVar && !isOverHandle && !isOverLabel && state.jalurs.some(j => {
       if (j._startX !== undefined && j._startY !== undefined) {
         return pointToPathDist(mx, my, j) <= 12;
       }
@@ -4617,8 +4718,8 @@ function setupCanvasInteractions() {
     
     if (e.ctrlKey || e.altKey || e.metaKey || state.isSpacePressed) {
       canvas.style.cursor = 'grab';
-    } else if (isOverHandle) {
-      canvas.style.cursor = 'move';
+    } else if (isOverHandle || isOverLabel) {
+      canvas.style.cursor = 'grab';
     } else if (isOverCatatan || isOverVar) {
       canvas.style.cursor = 'grab';
     } else if (isOverPath) {
@@ -4652,6 +4753,11 @@ function setupCanvasInteractions() {
       state.dragCurvaturePath = null;
       saveModelToDb();
     }
+    if (state.isDraggingPathLabel) {
+      state.isDraggingPathLabel = false;
+      state.dragLabelPath = null;
+      saveModelToDb();
+    }
     if (state.isDraggingCatatan) {
       state.isDraggingCatatan = false;
       state.dragCatatanTarget = null;
@@ -4671,6 +4777,11 @@ function setupCanvasInteractions() {
 
   window.addEventListener('mouseup', () => {
     stopCanvasPanning();
+    if (state.isDraggingPathLabel) {
+      state.isDraggingPathLabel = false;
+      state.dragLabelPath = null;
+      saveModelToDb();
+    }
   });
 
   // Spacebar Pan Key Listener (Figma / Illustrator / SmartPLS style)
@@ -5204,14 +5315,9 @@ function showVariableProperties(v) {
       <button class="btn btn-sm btn-primary btn-block" onclick="simpanPerubahanVariabel(${v.id})">
         <span class="material-icons-round">save</span> Simpan Perubahan Variabel
       </button>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-        <button class="btn btn-xs btn-outline" onclick="duplicateSelectedVariable(${v.id})">
-          <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Duplikat
-        </button>
-        <button class="btn btn-xs btn-outline" onclick="bukaModalTambahModerasi(${v.id})" style="color: #ec4899;">
-          <span class="material-icons-round" style="font-size: 14px;">tune</span> Moderasi...
-        </button>
-      </div>
+      <button class="btn btn-xs btn-outline" onclick="duplicateSelectedVariable(${v.id})">
+        <span class="material-icons-round" style="font-size: 14px;">content_copy</span> Duplikat Variabel
+      </button>
       <button class="btn btn-sm btn-danger btn-block" onclick="hapusVariabel(${v.id})">
         <span class="material-icons-round">delete</span> Hapus Variabel
       </button>
