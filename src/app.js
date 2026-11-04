@@ -30,12 +30,14 @@ const state = {
   dragCurvaturePath: null,
   isDraggingPathLabel: false,
   dragLabelPath: null,
-  activeTool: 'select', // 'select' | 'jalur' | 'variabel'
+  activeTool: 'select', // 'select' | 'jalur'
   isAddingPath: false,
-  isAddingVariable: false,
+  isDraggingConnection: false,
+  connectDragFromId: null,
   pathFrom: null,
   connectingMouse: null,
   connectingHoverVarId: null,
+  _hoveredPortVarId: null,
   // Zoom & Pan state
   zoom: 1.0,
   pan: { x: 0, y: 0 },
@@ -2708,6 +2710,12 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     showToast(`${tokens.length} indikator diterapkan`, 'sukses');
   });
 
+  // Listener Tambah Baris Indikator di Modal
+  document.getElementById('btnTambahIndikator')?.addEventListener('click', () => {
+    tambahIndikatorInput();
+    updateDatasetChipsInModal();
+  });
+
   function bukaModalTambahVariabel() {
     if (!state.proyekAktif) {
       showToast('Pilih proyek terlebih dahulu', 'peringatan');
@@ -2904,29 +2912,12 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     showToast('Mode pemodelan selesai', 'info');
   });
 
-  // Tombol Tambah Variabel Toolbar (Toggle mode on click, double-click/shift-click opens modal)
-  document.getElementById('btnTambahVariabel').addEventListener('click', (e) => {
+  // Tombol Tambah Variabel Toolbar: Langsung buka popup modal form tambah variabel
+  document.getElementById('btnTambahVariabel').addEventListener('click', () => {
     if (!state.proyekAktif) {
       showToast('Pilih proyek terlebih dahulu', 'peringatan');
       return;
     }
-
-    if (e.shiftKey || e.altKey) {
-      bukaModalTambahVariabel();
-      return;
-    }
-
-    const nextTool = (state.activeTool === 'variabel') ? 'select' : 'variabel';
-    window.setEditorActiveTool(nextTool);
-
-    if (nextTool === 'variabel') {
-      showToast('Mode Tambah Variabel Aktif: Klik pada kanvas untuk menempatkan variabel baru', 'info');
-    } else {
-      showToast('Mode Tambah Variabel dinonaktifkan', 'info');
-    }
-  });
-
-  document.getElementById('btnTambahVariabel').addEventListener('dblclick', () => {
     bukaModalTambahVariabel();
   });
 
@@ -2950,15 +2941,7 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     window.setEditorActiveTool(nextTool);
 
     if (nextTool === 'jalur') {
-      if (state.selectedNode) {
-        state.pathFrom = state.selectedNode;
-        window.updateCanvasModeIndicator();
-        renderModel();
-        const v = state.variabels.find(x => x.id === state.selectedNode);
-        showToast(`Mode Jalur Aktif: Dari "${v?.nama || 'X'}". Klik variabel tujuan (Y) untuk menyambungkan kabel.`, 'info');
-      } else {
-        showToast('Mode Jalur Aktif: Klik variabel asal (X) lalu variabel tujuan (Y) untuk menyambungkan kabel.', 'info');
-      }
+      showToast('Mode Jalur Aktif: Tekan variabel lalu tarik kabel ke variabel tujuan', 'info');
     } else {
       showToast('Mode Sambung Jalur dinonaktifkan', 'info');
     }
@@ -4402,9 +4385,10 @@ function drawPLSDiagram(ctx, options = {}) {
     }
   }
 
-  // 1.5. Preview Kabel Sambungan Dinamis (Saat Mode Jalur Aktif & Variabel Asal Dipilih)
-  if (!isExport && state.isAddingPath && state.pathFrom && state.connectingMouse) {
-    const srcVar = state.variabels.find(v => v.id == state.pathFrom);
+  // 1.5. Preview Kabel Sambungan Dinamis (Saat Tarik Kabel atau Mode Sambung Aktif)
+  const activeSrcId = state.connectDragFromId || state.pathFrom;
+  if (!isExport && activeSrcId && state.connectingMouse) {
+    const srcVar = state.variabels.find(v => v.id == activeSrcId);
     if (srcVar) {
       const R = PLS_STYLE.latentRadius;
       const mx = state.connectingMouse.x;
@@ -4439,8 +4423,8 @@ function drawPLSDiagram(ctx, options = {}) {
       ctx.fill();
 
       // Tooltip pill kecil di dekat kursor
-      const targetVar = state.variabels.find(v => Math.hypot(v.posisi_x - mx, v.posisi_y - my) <= R + 10 && v.id !== srcVar.id);
-      let tipText = 'Klik variabel tujuan (Y)';
+      const targetVar = state.variabels.find(v => Math.hypot(v.posisi_x - mx, v.posisi_y - my) <= R + 12 && v.id !== srcVar.id);
+      let tipText = 'Tarik kabel ke variabel tujuan (Y)';
       let tipBg = '#ec4899';
 
       if (targetVar) {
@@ -4452,7 +4436,7 @@ function drawPLSDiagram(ctx, options = {}) {
           tipText = `Jalur ke "${targetVar.nama}" sudah ada (diabaikan)`;
           tipBg = '#f59e0b';
         } else {
-          tipText = `Sambungkan ke "${targetVar.nama}"`;
+          tipText = `Lepaskan untuk sambung ke "${targetVar.nama}"`;
           tipBg = '#10b981';
         }
       }
@@ -4701,6 +4685,43 @@ function drawPLSDiagram(ctx, options = {}) {
     ctx.strokeStyle = nodeBorderColor;
     ctx.lineWidth = PLS_STYLE.latentBorderWidth;
     ctx.stroke();
+
+    // Connection Port Handle (Tombol Tarik Kabel Hubungan ke Variabel Lain)
+    if (!isExport) {
+      let portX = cx + R + 4;
+      let portY = cy;
+      if (orientasi === 'kanan') {
+        portX = cx - R - 4;
+      } else if (orientasi === 'atas') {
+        portX = cx;
+        portY = cy + R + 4;
+      }
+      
+      const portR = 9;
+      v._connectPort = { x: portX, y: portY, r: portR };
+
+      ctx.save();
+      const isHoveredPort = (state._hoveredPortVarId === v.id);
+      ctx.beginPath();
+      ctx.arc(portX, portY, isHoveredPort ? portR + 2 : portR, 0, Math.PI * 2);
+      ctx.fillStyle = '#ec4899';
+      ctx.shadowColor = 'rgba(236, 72, 153, 0.55)';
+      ctx.shadowBlur = isHoveredPort ? 8 : 4;
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+
+      ctx.font = '700 9px ' + PLS_STYLE.fontFamily;
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('➔', portX, portY);
+      ctx.restore();
+    }
     
     // Warning Diagnostic Badge pada Node jika ada peringatan struktur
     if (!isExport && state.modelWarningsByNode?.[v.id]) {
@@ -5052,155 +5073,31 @@ function setupCanvasInteractions() {
       return dist <= R + 10;
     });
 
-    // 2.A. MODE HUBUNGKAN JALUR AKTIF (Otomatis sambung kabel variabel X ke Y)
-    if (state.activeTool === 'jalur') {
-      if (clickedVar) {
-        if (!state.pathFrom) {
-          // Pilih variabel asal (X)
-          state.pathFrom = clickedVar.id;
-          if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
-          renderModel();
-          showToast(`Variabel asal: "${clickedVar.nama}". Sekarang klik variabel tujuan (Y) untuk menyambungkan kabel.`, 'info');
-          return;
-        } else {
-          // Klik variabel tujuan (Y)
-          if (state.pathFrom === clickedVar.id) {
-            showToast('Variabel asal dan tujuan tidak boleh sama', 'peringatan');
-            return;
-          }
+    // Cek apakah user mengklik Connection Port Handle pada variabel (titik tarik kabel ➔)
+    const portVar = state.variabels.find(v => {
+      if (!v._connectPort) return false;
+      return Math.hypot(v._connectPort.x - mx, v._connectPort.y - my) <= v._connectPort.r + 4;
+    });
 
-          const fromVar = state.variabels.find(v => v.id == state.pathFrom);
-          const toVar = clickedVar;
-          if (!fromVar) {
-            state.pathFrom = null;
-            return;
-          }
-
-          // Cek apakah jalur sudah ada (abaikan jika sudah tersedia untuk menghindari duplikasi garis)
-          const existingPath = state.jalurs.find(j => 
-            (j.dari_variabel_id == fromVar.id || j.dari == fromVar.nama) &&
-            (j.ke_variabel_id == toVar.id || j.ke == toVar.nama)
-          );
-          if (existingPath) {
-            showToast(`Jalur "${fromVar.nama} ➔ ${toVar.nama}" sudah tersedia (diabaikan agar tidak membuat garis duplikat)`, 'info');
-            // Pilih dan sorot jalur yang sudah ada di canvas & panel properti
-            state.selectedPath = existingPath.id;
-            state.selectedNode = null;
-            state.selectedNodes = [];
-            state.selectedPaths = [existingPath.id];
-            showPathProperties(existingPath);
-            // Reset variabel asal agar pengguna bisa langsung klik pasangan variabel lainnya
-            state.pathFrom = null;
-            state.connectingMouse = null;
-            state.connectingHoverVarId = null;
-            if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
-            renderModel();
-            return;
-          }
-
-          // Cek apakah jalur arah sebaliknya (Y -> X) sudah ada (menghindari circular loop)
-          const reversePath = state.jalurs.find(j => 
-            (j.dari_variabel_id == toVar.id || j.dari == toVar.nama) &&
-            (j.ke_variabel_id == fromVar.id || j.ke == fromVar.nama)
-          );
-          if (reversePath) {
-            showToast(`Model rekursif PLS-SEM: sudah ada jalur sebaliknya "${toVar.nama} ➔ ${fromVar.nama}" (diabaikan)`, 'peringatan');
-            state.pathFrom = null;
-            state.connectingMouse = null;
-            state.connectingHoverVarId = null;
-            if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
-            renderModel();
-            return;
-          }
-
-          let maxH = 0;
-          state.jalurs.forEach(j => {
-            const m = (j.label || '').match(/^H(\d+)/i);
-            if (m) {
-              const val = parseInt(m[1]);
-              if (!isNaN(val) && val > maxH) maxH = val;
-            }
-          });
-          const nextH = `H${Math.max(maxH + 1, state.jalurs.length + 1)}`;
-
-          const newPath = {
-            id: Date.now(),
-            dari: fromVar.nama,
-            dari_variabel_id: fromVar.id,
-            ke: toVar.nama,
-            ke_variabel_id: toVar.id,
-            label: nextH,
-            tipe_garis: 'solid',
-            tebal_garis: 2.5,
-            kelengkungan: 0
-          };
-
-          saveHistoryState(`Tambah Jalur ${fromVar.nama} -> ${toVar.nama}`);
-          state.jalurs.push(newPath);
-          saveModelToDb();
-          updateModelValidationStatus();
-
-          state.selectedPath = newPath.id;
-          state.selectedNode = null;
-          state.selectedNodes = [];
-          state.selectedPaths = [newPath.id];
-          showPathProperties(newPath);
-
-          showToast(`Kabel jalur "${fromVar.nama} ➔ ${toVar.nama}" (${nextH}) otomatis terhubung!`, 'sukses');
-
-          // Reset variabel asal agar user dapat langsung klik variabel berikutnya tanpa harus klik tombol jalur lagi
-          state.pathFrom = null;
-          state.connectingMouse = null;
-          state.connectingHoverVarId = null;
-          if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
-          renderModel();
-          return;
-        }
-      } else {
-        // Klik di ruang kosong saat mode jalur:
-        if (state.pathFrom) {
-          state.pathFrom = null;
-          state.connectingMouse = null;
-          state.connectingHoverVarId = null;
-          if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
-          renderModel();
-          showToast('Pemilihan variabel asal dibatalkan', 'info');
-          return;
-        }
-        return;
-      }
+    if (portVar) {
+      state.isDraggingConnection = true;
+      state.connectDragFromId = portVar.id;
+      state.connectingMouse = { x: mx, y: my };
+      state.connectingHoverVarId = null;
+      canvas.style.cursor = 'crosshair';
+      renderModel();
+      return;
     }
 
-    // 2.B. MODE TAMBAH VARIABEL AKTIF (Klik kanvas langsung menaruh variabel baru)
-    if (state.activeTool === 'variabel') {
-      if (!clickedVar) {
-        const varNum = state.variabels.length + 1;
-        const newName = `Variabel ${varNum}`;
-        const newVar = {
-          id: Date.now(),
-          nama: newName,
-          tipe: 'reflektif',
-          indikator: [],
-          orientasi: 'kiri',
-          posisi_x: Math.round(mx),
-          posisi_y: Math.round(my)
-        };
-
-        saveHistoryState(`Tambah Variabel ${newName}`);
-        state.variabels.push(newVar);
-        state.selectedNode = newVar.id;
-        state.selectedPath = null;
-        state.selectedCatatan = null;
-        state.selectedNodes = [newVar.id];
-        state.selectedPaths = [];
-        state.selectedCatatans = [];
-        saveModelToDb();
-        updateModelValidationStatus();
-        showVariableProperties(newVar);
-        showToast(`Variabel "${newName}" ditempatkan di kanvas`, 'sukses');
-        renderModel();
-        return;
-      }
+    // Jika tombol "+ Jalur" aktif dan user menekan variabel: langsung mulai tarik kabel
+    if (state.activeTool === 'jalur' && clickedVar) {
+      state.isDraggingConnection = true;
+      state.connectDragFromId = clickedVar.id;
+      state.connectingMouse = { x: mx, y: my };
+      state.connectingHoverVarId = null;
+      canvas.style.cursor = 'crosshair';
+      renderModel();
+      return;
     }
 
     if (clickedVar) {
@@ -5377,24 +5274,34 @@ function setupCanvasInteractions() {
       return;
     }
 
-    // Live Wire Tracking saat Mode Sambung Jalur Aktif
-    if (state.activeTool === 'jalur') {
+    // Live Wire Tracking saat user sedang press & tarik kabel hubungan antar variabel
+    if (state.isDraggingConnection && state.connectDragFromId) {
       canvas.style.cursor = 'crosshair';
-      if (state.pathFrom) {
-        state.connectingMouse = { x: mx, y: my };
-        const R = PLS_STYLE.latentRadius;
-        const hoveredVar = state.variabels.find(v => {
-          const dist = Math.hypot(v.posisi_x - mx, v.posisi_y - my);
-          return dist <= R + 10;
-        });
-        const newHoverId = (hoveredVar && hoveredVar.id !== state.pathFrom) ? hoveredVar.id : null;
-        if (state.connectingHoverVarId !== newHoverId) {
-          state.connectingHoverVarId = newHoverId;
-        }
-        renderModel();
-        return;
+      state.connectingMouse = { x: mx, y: my };
+      const R = PLS_STYLE.latentRadius;
+      const hoveredVar = state.variabels.find(v => {
+        const dist = Math.hypot(v.posisi_x - mx, v.posisi_y - my);
+        return dist <= R + 14 && v.id !== state.connectDragFromId;
+      });
+      const newHoverId = hoveredVar ? hoveredVar.id : null;
+      if (state.connectingHoverVarId !== newHoverId) {
+        state.connectingHoverVarId = newHoverId;
       }
-    } else if (state.activeTool === 'variabel') {
+      renderModel();
+      return;
+    }
+
+    // Hover detection pada tombol Connection Port ➔ variabel
+    const hoveredPortVar = state.variabels.find(v => {
+      if (!v._connectPort) return false;
+      return Math.hypot(v._connectPort.x - mx, v._connectPort.y - my) <= v._connectPort.r + 3;
+    });
+    const newHoverPortId = hoveredPortVar ? hoveredPortVar.id : null;
+    if (state._hoveredPortVarId !== newHoverPortId) {
+      state._hoveredPortVarId = newHoverPortId;
+      renderModel();
+    }
+    if (hoveredPortVar || state.activeTool === 'jalur') {
       canvas.style.cursor = 'crosshair';
     }
 
@@ -5571,8 +5478,89 @@ function setupCanvasInteractions() {
     }
   };
   
-  canvas.addEventListener('mouseup', () => {
+  canvas.addEventListener('mouseup', (e) => {
     stopCanvasPanning();
+
+    // Selesaikan Tarik Kabel Koneksi Antar Variabel jika sedang berlangsung
+    if (state.isDraggingConnection && state.connectDragFromId) {
+      const fromVar = state.variabels.find(v => v.id == state.connectDragFromId);
+      const rect = canvas.getBoundingClientRect();
+      const rawX = e.clientX - rect.left;
+      const rawY = e.clientY - rect.top;
+      const mx = (rawX - state.pan.x) / state.zoom;
+      const my = (rawY - state.pan.y) / state.zoom;
+      const R = PLS_STYLE.latentRadius;
+      
+      const toVar = state.variabels.find(v => {
+        const dist = Math.hypot(v.posisi_x - mx, v.posisi_y - my);
+        return dist <= R + 14 && v.id !== state.connectDragFromId;
+      });
+
+      if (fromVar && toVar) {
+        // Cek apakah jalur sudah ada
+        const existingPath = state.jalurs.find(j => 
+          (j.dari_variabel_id == fromVar.id || j.dari == fromVar.nama) &&
+          (j.ke_variabel_id == toVar.id || j.ke == toVar.nama)
+        );
+        if (existingPath) {
+          showToast(`Jalur "${fromVar.nama} ➔ ${toVar.nama}" sudah tersedia (diabaikan agar tidak duplikat)`, 'info');
+          state.selectedPath = existingPath.id;
+          state.selectedNode = null;
+          state.selectedNodes = [];
+          state.selectedPaths = [existingPath.id];
+          showPathProperties(existingPath);
+        } else {
+          // Cek jalur arah sebaliknya (rekursif)
+          const reversePath = state.jalurs.find(j => 
+            (j.dari_variabel_id == toVar.id || j.dari == toVar.nama) &&
+            (j.ke_variabel_id == fromVar.id || j.ke == fromVar.nama)
+          );
+          if (reversePath) {
+            showToast(`Model rekursif PLS-SEM: sudah ada jalur sebaliknya "${toVar.nama} ➔ ${fromVar.nama}" (diabaikan)`, 'peringatan');
+          } else {
+            let maxH = 0;
+            state.jalurs.forEach(j => {
+              const m = (j.label || '').match(/^H(\d+)/i);
+              if (m) {
+                const val = parseInt(m[1]);
+                if (!isNaN(val) && val > maxH) maxH = val;
+              }
+            });
+            const nextH = `H${Math.max(maxH + 1, state.jalurs.length + 1)}`;
+            const newPath = {
+              id: Date.now(),
+              dari: fromVar.nama,
+              dari_variabel_id: fromVar.id,
+              ke: toVar.nama,
+              ke_variabel_id: toVar.id,
+              label: nextH,
+              tipe_garis: 'solid',
+              tebal_garis: 2.5,
+              kelengkungan: 0
+            };
+
+            saveHistoryState(`Tambah Jalur ${fromVar.nama} -> ${toVar.nama}`);
+            state.jalurs.push(newPath);
+            saveModelToDb();
+            updateModelValidationStatus();
+            state.selectedPath = newPath.id;
+            state.selectedNode = null;
+            state.selectedNodes = [];
+            state.selectedPaths = [newPath.id];
+            showPathProperties(newPath);
+            showToast(`Kabel jalur "${fromVar.nama} ➔ ${toVar.nama}" (${nextH}) otomatis terhubung!`, 'sukses');
+          }
+        }
+      }
+
+      state.isDraggingConnection = false;
+      state.connectDragFromId = null;
+      state.connectingMouse = null;
+      state.connectingHoverVarId = null;
+      renderModel();
+      return;
+    }
+
     if (state.isMarqueeSelecting) {
       state.isMarqueeSelecting = false;
       if (state.selectedNodes.length > 1) {
@@ -5617,6 +5605,13 @@ function setupCanvasInteractions() {
 
   window.addEventListener('mouseup', () => {
     stopCanvasPanning();
+    if (state.isDraggingConnection) {
+      state.isDraggingConnection = false;
+      state.connectDragFromId = null;
+      state.connectingMouse = null;
+      state.connectingHoverVarId = null;
+      renderModel();
+    }
     if (state.isDraggingPathLabel) {
       state.isDraggingPathLabel = false;
       state.dragLabelPath = null;

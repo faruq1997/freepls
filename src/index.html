@@ -234,11 +234,11 @@
 
               <!-- Canvas Modeling Tools Segmented Group -->
               <div class="toolbar-btn-group">
-                <button class="btn btn-sm btn-ghost btn-group-item btn-highlight-primary" id="btnTambahVariabel" title="Tambah Variabel (Klik untuk Mode Penempatan Langsung di Canvas | Shift+Klik untuk Form Modal)">
+                <button class="btn btn-sm btn-ghost btn-group-item btn-highlight-primary" id="btnTambahVariabel" title="Tambah Variabel Laten Baru (Buka Form Popup)">
                   <span class="material-icons-round" style="color: #009bf2;">add_circle</span>
                   <span>+ Variabel</span>
                 </button>
-                <button class="btn btn-sm btn-ghost btn-group-item" id="btnTambahJalur" title="Mode Sambung Jalur (Klik untuk menghubungkan kabel X ke Y langsung | Shift+Klik untuk Modal)">
+                <button class="btn btn-sm btn-ghost btn-group-item" id="btnTambahJalur" title="Hubungkan Jalur / Pengaruh (Klik atau Tarik Kabel antar Variabel)">
                   <span class="material-icons-round" style="color: #ec4899;">trending_flat</span>
                   <span>+ Jalur</span>
                 </button>
@@ -372,18 +372,6 @@
             <canvas id="modelCanvas" style="display:block;"></canvas>
             <div class="canvas-overlay" id="canvasOverlay">
               <!-- Nodes akan dirender di sini -->
-            </div>
-
-            <!-- Floating Mode Banner (Aktif saat Mode Hubungkan Jalur atau Tambah Variabel) -->
-            <div id="canvasModeBanner" class="canvas-mode-banner tersembunyi" style="position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 10px; background: rgba(17, 24, 39, 0.94); backdrop-filter: blur(12px); border: 1.5px solid var(--border-color); border-radius: 9999px; padding: 6px 14px 6px 16px; color: #fff; font-size: 12.5px; font-weight: 500; pointer-events: auto;">
-              <span class="material-icons-round" id="canvasModeBannerIcon" style="font-size: 18px; color: #ec4899;">trending_flat</span>
-              <span id="canvasModeBannerText">Mode Hubungkan Jalur: Klik Variabel Asal (X) lalu Variabel Tujuan (Y)</span>
-              <button class="btn btn-sm btn-ghost" id="btnModeBannerModal" style="color: #cbd5e1; font-size: 11px; padding: 2px 8px; border: 1px solid rgba(255,255,255,0.2); border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;">
-                <span class="material-icons-round" style="font-size: 14px;">settings</span>Form Detail
-              </button>
-              <button class="btn btn-icon btn-ghost" id="btnModeBannerExit" title="Selesai / Keluar dari mode ini (Esc)" style="width: 24px; height: 24px; color: #cbd5e1; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
-                <span class="material-icons-round" style="font-size: 16px;">close</span>
-              </button>
             </div>
 
             <!-- Floating Button Buka Sidebar Kiri (Muncul jika sidebar disembunyikan) -->
