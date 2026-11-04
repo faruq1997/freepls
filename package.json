@@ -14,7 +14,7 @@
   "license": "CC-BY-NC-4.0",
   "type": "commonjs",
   "build": {
-    "appId": "org.freepls.indonesia",
+    "appId": "org.freepls",
     "productName": "FreePLS",
     "win": {
       "target": "nsis",

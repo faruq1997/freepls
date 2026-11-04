@@ -46,11 +46,19 @@ let db = null;
 let SQL = null;
 
 function getAppUserData() {
-  const appName = 'freepls-indonesia';
+  for (const name of ['freepls', 'FreePLS', 'freepls-indonesia']) {
+    let p;
+    switch (process.platform) {
+      case 'win32':  p = path.join(os.homedir(), 'AppData', 'Roaming', name); break;
+      case 'darwin': p = path.join(os.homedir(), 'Library', 'Application Support', name); break;
+      default:       p = path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), name);
+    }
+    if (fs.existsSync(path.join(p, 'freepls.db'))) return p;
+  }
   switch (process.platform) {
-    case 'win32':  return path.join(os.homedir(), 'AppData', 'Roaming', appName);
-    case 'darwin': return path.join(os.homedir(), 'Library', 'Application Support', appName);
-    default:       return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), appName);
+    case 'win32':  return path.join(os.homedir(), 'AppData', 'Roaming', 'freepls');
+    case 'darwin': return path.join(os.homedir(), 'Library', 'Application Support', 'freepls');
+    default:       return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'freepls');
   }
 }
 
@@ -865,7 +873,7 @@ async function handleRequest(req) {
         ok(id, {
           protocolVersion: '2024-11-05',
           capabilities: { tools: {}, resources: {} },
-          serverInfo: { name: 'freepls-indonesia', version: '1.2.0' },
+          serverInfo: { name: 'freepls', version: '1.2.0' },
         });
         break;
 

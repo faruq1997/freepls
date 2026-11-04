@@ -135,7 +135,7 @@ Ganti `<PATH_TO_FREEPLS>` dengan path absolut ke folder FreePLS di komputer Anda
   "servers": {
     "freepls": {
       "command": "node",
-      "args": ["/home/namauser/freepls-indonesia/mcp-server/index.js"]
+      "args": ["/home/namauser/freepls/mcp-server/index.js"]
     }
   }
 }
