@@ -2823,6 +2823,21 @@ body:has(.fullscreen-canvas) .toast-container {
 }
 .mcp-tool-chip .material-icons-round { font-size: 13px; color: var(--color-primary); }
 
+.mcp-auto-launch-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--color-success, #22c55e) 8%, var(--bg-card));
+  border: 1px solid color-mix(in srgb, var(--color-success, #22c55e) 25%, transparent);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  font-size: 12.5px;
+}
+.mcp-auto-launch-info > .material-icons-round { font-size: 18px; color: var(--color-success, #22c55e); flex-shrink: 0; margin-top: 1px; }
+.mcp-auto-launch-info strong { display: block; margin-bottom: 2px; }
+.mcp-auto-launch-info p { margin: 0; color: var(--text-secondary); line-height: 1.4; }
+
 .mcp-tabs {
   display: flex;
   gap: 4px;

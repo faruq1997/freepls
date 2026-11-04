@@ -10519,20 +10519,18 @@ async function checkMcpStatus() {
   const text  = document.getElementById('mcp-status-text');
   if (!badge || !text) return;
 
+  // Ping local HTTP bridge — terbuka berarti FreePLS aktif & bridge siap
   try {
-    // Try to ping the MCP server via IPC (app exposes checkMcpServer if wired)
-    if (window.electronAPI?.checkMcpServer) {
-      const running = await window.electronAPI.checkMcpServer();
-      badge.className = `mcp-badge ${running ? 'mcp-running' : 'mcp-stopped'}`;
-      text.textContent = running ? 'Server tersedia' : 'Server tidak aktif';
-    } else {
-      badge.className = 'mcp-badge mcp-stopped';
-      text.textContent = 'Siap dijalankan';
+    const res = await fetch('http://127.0.0.1:48123/status', { signal: AbortSignal.timeout(1500) });
+    if (res.ok) {
+      badge.className = 'mcp-badge mcp-running';
+      text.textContent = 'Bridge aktif — siap terima perintah agent';
+      return;
     }
-  } catch {
-    badge.className = 'mcp-badge mcp-stopped';
-    text.textContent = 'Siap dijalankan';
-  }
+  } catch { /* bridge belum jalan */ }
+
+  badge.className = 'mcp-badge mcp-stopped';
+  text.textContent = 'Siap dijalankan';
 }
 
 // ============ UTILITIES ============
