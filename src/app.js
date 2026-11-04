@@ -2719,15 +2719,11 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     updateDatasetChipsInModal();
   });
 
-  // Simpan Variabel Baru dari Modal
+  // Simpan Variabel (Tambah baru ATAU Update edit)
   document.getElementById('btnSimpanVariabel')?.addEventListener('click', () => {
     const nama = document.getElementById('inputNamaVariabel').value.trim();
     if (!nama) {
       showToast('Nama variabel tidak boleh kosong', 'peringatan');
-      return;
-    }
-    if (state.variabels.some(v => v.nama.toLowerCase() === nama.toLowerCase())) {
-      showToast(`Nama variabel "${nama}" sudah digunakan`, 'peringatan');
       return;
     }
     const tipe = document.querySelector('input[name="tipeVariabel"]:checked')?.value || 'reflektif';
@@ -2737,23 +2733,50 @@ window.terapkanTemplateModel = terapkanTemplateModel;
       const val = input.value.trim();
       if (val) indikator.push(val);
     });
-    const newVar = {
-      id: Date.now(),
-      nama,
-      tipe,
-      indikator,
-      orientasi,
-      posisi_x: 160 + Math.random() * 320,
-      posisi_y: 160 + Math.random() * 240
-    };
-    saveHistoryState(`Tambah Variabel "${nama}"`);
-    state.variabels.push(newVar);
-    hideModal('modalTambahVariabel');
-    renderModel();
-    saveModelToDb();
-    showToast(indikator.length === 0
-      ? `Variabel konseptual "${nama}" ditambahkan (tanpa indikator)`
-      : `Variabel "${nama}" ditambahkan (${indikator.length} indikator)`, 'sukses');
+
+    const editId = parseInt(document.getElementById('_editVariabelId').value);
+    if (editId) {
+      // Mode Edit
+      const v = state.variabels.find(vv => vv.id === editId);
+      if (!v) return;
+      if (nama !== v.nama && state.variabels.some(other => other.id !== editId && other.nama.toLowerCase() === nama.toLowerCase())) {
+        showToast(`Nama variabel "${nama}" sudah digunakan`, 'peringatan');
+        return;
+      }
+      saveHistoryState(`Edit Variabel "${v.nama}"`);
+      const namaLama = v.nama;
+      v.nama = nama; v.tipe = tipe; v.orientasi = orientasi; v.indikator = indikator;
+      if (namaLama !== nama) {
+        state.jalurs.forEach(j => {
+          if (j.dari === namaLama || j.dari_variabel_id == editId) j.dari = nama;
+          if (j.ke === namaLama || j.ke_variabel_id == editId) j.ke = nama;
+        });
+      }
+      hideModal('modalTambahVariabel');
+      renderModel();
+      saveModelToDb();
+      showVariableProperties(v);
+      showToast(`Variabel "${nama}" diperbarui (${indikator.length} indikator)`, 'sukses');
+    } else {
+      // Mode Tambah Baru
+      if (state.variabels.some(v => v.nama.toLowerCase() === nama.toLowerCase())) {
+        showToast(`Nama variabel "${nama}" sudah digunakan`, 'peringatan');
+        return;
+      }
+      const newVar = {
+        id: Date.now(), nama, tipe, indikator, orientasi,
+        posisi_x: 160 + Math.random() * 320,
+        posisi_y: 160 + Math.random() * 240
+      };
+      saveHistoryState(`Tambah Variabel "${nama}"`);
+      state.variabels.push(newVar);
+      hideModal('modalTambahVariabel');
+      renderModel();
+      saveModelToDb();
+      showToast(indikator.length === 0
+        ? `Variabel konseptual "${nama}" ditambahkan (tanpa indikator)`
+        : `Variabel "${nama}" ditambahkan (${indikator.length} indikator)`, 'sukses');
+    }
   });
 
   function bukaModalTambahVariabel() {
@@ -2764,6 +2787,9 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     
     // Reset form
     document.getElementById('inputNamaVariabel').value = '';
+    document.getElementById('_editVariabelId').value = '';
+    const h3Modal = document.querySelector('#modalTambahVariabel h3');
+    if (h3Modal) h3Modal.textContent = 'Tambah Variabel Laten';
     document.querySelector('input[name="tipeVariabel"][value="reflektif"]').checked = true;
     document.querySelectorAll('.tipe-card').forEach(c => c.classList.remove('active'));
     document.querySelector('.tipe-card:first-child')?.classList.add('active');
@@ -2785,6 +2811,44 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     setTimeout(() => document.getElementById('inputNamaVariabel').focus(), 150);
   }
 
+  // Buka modal variabel dalam mode EDIT (pre-fill data variabel yang ada)
+  window.bukaModalEditVariabel = function(varId) {
+    const v = state.variabels.find(vv => vv.id == varId);
+    if (!v) return;
+
+    // Set judul modal ke mode edit
+    const h3 = document.querySelector('#modalTambahVariabel h3');
+    if (h3) h3.textContent = 'Edit Variabel Laten';
+
+    document.getElementById('inputNamaVariabel').value = v.nama;
+    document.getElementById('_editVariabelId').value = v.id;
+
+    // Tipe
+    const tipeRadio = document.querySelector(`input[name="tipeVariabel"][value="${v.tipe || 'reflektif'}"]`);
+    if (tipeRadio) {
+      tipeRadio.checked = true;
+      document.querySelectorAll('.tipe-card').forEach(c => c.classList.remove('active'));
+      tipeRadio.closest('.tipe-card')?.classList.add('active');
+    }
+
+    // Orientasi
+    const orientRadio = document.querySelector(`input[name="orientasiIndikator"][value="${v.orientasi || 'kiri'}"]`);
+    if (orientRadio) {
+      orientRadio.checked = true;
+      document.querySelectorAll('.orientasi-card').forEach(c => c.classList.remove('active'));
+      orientRadio.closest('.orientasi-card')?.classList.add('active');
+    }
+
+    document.getElementById('batchInputContainer')?.classList.add('tersembunyi');
+    document.getElementById('indikatorContainer').innerHTML = '';
+    (v.indikator || []).forEach(ind => tambahIndikatorInput(ind));
+    if ((v.indikator || []).length === 0) tambahIndikatorInput();
+    updateDatasetChipsInModal(v.id);
+
+    showModal('modalTambahVariabel');
+    setTimeout(() => document.getElementById('inputNamaVariabel').focus(), 150);
+  };
+
   function bukaModalTambahJalur() {
     if (!state.proyekAktif) {
       showToast('Pilih proyek terlebih dahulu', 'peringatan');
@@ -2794,6 +2858,13 @@ window.terapkanTemplateModel = terapkanTemplateModel;
       showToast('Tambahkan minimal 2 variabel untuk membuat jalur', 'peringatan');
       return;
     }
+
+    const hiddenEditId = document.getElementById('_editJalurId');
+    if (hiddenEditId) hiddenEditId.value = '';
+    const titleEl = document.querySelector('#modalTambahJalur .modal-header h3');
+    if (titleEl) titleEl.textContent = 'Tambah Jalur Struktural (Path)';
+    const btnSubmit = document.getElementById('btnSimpanJalur');
+    if (btnSubmit) btnSubmit.innerHTML = '<span class="material-icons-round">check</span> Tambah Jalur';
     
     const selectDari = document.getElementById('selectDariVariabel');
     const selectKe = document.getElementById('selectKeVariabel');
@@ -2836,6 +2907,58 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     showModal('modalTambahJalur');
   }
 
+  // Buka Modal Jalur dalam Mode Edit (Dipanggil saat Double-Click Jalur di Canvas)
+  window.bukaModalEditJalur = function(jalurId) {
+    const jalur = state.jalurs.find(j => j.id == jalurId);
+    if (!jalur) return;
+
+    bukaModalTambahJalur();
+
+    const hiddenEditId = document.getElementById('_editJalurId');
+    if (hiddenEditId) hiddenEditId.value = jalur.id;
+    const titleEl = document.querySelector('#modalTambahJalur .modal-header h3');
+    if (titleEl) titleEl.textContent = 'Edit Jalur Struktural (Path)';
+    const btnSubmit = document.getElementById('btnSimpanJalur');
+    if (btnSubmit) btnSubmit.innerHTML = '<span class="material-icons-round">save</span> Simpan Perubahan Jalur';
+
+    const selectDari = document.getElementById('selectDariVariabel');
+    const selectKe = document.getElementById('selectKeVariabel');
+    const selectMediator = document.getElementById('selectMediatorVariabel');
+    const inputLabel = document.getElementById('inputLabelJalur');
+
+    if (selectDari && jalur.dari_variabel_id) selectDari.value = jalur.dari_variabel_id;
+    if (selectKe && jalur.ke_variabel_id) selectKe.value = jalur.ke_variabel_id;
+    if (inputLabel) inputLabel.value = jalur.label || '';
+
+    if (jalur.melalui_variabel_id || jalur.melalui) {
+      const cardMediasi = document.getElementById('cardHubunganMediasi');
+      cardMediasi?.click();
+      if (selectMediator && jalur.melalui_variabel_id) selectMediator.value = jalur.melalui_variabel_id;
+    } else {
+      const cardLangsung = document.getElementById('cardHubunganLangsung');
+      cardLangsung?.click();
+    }
+
+    // Tipe Garis
+    const tipeGarisRadio = document.querySelector(`input[name="tipeGarisJalur"][value="${jalur.tipe_garis || 'solid'}"]`);
+    if (tipeGarisRadio) {
+      tipeGarisRadio.checked = true;
+      document.querySelectorAll('.tipe-garis-card').forEach(c => c.classList.remove('active'));
+      tipeGarisRadio.closest('.tipe-garis-card')?.classList.add('active');
+    }
+
+    // Tebal Garis
+    const tebalRadio = document.querySelector(`input[name="tipeTebalGarisJalur"][value="${jalur.tebal_garis || 2.5}"]`);
+    if (tebalRadio) {
+      tebalRadio.checked = true;
+      document.querySelectorAll('.tipe-tebal-card').forEach(c => c.classList.remove('active'));
+      tebalRadio.closest('.tipe-tebal-card')?.classList.add('active');
+    }
+
+    // Kelengkungan
+    window.setPresetKelengkungan(jalur.kelengkungan || 0);
+  };
+
   // Helper untuk mengubah Tool Mode (Select, Jalur, Variabel)
   window.setEditorActiveTool = function(tool) {
     if (state.activeTool === tool && tool !== 'select') {
@@ -2856,22 +2979,7 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     const btnJalur = document.getElementById('btnTambahJalur');
     const btnVar = document.getElementById('btnTambahVariabel');
 
-    // Update active highlight pada tombol toolbar
-    if (btnJalur) {
-      const isJalurActive = (tool === 'jalur');
-      btnJalur.classList.toggle('tool-active', isJalurActive);
-      let dot = btnJalur.querySelector('.tool-active-dot');
-      if (isJalurActive) {
-        if (!dot) {
-          dot = document.createElement('span');
-          dot.className = 'tool-active-dot';
-          btnJalur.appendChild(dot);
-        }
-      } else if (dot) {
-        dot.remove();
-      }
-    }
-
+    // Update active highlight pada tombol toolbar (jalur tidak ada tanda aktif visual)
     if (btnVar) {
       const isVarActive = (tool === 'variabel');
       btnVar.classList.toggle('tool-active', isVarActive);
@@ -2885,6 +2993,12 @@ window.terapkanTemplateModel = terapkanTemplateModel;
       } else if (dot) {
         dot.remove();
       }
+    }
+    // Tombol jalur dipastikan tidak pernah memiliki tanda/marker sedang aktif
+    const btnJalurEl = document.getElementById('btnTambahJalur');
+    if (btnJalurEl) {
+      btnJalurEl.classList.remove('tool-active', 'active');
+      btnJalurEl.querySelector('.tool-active-dot')?.remove();
     }
 
     // Update Canvas Cursor
@@ -2997,6 +3111,45 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     const dariVar = state.variabels.find(v => v.id == dari);
     const keVar = state.variabels.find(v => v.id == ke);
 
+    // MODE EDIT JALUR (Jika _editJalurId terisi)
+    const editJalurId = parseInt(document.getElementById('_editJalurId')?.value);
+    if (editJalurId) {
+      const existingJalur = state.jalurs.find(j => j.id === editJalurId);
+      if (existingJalur) {
+        saveHistoryState(`Edit Jalur ${dariVar.nama} -> ${keVar.nama}`);
+        existingJalur.dari = dariVar.nama;
+        existingJalur.dari_variabel_id = dari;
+        existingJalur.ke = keVar.nama;
+        existingJalur.ke_variabel_id = ke;
+        existingJalur.label = label;
+        existingJalur.tipe_garis = tipeGaris;
+        existingJalur.tebal_garis = tebalGaris;
+        existingJalur.kelengkungan = kelengkungan;
+
+        if (tipeHubungan === 'mediasi') {
+          if (!mediator || mediator === dari || mediator === ke) {
+            showToast('Pilih variabel mediator (Z) yang valid', 'peringatan');
+            return;
+          }
+          const medVar = state.variabels.find(v => v.id == mediator);
+          existingJalur.melalui = medVar?.nama || null;
+          existingJalur.melalui_variabel_id = mediator ? parseInt(mediator) : null;
+          if (existingJalur.label_offset_t === undefined) existingJalur.label_offset_t = 0.25;
+        } else {
+          existingJalur.melalui = null;
+          existingJalur.melalui_variabel_id = null;
+        }
+
+        hideModal('modalTambahJalur');
+        renderModel();
+        saveModelToDb();
+        updateModelValidationStatus();
+        showPathProperties(existingJalur);
+        showToast(`Jalur "${dariVar.nama} → ${keVar.nama}" berhasil diperbarui`, 'sukses');
+        return;
+      }
+    }
+
     if (tipeHubungan === 'mediasi') {
       if (!mediator) {
         showToast('Pilih variabel mediator (Z) untuk hubungan mediasi', 'peringatan');
@@ -3027,6 +3180,7 @@ window.terapkanTemplateModel = terapkanTemplateModel;
         melalui: medVar.nama,
         melalui_variabel_id: parseInt(mediator),
         label: indirectLabel,
+        label_offset_t: 0.25,
         tipe_garis: tipeGaris,
         tebal_garis: tebalGaris,
         kelengkungan: kelengkungan !== 0 ? kelengkungan : 0
@@ -4367,8 +4521,10 @@ function drawPLSDiagram(ctx, options = {}) {
     }
     
     if (labelText) {
-      // Posisi label berdasarkan label_offset_t (0.0–1.0 sepanjang kurva), default 0.5 (tengah)
-      const t = (jalur.label_offset_t !== undefined) ? jalur.label_offset_t : 0.5;
+      // Posisi label: default 0.25 (dekat variabel asal) untuk mediasi/moderasi, 0.5 (tengah) untuk langsung
+      const isMediasiOrModerasi = !!(viaVar || jalur.melalui || jalur.melalui_variabel_id || (jalur.label && (jalur.label.includes('→') || jalur.label.includes('->') || jalur.label.includes('*'))));
+      const defaultT = isMediasiOrModerasi ? 0.25 : 0.5;
+      const t = (jalur.label_offset_t !== undefined) ? jalur.label_offset_t : defaultT;
       const pt = getPathPointAtT(jalur, t);
       let labelMidX = pt.x;
       let labelMidY = pt.y;
@@ -4709,41 +4865,13 @@ function drawPLSDiagram(ctx, options = {}) {
     ctx.lineWidth = PLS_STYLE.latentBorderWidth;
     ctx.stroke();
 
-    // Connection Port Handle (Tombol Tarik Kabel Hubungan ke Variabel Lain)
+    // Connection Port (invisible hit-target, no visual icon)
     if (!isExport) {
       let portX = cx + R + 4;
       let portY = cy;
-      if (orientasi === 'kanan') {
-        portX = cx - R - 4;
-      } else if (orientasi === 'atas') {
-        portX = cx;
-        portY = cy + R + 4;
-      }
-      
-      const portR = 9;
-      v._connectPort = { x: portX, y: portY, r: portR };
-
-      ctx.save();
-      const isHoveredPort = (state._hoveredPortVarId === v.id);
-      ctx.beginPath();
-      ctx.arc(portX, portY, isHoveredPort ? portR + 2 : portR, 0, Math.PI * 2);
-      ctx.fillStyle = '#ec4899';
-      ctx.shadowColor = 'rgba(236, 72, 153, 0.55)';
-      ctx.shadowBlur = isHoveredPort ? 8 : 4;
-      ctx.fill();
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
-
-      ctx.font = '700 9px ' + PLS_STYLE.fontFamily;
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('➔', portX, portY);
-      ctx.restore();
+      if (orientasi === 'kanan') portX = cx - R - 4;
+      else if (orientasi === 'atas') { portX = cx; portY = cy + R + 4; }
+      v._connectPort = { x: portX, y: portY, r: 9 };
     }
     
     // Warning Diagnostic Badge pada Node jika ada peringatan struktur
@@ -5684,7 +5812,7 @@ function setupCanvasInteractions() {
     }
   });
 
-  // Double Click di Canvas: Edit Catatan jika diklik, atau buat catatan baru
+  // Double Click di Canvas: Edit Variabel, Indikator, Jalur, atau Catatan via Popup Modal
   canvas.addEventListener('dblclick', (e) => {
     const rect = canvas.getBoundingClientRect();
     const rawX = e.clientX - rect.left;
@@ -5692,6 +5820,7 @@ function setupCanvasInteractions() {
     const mx = (rawX - state.pan.x) / state.zoom;
     const my = (rawY - state.pan.y) / state.zoom;
 
+    // 1. Double Click pada Catatan
     if (state.catatans && state.catatans.length > 0) {
       const clickedCatatan = state.catatans.slice().reverse().find(c => {
         const x = c.x || 100;
@@ -5705,6 +5834,46 @@ function setupCanvasInteractions() {
         bukaModalEditCatatan(clickedCatatan);
         return;
       }
+    }
+
+    // 2. Double Click pada Indikator (Manifest Variables)
+    if (state.showIndikator !== false) {
+      for (const v of state.variabels) {
+        const indPositions = getIndicatorPositions(v);
+        const clickedInd = indPositions.find(p => mx >= p.x && mx <= p.x + p.w && my >= p.y && my <= p.y + p.h);
+        if (clickedInd) {
+          bukaModalEditIndikator(v.id, clickedInd.name);
+          return;
+        }
+      }
+    }
+
+    // 3. Double Click pada Variabel Laten
+    const R = PLS_STYLE.latentRadius;
+    const clickedVar = state.variabels.find(v => Math.hypot(v.posisi_x - mx, v.posisi_y - my) <= R + 8);
+    if (clickedVar) {
+      if (window.bukaModalEditVariabel) {
+        window.bukaModalEditVariabel(clickedVar.id);
+      }
+      return;
+    }
+
+    // 4. Double Click pada Jalur Struktural (Path atau labelnya)
+    const clickedPath = state.jalurs.slice().reverse().find(j => {
+      if (j._labelBox) {
+        const b = j._labelBox;
+        if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) return true;
+      }
+      if (j._startX !== undefined && j._startY !== undefined) {
+        return pointToPathDist(mx, my, j) <= 14;
+      }
+      return false;
+    });
+    if (clickedPath) {
+      if (window.bukaModalEditJalur) {
+        window.bukaModalEditJalur(clickedPath.id);
+      }
+      return;
     }
   });
 
@@ -6823,24 +6992,16 @@ async function hapusJalur(id) {
   const jalur = state.jalurs.find(j => j.id === id);
   if (!jalur) return;
   
-  const ok = await konfirmasiDialog({
-    title: 'Hapus Jalur Struktural',
-    message: `Apakah Anda yakin ingin menghapus hubungan jalur ${jalur.dari} → ${jalur.ke}?`,
-    okText: 'Hapus Jalur',
-    okIcon: 'delete',
-    isDanger: true,
-    icon: 'delete_outline'
-  });
-  
-  if (ok) {
-    state.jalurs = state.jalurs.filter(j => j.id !== id);
-    state.selectedPath = null;
-    renderModel();
-    await saveModelToDb();
-    const pbPath = document.getElementById('panelBody');
-    if (pbPath) pbPath.innerHTML = '<p class="text-muted">Pilih variabel atau jalur untuk melihat propertinya</p>';
-    showToast('Jalur struktural dihapus', 'sukses');
-  }
+  saveHistoryState(`Hapus Jalur ${jalur.dari} -> ${jalur.ke}`);
+  state.jalurs = state.jalurs.filter(j => j.id !== id);
+  state.selectedPath = null;
+  state.selectedPaths = [];
+  renderModel();
+  await saveModelToDb();
+  updateModelValidationStatus();
+  const pbPath = document.getElementById('panelBody');
+  if (pbPath) pbPath.innerHTML = '<p class="text-muted">Pilih variabel atau jalur untuk melihat propertinya</p>';
+  showToast(`Jalur "${jalur.dari} ➔ ${jalur.ke}" berhasil dihapus`, 'sukses');
 }
 
 function setVariableOrientation(id, orientasi) {
