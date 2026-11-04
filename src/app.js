@@ -6501,7 +6501,7 @@ function showVariableProperties(v) {
           ${inPaths.map(j => {
             const dariName = j.dari || state.variabels.find(x => x.id == j.dari_variabel_id)?.nama || 'X';
             return `
-              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); font-size: 11.5px;">
+              <div class="jalur-summary-row" style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); font-size: 11.5px;">
                 <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                   <span style="color: #10b981; font-weight: 800; font-size: 13px;">←</span>
                   <span style="font-weight: 700; color: var(--text-primary);" title="Dipengaruhi oleh ${escapeHtml(dariName)}">${escapeHtml(dariName)}</span>
@@ -6509,10 +6509,10 @@ function showVariableProperties(v) {
                   ${j.label ? `<span class="badge" style="font-size: 9.5px; padding: 1px 5px; background: rgba(236,72,153,0.15); color: #ec4899; font-weight: 600;">${escapeHtml(j.label)}</span>` : ''}
                 </div>
                 <div style="display: flex; gap: 2px;">
-                  <button type="button" class="btn btn-xs btn-ghost" onclick="sorotJalurDiCanvas(${j.id})" title="Sorot jalur ini di kanvas" style="padding: 2px 4px;">
+                  <button type="button" class="btn btn-xs btn-ghost" onclick="event.stopPropagation(); sorotJalurDiCanvas(${j.id})" title="Sorot jalur ini di kanvas" style="padding: 2px 4px;">
                     <span class="material-icons-round" style="font-size: 15px; color: var(--color-primary);">visibility</span>
                   </button>
-                  <button type="button" class="btn btn-xs btn-ghost" onclick="hapusJalurDariPanel(${j.id}, ${v.id})" title="Hapus jalur ini" style="padding: 2px 4px;">
+                  <button type="button" class="btn btn-xs btn-ghost" onclick="event.stopPropagation(); hapusJalurDariPanel(${j.id}, ${v.id}, this)" title="Hapus jalur ini" style="padding: 2px 4px;">
                     <span class="material-icons-round" style="font-size: 15px; color: var(--color-danger);">close</span>
                   </button>
                 </div>
@@ -6523,7 +6523,7 @@ function showVariableProperties(v) {
           ${outPaths.map(j => {
             const keName = j.ke || state.variabels.find(x => x.id == j.ke_variabel_id)?.nama || 'Y';
             return `
-              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); font-size: 11.5px;">
+              <div class="jalur-summary-row" style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); font-size: 11.5px;">
                 <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                   <span style="color: #0ea5e9; font-weight: 800; font-size: 13px;">→</span>
                   <span style="color: var(--text-muted); font-size: 11px;">${escapeHtml(v.nama)} ➔</span>
@@ -6531,10 +6531,10 @@ function showVariableProperties(v) {
                   ${j.label ? `<span class="badge" style="font-size: 9.5px; padding: 1px 5px; background: rgba(236,72,153,0.15); color: #ec4899; font-weight: 600;">${escapeHtml(j.label)}</span>` : ''}
                 </div>
                 <div style="display: flex; gap: 2px;">
-                  <button type="button" class="btn btn-xs btn-ghost" onclick="sorotJalurDiCanvas(${j.id})" title="Sorot jalur ini di kanvas" style="padding: 2px 4px;">
+                  <button type="button" class="btn btn-xs btn-ghost" onclick="event.stopPropagation(); sorotJalurDiCanvas(${j.id})" title="Sorot jalur ini di kanvas" style="padding: 2px 4px;">
                     <span class="material-icons-round" style="font-size: 15px; color: var(--color-primary);">visibility</span>
                   </button>
-                  <button type="button" class="btn btn-xs btn-ghost" onclick="hapusJalurDariPanel(${j.id}, ${v.id})" title="Hapus jalur ini" style="padding: 2px 4px;">
+                  <button type="button" class="btn btn-xs btn-ghost" onclick="event.stopPropagation(); hapusJalurDariPanel(${j.id}, ${v.id}, this)" title="Hapus jalur ini" style="padding: 2px 4px;">
                     <span class="material-icons-round" style="font-size: 15px; color: var(--color-danger);">close</span>
                   </button>
                 </div>
@@ -6657,18 +6657,30 @@ window.sorotJalurDiCanvas = function(jalurId) {
   showToast(`Jalur "${jalur.dari} ➔ ${jalur.ke}" disorot di kanvas`, 'info');
 };
 
-window.hapusJalurDariPanel = function(jalurId, varId) {
+window.hapusJalurDariPanel = function(jalurId, varId, btnEl = null) {
+  if (btnEl) {
+    const row = btnEl.closest('.jalur-summary-row');
+    if (row) row.style.opacity = '0.2';
+  }
   const idx = state.jalurs.findIndex(j => j.id == jalurId);
   if (idx >= 0) {
     const deleted = state.jalurs[idx];
-    saveHistoryState(`Hapus Jalur ${deleted.dari} -> ${deleted.ke}`);
     state.jalurs.splice(idx, 1);
-    saveModelToDb();
-    updateModelValidationStatus();
+    if (state.selectedPath == jalurId) {
+      state.selectedPath = null;
+      state.selectedPaths = [];
+    }
+    // Update canvas & UI immediately in realtime (0ms latency)
     renderModel();
-    showToast(`Jalur "${deleted.dari} ➔ ${deleted.ke}" dihapus`, 'sukses');
+    updateModelValidationStatus();
+    showToast(`Jalur "${deleted.dari} ➔ ${deleted.ke}" berhasil dihapus`, 'sukses');
+    
+    // Refresh variable properties panel in realtime
     const v = state.variabels.find(x => x.id == varId);
     if (v) showVariableProperties(v);
+
+    // Save in background
+    saveModelToDb(`Hapus Jalur ${deleted.dari} -> ${deleted.ke}`);
   }
 };
 
@@ -6988,21 +7000,31 @@ async function simpanLabelJalur(id) {
   showToast(`Perubahan jalur disimpan: "${labelBaru || '(Tanpa label)'}"`, 'sukses');
 }
 
-async function hapusJalur(id) {
-  const jalur = state.jalurs.find(j => j.id === id);
-  if (!jalur) return;
+window.hapusJalur = function(id) {
+  const idx = state.jalurs.findIndex(j => j.id == id);
+  if (idx === -1) return;
+  const jalur = state.jalurs[idx];
   
-  saveHistoryState(`Hapus Jalur ${jalur.dari} -> ${jalur.ke}`);
-  state.jalurs = state.jalurs.filter(j => j.id !== id);
+  // 1. Hapus seketika dari state (realtime)
+  state.jalurs.splice(idx, 1);
   state.selectedPath = null;
   state.selectedPaths = [];
+  
+  // 2. Re-render kanvas dan validasi seketika tanpa jeda
   renderModel();
-  await saveModelToDb();
   updateModelValidationStatus();
+  
+  // 3. Bersihkan panel properti seketika
   const pbPath = document.getElementById('panelBody');
-  if (pbPath) pbPath.innerHTML = '<p class="text-muted">Pilih variabel atau jalur untuk melihat propertinya</p>';
+  if (pbPath) {
+    pbPath.innerHTML = '<p class="text-muted">Pilih variabel atau jalur untuk melihat propertinya</p>';
+  }
+  
   showToast(`Jalur "${jalur.dari} ➔ ${jalur.ke}" berhasil dihapus`, 'sukses');
-}
+  
+  // 4. Simpan ke database di latar belakang
+  saveModelToDb(`Hapus Jalur ${jalur.dari} -> ${jalur.ke}`);
+};
 
 function setVariableOrientation(id, orientasi) {
   const v = state.variabels.find(vv => vv.id === id);
