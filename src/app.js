@@ -13,7 +13,7 @@ const state = {
   catatans: [],
   hasilPLS: null,
   hasilBootstrap: null,
-  tema: localStorage.getItem('tema') || 'gelap',
+  tema: localStorage.getItem('tema') || 'terang',
   selectedNode: null,
   selectedPath: null,
   selectedCatatan: null,
@@ -282,6 +282,7 @@ function initWindowControls() {
   };
 
   document.getElementById('btnToggleSidebarMenu')?.addEventListener('click', toggleSidebar);
+  document.getElementById('btnTitlebarToggleSidebar')?.addEventListener('click', toggleSidebar);
   document.getElementById('btnFloatingOpenSidebar')?.addEventListener('click', () => {
     const sidebar = document.querySelector('.sidebar');
     sidebar?.classList.remove('collapsed');

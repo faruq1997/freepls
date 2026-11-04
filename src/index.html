@@ -8,11 +8,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 </head>
-<body class="tema-gelap">
+<body class="tema-terang">
   
   <!-- ============ TITLE BAR ============ -->
   <div class="title-bar">
     <div class="title-bar-drag">
+      <button class="title-btn title-btn-menu" id="btnTitlebarToggleSidebar" title="Tampilkan / Sembunyikan Menu (Ctrl+B)" style="-webkit-app-region: no-drag; width: 32px; height: 32px; border-radius: var(--radius-sm); margin-right: 8px;">
+        <span class="material-icons-round" style="font-size: 19px;">menu</span>
+      </button>
       <div class="title-bar-logo">
         <span class="material-icons-round logo-icon">hub</span>
         <span class="title-text">FreePLS Indonesia</span>
@@ -1002,10 +1005,10 @@
                 </div>
               </div>
               <div class="tema-switch">
-                <button class="tema-option" data-tema="terang">
+                <button class="tema-option active" data-tema="terang">
                   <span class="material-icons-round">light_mode</span> Terang
                 </button>
-                <button class="tema-option active" data-tema="gelap">
+                <button class="tema-option" data-tema="gelap">
                   <span class="material-icons-round">dark_mode</span> Gelap
                 </button>
               </div>

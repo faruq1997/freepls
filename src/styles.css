@@ -273,14 +273,18 @@ body {
 /* ============ SIDEBAR ============ */
 .sidebar {
   width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  max-width: var(--sidebar-width);
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   padding: var(--space-md) var(--space-sm);
-  transition: all var(--transition-normal);
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), padding 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 10;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .sidebar-menu {
@@ -337,8 +341,10 @@ body {
 
 /* Sidebar Collapsed State (Mini Sidebar Mode) */
 .sidebar.collapsed {
-  width: 68px;
-  padding: var(--space-md) 8px;
+  width: 68px !important;
+  min-width: 68px !important;
+  max-width: 68px !important;
+  padding: var(--space-md) 8px !important;
 }
 
 .sidebar.collapsed .sidebar-label {
@@ -1589,17 +1595,6 @@ select.form-input {
   display: none !important;
 }
 
-.sidebar.collapsed {
-  width: 0 !important;
-  min-width: 0 !important;
-  max-width: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  border-right: none !important;
-  overflow: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
 
 .editor-canvas-wrapper.fullscreen-canvas {
   position: fixed !important;
