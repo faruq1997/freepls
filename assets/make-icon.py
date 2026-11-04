@@ -23,14 +23,12 @@ icon_1024 = cropped.resize((1024, 1024), Image.LANCZOS)
 icon_1024.save(os.path.join(out_dir, "icon.png"), "PNG")
 print("Saved icon.png (1024x1024)")
 
-# Generate .ico with multiple sizes for Windows taskbar
-sizes = [16, 24, 32, 48, 64, 128, 256]
-ico_frames = [icon_1024.resize((s, s), Image.LANCZOS) for s in sizes]
-ico_frames[0].save(
+# Generate .ico with multiple sizes for Windows taskbar (primary 256x256)
+sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
+icon_1024.save(
     os.path.join(out_dir, "icon.ico"),
     format="ICO",
-    sizes=[(s, s) for s in sizes],
-    append_images=ico_frames[1:]
+    sizes=sizes
 )
 print("Saved icon.ico with sizes:", sizes)
 
