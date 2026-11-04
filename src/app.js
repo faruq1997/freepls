@@ -30,8 +30,12 @@ const state = {
   dragCurvaturePath: null,
   isDraggingPathLabel: false,
   dragLabelPath: null,
+  activeTool: 'select', // 'select' | 'jalur' | 'variabel'
   isAddingPath: false,
+  isAddingVariable: false,
   pathFrom: null,
+  connectingMouse: null,
+  connectingHoverVarId: null,
   // Zoom & Pan state
   zoom: 1.0,
   pan: { x: 0, y: 0 },
@@ -722,6 +726,14 @@ async function setActiveProject(proyek, forceVersiId = null) {
   state.zoom = 1.0;
   state.pan = { x: 0, y: 0 };
   updateZoomLabel();
+  if (typeof window.setEditorActiveTool === 'function') {
+    window.setEditorActiveTool('select');
+  } else {
+    state.activeTool = 'select';
+    state.isAddingPath = false;
+    state.isAddingVariable = false;
+    state.pathFrom = null;
+  }
   
   // Update all project name labels
   document.querySelectorAll('.proyek-nama-aktif').forEach(el => {
@@ -2696,7 +2708,7 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     showToast(`${tokens.length} indikator diterapkan`, 'sukses');
   });
 
-  document.getElementById('btnTambahVariabel').addEventListener('click', () => {
+  function bukaModalTambahVariabel() {
     if (!state.proyekAktif) {
       showToast('Pilih proyek terlebih dahulu', 'peringatan');
       return;
@@ -2723,53 +2735,9 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     
     showModal('modalTambahVariabel');
     setTimeout(() => document.getElementById('inputNamaVariabel').focus(), 150);
-  });
-  
-  document.getElementById('btnTambahIndikator').addEventListener('click', () => {
-    tambahIndikatorInput();
-    updateDatasetChipsInModal();
-  });
-  
-  document.getElementById('btnSimpanVariabel').addEventListener('click', () => {
-    const nama = document.getElementById('inputNamaVariabel').value.trim();
-    if (!nama) {
-      showToast('Nama variabel tidak boleh kosong', 'peringatan');
-      return;
-    }
-    
-    const tipe = document.querySelector('input[name="tipeVariabel"]:checked')?.value || 'reflektif';
-    const orientasi = document.querySelector('input[name="orientasiIndikator"]:checked')?.value || 'kiri';
-    const indikator = [];
-    document.querySelectorAll('#indikatorContainer .form-input').forEach(input => {
-      const val = input.value.trim();
-      if (val) indikator.push(val);
-    });
-    
-    // Variabel tanpa indikator diperbolehkan (sebagai kerangka pemikiran / model konseptual)
-    const newVar = {
-      id: Date.now(),
-      nama,
-      tipe,
-      indikator,
-      orientasi,
-      posisi_x: 160 + Math.random() * 320,
-      posisi_y: 160 + Math.random() * 240
-    };
-    
-    state.variabels.push(newVar);
-    hideModal('modalTambahVariabel');
-    renderModel();
-    saveModelToDb();
-    
-    if (indikator.length === 0) {
-      showToast(`Variabel konseptual "${nama}" ditambahkan (Tanpa Indikator)`, 'sukses');
-    } else {
-      showToast(`Variabel "${nama}" ditambahkan (${indikator.length} indikator)`, 'sukses');
-    }
-  });
-  
-  // Tambah Jalur
-  document.getElementById('btnTambahJalur').addEventListener('click', () => {
+  }
+
+  function bukaModalTambahJalur() {
     if (!state.proyekAktif) {
       showToast('Pilih proyek terlebih dahulu', 'peringatan');
       return;
@@ -2785,13 +2753,19 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     const inputLabel = document.getElementById('inputLabelJalur');
     
     // Auto generate next hypothesis label (e.g. H1, H2, H3...)
-    const nextH = `H${state.jalurs.length + 1}`;
+    let maxH = 0;
+    state.jalurs.forEach(j => {
+      const m = (j.label || '').match(/^H(\d+)/i);
+      if (m) {
+        const val = parseInt(m[1]);
+        if (!isNaN(val) && val > maxH) maxH = val;
+      }
+    });
+    const nextH = `H${Math.max(maxH + 1, state.jalurs.length + 1)}`;
     if (inputLabel) inputLabel.value = nextH;
 
     // Reset hubungan to langsung
     const cardLangsung = document.getElementById('cardHubunganLangsung');
-    const cardMediasi = document.getElementById('cardHubunganMediasi');
-    const containerMediator = document.getElementById('containerPilihMediator');
     cardLangsung?.click();
 
     // Reset curvature to straight (0)
@@ -2804,10 +2778,194 @@ window.terapkanTemplateModel = terapkanTemplateModel;
       selectMediator.innerHTML = '<option value="">-- Pilih Variabel Mediator (Z) --</option>' + options;
     }
 
-    // Auto-isi variabel asal dari node yang sedang dipilih di canvas
-    if (state.selectedNode) selectDari.value = state.selectedNode;
+    // Auto-isi variabel asal dari source node connect mode atau node yang sedang dipilih di canvas
+    if (state.pathFrom) {
+      selectDari.value = state.pathFrom;
+    } else if (state.selectedNode) {
+      selectDari.value = state.selectedNode;
+    }
 
     showModal('modalTambahJalur');
+  }
+
+  // Helper untuk mengubah Tool Mode (Select, Jalur, Variabel)
+  window.setEditorActiveTool = function(tool) {
+    if (state.activeTool === tool && tool !== 'select') {
+      tool = 'select'; // Toggle off
+    }
+
+    state.activeTool = tool;
+    state.isAddingPath = (tool === 'jalur');
+    state.isAddingVariable = (tool === 'variabel');
+    
+    if (tool !== 'jalur') {
+      state.pathFrom = null;
+      state.connectingMouse = null;
+      state.connectingHoverVarId = null;
+    }
+
+    const canvas = document.getElementById('modelCanvas');
+    const btnJalur = document.getElementById('btnTambahJalur');
+    const btnVar = document.getElementById('btnTambahVariabel');
+
+    // Update active highlight pada tombol toolbar
+    if (btnJalur) {
+      const isJalurActive = (tool === 'jalur');
+      btnJalur.classList.toggle('tool-active', isJalurActive);
+      let dot = btnJalur.querySelector('.tool-active-dot');
+      if (isJalurActive) {
+        if (!dot) {
+          dot = document.createElement('span');
+          dot.className = 'tool-active-dot';
+          btnJalur.appendChild(dot);
+        }
+      } else if (dot) {
+        dot.remove();
+      }
+    }
+
+    if (btnVar) {
+      const isVarActive = (tool === 'variabel');
+      btnVar.classList.toggle('tool-active', isVarActive);
+      let dot = btnVar.querySelector('.tool-active-dot');
+      if (isVarActive) {
+        if (!dot) {
+          dot = document.createElement('span');
+          dot.className = 'tool-active-dot';
+          btnVar.appendChild(dot);
+        }
+      } else if (dot) {
+        dot.remove();
+      }
+    }
+
+    // Update Canvas Cursor
+    if (canvas) {
+      if (tool === 'jalur' || tool === 'variabel') {
+        canvas.style.cursor = 'crosshair';
+      } else if (!state.isSpacePressed && !state.isPanning) {
+        canvas.style.cursor = 'default';
+      }
+    }
+
+    updateCanvasModeIndicator();
+    renderModel();
+  };
+
+  // Helper untuk memperbarui Floating Banner di atas Canvas
+  window.updateCanvasModeIndicator = function() {
+    const banner = document.getElementById('canvasModeBanner');
+    const bannerIcon = document.getElementById('canvasModeBannerIcon');
+    const bannerText = document.getElementById('canvasModeBannerText');
+    const btnModal = document.getElementById('btnModeBannerModal');
+    if (!banner || !bannerIcon || !bannerText) return;
+
+    if (state.activeTool === 'jalur') {
+      banner.classList.remove('tersembunyi');
+      bannerIcon.textContent = 'trending_flat';
+      bannerIcon.style.color = '#ec4899';
+      if (btnModal) {
+        btnModal.style.display = 'inline-flex';
+        btnModal.title = 'Buka form opsi jalur & mediasi lengkap';
+      }
+
+      if (state.pathFrom) {
+        const fromVar = state.variabels.find(v => v.id == state.pathFrom);
+        bannerText.innerHTML = `Mode Hubungkan: Dari <strong>"${escapeHtml(fromVar?.nama || 'X')}"</strong> ➔ Klik Variabel Tujuan (Y)`;
+      } else {
+        bannerText.innerHTML = `Mode Hubungkan Jalur: Klik <strong>Variabel Asal (X)</strong> lalu <strong>Tujuan (Y)</strong>`;
+      }
+    } else if (state.activeTool === 'variabel') {
+      banner.classList.remove('tersembunyi');
+      bannerIcon.textContent = 'add_circle';
+      bannerIcon.style.color = '#009bf2';
+      if (btnModal) {
+        btnModal.style.display = 'inline-flex';
+        btnModal.title = 'Buka dialog konfigurasi indikator lengkap';
+      }
+      bannerText.innerHTML = `Mode Tambah Variabel: Klik di kanvas untuk menaruh variabel baru`;
+    } else {
+      banner.classList.add('tersembunyi');
+    }
+  };
+
+  // Event listener tombol modal floating banner
+  document.getElementById('btnModeBannerModal')?.addEventListener('click', () => {
+    if (state.activeTool === 'jalur') {
+      bukaModalTambahJalur();
+    } else if (state.activeTool === 'variabel') {
+      bukaModalTambahVariabel();
+    }
+  });
+
+  // Event listener tombol exit floating banner
+  document.getElementById('btnModeBannerExit')?.addEventListener('click', () => {
+    window.setEditorActiveTool('select');
+    showToast('Mode pemodelan selesai', 'info');
+  });
+
+  // Tombol Tambah Variabel Toolbar (Toggle mode on click, double-click/shift-click opens modal)
+  document.getElementById('btnTambahVariabel').addEventListener('click', (e) => {
+    if (!state.proyekAktif) {
+      showToast('Pilih proyek terlebih dahulu', 'peringatan');
+      return;
+    }
+
+    if (e.shiftKey || e.altKey) {
+      bukaModalTambahVariabel();
+      return;
+    }
+
+    const nextTool = (state.activeTool === 'variabel') ? 'select' : 'variabel';
+    window.setEditorActiveTool(nextTool);
+
+    if (nextTool === 'variabel') {
+      showToast('Mode Tambah Variabel Aktif: Klik pada kanvas untuk menempatkan variabel baru', 'info');
+    } else {
+      showToast('Mode Tambah Variabel dinonaktifkan', 'info');
+    }
+  });
+
+  document.getElementById('btnTambahVariabel').addEventListener('dblclick', () => {
+    bukaModalTambahVariabel();
+  });
+
+  // Tombol Tambah Jalur Toolbar (Toggle mode on click, double-click/shift-click opens modal)
+  document.getElementById('btnTambahJalur').addEventListener('click', (e) => {
+    if (!state.proyekAktif) {
+      showToast('Pilih proyek terlebih dahulu', 'peringatan');
+      return;
+    }
+    if (state.variabels.length < 2) {
+      showToast('Tambahkan minimal 2 variabel untuk membuat jalur', 'peringatan');
+      return;
+    }
+
+    if (e.shiftKey || e.altKey) {
+      bukaModalTambahJalur();
+      return;
+    }
+
+    const nextTool = (state.activeTool === 'jalur') ? 'select' : 'jalur';
+    window.setEditorActiveTool(nextTool);
+
+    if (nextTool === 'jalur') {
+      if (state.selectedNode) {
+        state.pathFrom = state.selectedNode;
+        window.updateCanvasModeIndicator();
+        renderModel();
+        const v = state.variabels.find(x => x.id === state.selectedNode);
+        showToast(`Mode Jalur Aktif: Dari "${v?.nama || 'X'}". Klik variabel tujuan (Y) untuk menyambungkan kabel.`, 'info');
+      } else {
+        showToast('Mode Jalur Aktif: Klik variabel asal (X) lalu variabel tujuan (Y) untuk menyambungkan kabel.', 'info');
+      }
+    } else {
+      showToast('Mode Sambung Jalur dinonaktifkan', 'info');
+    }
+  });
+
+  document.getElementById('btnTambahJalur').addEventListener('dblclick', () => {
+    bukaModalTambahJalur();
   });
   
   document.getElementById('btnSimpanJalur').addEventListener('click', () => {
@@ -3943,7 +4101,7 @@ function drawPLSDiagram(ctx, options = {}) {
     }
     
     const isPathSelected = (selectedPathId === jalur.id || state.selectedPaths?.includes(jalur.id)) && !isExport;
-    const currentPathColor = isPathSelected ? '#f093fb' : pathColor;
+    const currentPathColor = isPathSelected ? '#ec4899' : pathColor;
     const isDashed = (jalur.tipe_garis === 'dashed');
     if (isDashed) hasDashedLine = true;
     
@@ -3953,7 +4111,7 @@ function drawPLSDiagram(ctx, options = {}) {
     const ty = toVar.posisi_y;
     const R = PLS_STYLE.latentRadius;
     const baseLineWidth = jalur.tebal_garis ? parseFloat(jalur.tebal_garis) : PLS_STYLE.pathLineWidth;
-    const currentLineWidth = isPathSelected ? baseLineWidth + 1.8 : baseLineWidth;
+    const currentLineWidth = isPathSelected ? baseLineWidth + 2.2 : baseLineWidth;
     const kelengkungan = jalur.kelengkungan || 0;
 
     let startX, startY, endX, endY, cpX, cpY, midArcX, midArcY, arrowAngle;
@@ -4204,9 +4362,9 @@ function drawPLSDiagram(ctx, options = {}) {
       const padX = 6;
       const padY = 3;
 
-      ctx.fillStyle = isPathSelected ? (isDark ? '#3b1c4a' : '#fdf2f8') : (isDark ? '#1a1a3e' : '#ffffff');
-      ctx.strokeStyle = isPathSelected ? '#f093fb' : (isDark ? '#3d3d7a' : '#d1d5db');
-      ctx.lineWidth = isPathSelected ? 1.5 : 1;
+      ctx.fillStyle = isPathSelected ? (isDark ? '#4a1236' : '#fdf2f8') : (isDark ? '#1a1a3e' : '#ffffff');
+      ctx.strokeStyle = isPathSelected ? '#ec4899' : (isDark ? '#3d3d7a' : '#d1d5db');
+      ctx.lineWidth = isPathSelected ? 2 : 1;
 
       const boxX = labelMidX - textMetrics.width / 2 - padX;
       const boxY = labelMidY - 8 - padY;
@@ -4222,7 +4380,7 @@ function drawPLSDiagram(ctx, options = {}) {
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = isPathSelected ? '#d946ef' : (isDark ? '#80b3ff' : '#1e3a8a');
+      ctx.fillStyle = isPathSelected ? '#ec4899' : (isDark ? '#80b3ff' : '#1e3a8a');
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(labelText, labelMidX, labelMidY + 1);
@@ -4231,6 +4389,73 @@ function drawPLSDiagram(ctx, options = {}) {
       jalur._labelBox = { x: boxX, y: boxY, w: boxW, h: boxH };
     } else {
       jalur._labelBox = null;
+    }
+  }
+
+  // 1.5. Preview Kabel Sambungan Dinamis (Saat Mode Jalur Aktif & Variabel Asal Dipilih)
+  if (!isExport && state.isAddingPath && state.pathFrom && state.connectingMouse) {
+    const srcVar = state.variabels.find(v => v.id == state.pathFrom);
+    if (srcVar) {
+      const R = PLS_STYLE.latentRadius;
+      const mx = state.connectingMouse.x;
+      const my = state.connectingMouse.y;
+      const angle = Math.atan2(my - srcVar.posisi_y, mx - srcVar.posisi_x);
+      const sx = srcVar.posisi_x + Math.cos(angle) * R;
+      const sy = srcVar.posisi_y + Math.sin(angle) * R;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = '#ec4899';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 5]);
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(mx, my);
+      ctx.stroke();
+
+      // Panah di ujung kursor
+      const arrSize = 13;
+      ctx.beginPath();
+      ctx.fillStyle = '#ec4899';
+      ctx.moveTo(mx, my);
+      ctx.lineTo(
+        mx - arrSize * Math.cos(angle - Math.PI / 7),
+        my - arrSize * Math.sin(angle - Math.PI / 7)
+      );
+      ctx.lineTo(
+        mx - arrSize * Math.cos(angle + Math.PI / 7),
+        my - arrSize * Math.sin(angle + Math.PI / 7)
+      );
+      ctx.closePath();
+      ctx.fill();
+
+      // Tooltip pill kecil di dekat kursor
+      const targetVar = state.variabels.find(v => Math.hypot(v.posisi_x - mx, v.posisi_y - my) <= R + 10 && v.id !== srcVar.id);
+      const tipText = targetVar ? `Sambungkan ke "${targetVar.nama}"` : 'Klik variabel tujuan (Y)';
+      ctx.font = '700 11px ' + PLS_STYLE.fontFamily;
+      const tipMetrics = ctx.measureText(tipText);
+      const tipW = tipMetrics.width + 16;
+      const tipH = 22;
+      const tipX = mx + 14;
+      const tipY = my - 11;
+
+      ctx.fillStyle = targetVar ? '#10b981' : '#ec4899';
+      ctx.shadowColor = 'rgba(0,0,0,0.3)';
+      ctx.shadowBlur = 6;
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(tipX, tipY, tipW, tipH, 11);
+        ctx.fill();
+      } else {
+        ctx.fillRect(tipX, tipY, tipW, tipH);
+      }
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(tipText, tipX + 8, tipY + tipH / 2);
+      ctx.restore();
     }
   }
   
@@ -4334,13 +4559,101 @@ function drawPLSDiagram(ctx, options = {}) {
     // 3. Gambar Lingkaran Variabel Laten (Biru SmartPLS / Custom Warna)
     ctx.save();
     
-    // Selection glow if in editor
-    if (isSelected && !isExport) {
+    // Selection & Active Connection markers on node
+    const isConnectSource = (!isExport && state.isAddingPath && state.pathFrom === v.id);
+    const isConnectHoverTarget = (!isExport && state.isAddingPath && state.pathFrom && state.connectingHoverVarId === v.id && v.id !== state.pathFrom);
+
+    if (isConnectSource) {
+      // Halo aktif variabel asal X (Hot Pink Pulse)
       ctx.beginPath();
-      ctx.arc(cx, cy, R + 6, 0, Math.PI * 2);
-      ctx.strokeStyle = '#f093fb';
-      ctx.lineWidth = 3;
+      ctx.arc(cx, cy, R + 9, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ec4899';
+      ctx.lineWidth = 3.5;
       ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, R + 15, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(236, 72, 153, 0.45)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Label badge ASAL (X)
+      const bY = cy - R - 18;
+      ctx.save();
+      ctx.font = '700 10.5px ' + PLS_STYLE.fontFamily;
+      const bText = '📌 ASAL (X)';
+      const bW = ctx.measureText(bText).width + 12;
+      ctx.fillStyle = '#ec4899';
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(cx - bW / 2, bY - 8, bW, 16, 8);
+        ctx.fill();
+      } else {
+        ctx.fillRect(cx - bW / 2, bY - 8, bW, 16);
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(bText, cx, bY);
+      ctx.restore();
+    } else if (isConnectHoverTarget) {
+      // Halo aktif variabel tujuan Y (Emerald Green Snap)
+      ctx.beginPath();
+      ctx.arc(cx, cy, R + 9, 0, Math.PI * 2);
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+
+      const bY = cy - R - 18;
+      ctx.save();
+      ctx.font = '700 10.5px ' + PLS_STYLE.fontFamily;
+      const bText = '🎯 TUJUAN (Y)';
+      const bW = ctx.measureText(bText).width + 12;
+      ctx.fillStyle = '#10b981';
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(cx - bW / 2, bY - 8, bW, 16, 8);
+        ctx.fill();
+      } else {
+        ctx.fillRect(cx - bW / 2, bY - 8, bW, 16);
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(bText, cx, bY);
+      ctx.restore();
+    } else if (isSelected && !isExport) {
+      // Marker Variabel Aktif Terpilih (Sky Blue Double Ring + 4 Anchor Points)
+      ctx.beginPath();
+      ctx.arc(cx, cy, R + 5, 0, Math.PI * 2);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, R + 9, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // 4 Anchor grip dots
+      const anchors = [
+        { x: cx, y: cy - R - 5 },
+        { x: cx + R + 5, y: cy },
+        { x: cx, y: cy + R + 5 },
+        { x: cx - R - 5, y: cy }
+      ];
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 1.5;
+      anchors.forEach(a => {
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
     }
     
     // Lingkaran Laten dengan Warna Kustom atau Default
@@ -4671,7 +4984,131 @@ function setupCanvasInteractions() {
       const dist = Math.hypot(v.posisi_x - mx, v.posisi_y - my);
       return dist <= R + 10;
     });
-    
+
+    // 2.A. MODE HUBUNGKAN JALUR AKTIF (Otomatis sambung kabel variabel X ke Y)
+    if (state.activeTool === 'jalur') {
+      if (clickedVar) {
+        if (!state.pathFrom) {
+          // Pilih variabel asal (X)
+          state.pathFrom = clickedVar.id;
+          if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
+          renderModel();
+          showToast(`Variabel asal: "${clickedVar.nama}". Sekarang klik variabel tujuan (Y) untuk menyambungkan kabel.`, 'info');
+          return;
+        } else {
+          // Klik variabel tujuan (Y)
+          if (state.pathFrom === clickedVar.id) {
+            showToast('Variabel asal dan tujuan tidak boleh sama', 'peringatan');
+            return;
+          }
+
+          const fromVar = state.variabels.find(v => v.id == state.pathFrom);
+          const toVar = clickedVar;
+          if (!fromVar) {
+            state.pathFrom = null;
+            return;
+          }
+
+          // Cek apakah jalur sudah ada
+          const exists = state.jalurs.some(j => 
+            (j.dari_variabel_id == fromVar.id || j.dari == fromVar.nama) &&
+            (j.ke_variabel_id == toVar.id || j.ke == toVar.nama)
+          );
+          if (exists) {
+            showToast(`Jalur dari "${fromVar.nama}" ke "${toVar.nama}" sudah ada`, 'peringatan');
+            return;
+          }
+
+          let maxH = 0;
+          state.jalurs.forEach(j => {
+            const m = (j.label || '').match(/^H(\d+)/i);
+            if (m) {
+              const val = parseInt(m[1]);
+              if (!isNaN(val) && val > maxH) maxH = val;
+            }
+          });
+          const nextH = `H${Math.max(maxH + 1, state.jalurs.length + 1)}`;
+
+          const newPath = {
+            id: Date.now(),
+            dari: fromVar.nama,
+            dari_variabel_id: fromVar.id,
+            ke: toVar.nama,
+            ke_variabel_id: toVar.id,
+            label: nextH,
+            tipe_garis: 'solid',
+            tebal_garis: 2.5,
+            kelengkungan: 0
+          };
+
+          saveHistoryState(`Tambah Jalur ${fromVar.nama} -> ${toVar.nama}`);
+          state.jalurs.push(newPath);
+          saveModelToDb();
+          updateModelValidationStatus();
+
+          state.selectedPath = newPath.id;
+          state.selectedNode = null;
+          state.selectedNodes = [];
+          state.selectedPaths = [newPath.id];
+          showPathProperties(newPath);
+
+          showToast(`Kabel jalur "${fromVar.nama} ➔ ${toVar.nama}" (${nextH}) otomatis terhubung!`, 'sukses');
+
+          // Reset variabel asal agar user dapat langsung klik variabel berikutnya tanpa harus klik tombol jalur lagi
+          state.pathFrom = null;
+          state.connectingMouse = null;
+          state.connectingHoverVarId = null;
+          if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
+          renderModel();
+          return;
+        }
+      } else {
+        // Klik di ruang kosong saat mode jalur:
+        if (state.pathFrom) {
+          state.pathFrom = null;
+          state.connectingMouse = null;
+          state.connectingHoverVarId = null;
+          if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
+          renderModel();
+          showToast('Pemilihan variabel asal dibatalkan', 'info');
+          return;
+        }
+        return;
+      }
+    }
+
+    // 2.B. MODE TAMBAH VARIABEL AKTIF (Klik kanvas langsung menaruh variabel baru)
+    if (state.activeTool === 'variabel') {
+      if (!clickedVar) {
+        const varNum = state.variabels.length + 1;
+        const newName = `Variabel ${varNum}`;
+        const newVar = {
+          id: Date.now(),
+          nama: newName,
+          tipe: 'reflektif',
+          indikator: [],
+          orientasi: 'kiri',
+          posisi_x: Math.round(mx),
+          posisi_y: Math.round(my)
+        };
+
+        saveHistoryState(`Tambah Variabel ${newName}`);
+        state.variabels.push(newVar);
+        state.selectedNode = newVar.id;
+        state.selectedPath = null;
+        state.selectedCatatan = null;
+        state.selectedNodes = [newVar.id];
+        state.selectedPaths = [];
+        state.selectedCatatans = [];
+        saveModelToDb();
+        updateModelValidationStatus();
+        showVariableProperties(newVar);
+        showToast(`Variabel "${newName}" ditempatkan di kanvas`, 'sukses');
+        renderModel();
+        return;
+      }
+    }
+
     if (clickedVar) {
       // Shift-Click: Toggle Multi-Selection
       if (e.shiftKey) {
@@ -4844,6 +5281,27 @@ function setupCanvasInteractions() {
         renderModel();
       }
       return;
+    }
+
+    // Live Wire Tracking saat Mode Sambung Jalur Aktif
+    if (state.activeTool === 'jalur') {
+      canvas.style.cursor = 'crosshair';
+      if (state.pathFrom) {
+        state.connectingMouse = { x: mx, y: my };
+        const R = PLS_STYLE.latentRadius;
+        const hoveredVar = state.variabels.find(v => {
+          const dist = Math.hypot(v.posisi_x - mx, v.posisi_y - my);
+          return dist <= R + 10;
+        });
+        const newHoverId = (hoveredVar && hoveredVar.id !== state.pathFrom) ? hoveredVar.id : null;
+        if (state.connectingHoverVarId !== newHoverId) {
+          state.connectingHoverVarId = newHoverId;
+        }
+        renderModel();
+        return;
+      }
+    } else if (state.activeTool === 'variabel') {
+      canvas.style.cursor = 'crosshair';
     }
 
     // Update Marquee Box Selection
@@ -5056,6 +5514,11 @@ function setupCanvasInteractions() {
 
   canvas.addEventListener('mouseleave', () => {
     stopCanvasPanning();
+    if (state.connectingMouse) {
+      state.connectingMouse = null;
+      state.connectingHoverVarId = null;
+      renderModel();
+    }
   });
 
   window.addEventListener('mouseup', () => {
@@ -5064,6 +5527,25 @@ function setupCanvasInteractions() {
       state.isDraggingPathLabel = false;
       state.dragLabelPath = null;
       saveModelToDb();
+    }
+  });
+
+  // Escape key untuk keluar dari tool mode atau membatalkan pilihan variabel asal
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (state.activeTool && state.activeTool !== 'select') {
+        if (state.pathFrom) {
+          state.pathFrom = null;
+          state.connectingMouse = null;
+          state.connectingHoverVarId = null;
+          if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
+          renderModel();
+          showToast('Pemilihan variabel asal dibatalkan', 'info');
+        } else {
+          if (window.setEditorActiveTool) window.setEditorActiveTool('select');
+          showToast('Mode pemodelan dinonaktifkan', 'info');
+        }
+      }
     }
   });
 

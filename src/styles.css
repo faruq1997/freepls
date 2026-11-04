@@ -1640,6 +1640,56 @@ body:has(.fullscreen-canvas) .toast-container {
   display: flex !important;
 }
 
+/* ============ STYLES FOR ACTIVE TOOLS & CANVAS MODE BANNER ============ */
+.btn-group-item.tool-active {
+  background: var(--color-primary-light) !important;
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.25), var(--shadow-sm);
+  position: relative;
+}
+
+.btn-group-item.tool-active#btnTambahJalur {
+  background: rgba(236, 72, 153, 0.14) !important;
+  border-color: #ec4899 !important;
+  color: #ec4899 !important;
+  box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.35), var(--shadow-sm);
+}
+
+.btn-group-item.tool-active#btnTambahVariabel {
+  background: rgba(2, 132, 199, 0.14) !important;
+  border-color: #0284c7 !important;
+  color: #0284c7 !important;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.35), var(--shadow-sm);
+}
+
+.tool-active-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: currentColor;
+  display: inline-block;
+  margin-left: 5px;
+  box-shadow: 0 0 6px currentColor;
+  animation: pulseToolDot 1.4s infinite ease-in-out;
+}
+
+@keyframes pulseToolDot {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  50% { transform: scale(1.35); opacity: 1; }
+  100% { transform: scale(0.85); opacity: 0.6; }
+}
+
+.canvas-mode-banner {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.canvas-mode-banner.tersembunyi {
+  display: none !important;
+}
+
 /* ============ STYLES FOR VERSION HISTORY & STICKY NOTES ============ */
 .versi-card-item {
   background: var(--bg-card);
