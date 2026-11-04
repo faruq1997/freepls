@@ -2961,8 +2961,8 @@ window.terapkanTemplateModel = terapkanTemplateModel;
     bukaModalTambahVariabel();
   });
 
-  // Tombol Tambah Jalur Toolbar (Toggle mode on click, double-click/shift-click opens modal)
-  document.getElementById('btnTambahJalur').addEventListener('click', (e) => {
+  // Tombol Tambah Jalur Toolbar: Langsung buka popup modal (dengan opsi mediasi/moderasi)
+  document.getElementById('btnTambahJalur').addEventListener('click', () => {
     if (!state.proyekAktif) {
       showToast('Pilih proyek terlebih dahulu', 'peringatan');
       return;
@@ -2971,23 +2971,6 @@ window.terapkanTemplateModel = terapkanTemplateModel;
       showToast('Tambahkan minimal 2 variabel untuk membuat jalur', 'peringatan');
       return;
     }
-
-    if (e.shiftKey || e.altKey) {
-      bukaModalTambahJalur();
-      return;
-    }
-
-    const nextTool = (state.activeTool === 'jalur') ? 'select' : 'jalur';
-    window.setEditorActiveTool(nextTool);
-
-    if (nextTool === 'jalur') {
-      showToast('Mode Jalur Aktif: Tekan variabel lalu tarik kabel ke variabel tujuan', 'info');
-    } else {
-      showToast('Mode Sambung Jalur dinonaktifkan', 'info');
-    }
-  });
-
-  document.getElementById('btnTambahJalur').addEventListener('dblclick', () => {
     bukaModalTambahJalur();
   });
   
