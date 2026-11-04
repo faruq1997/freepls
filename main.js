@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 const XLSX = require('xlsx');
 
 // Suppress GPU & HTTP cache permission error on Windows multi-instance
@@ -13,6 +14,78 @@ let mainWindow;
 let db;
 let SQL;
 let dbPath;
+let bridgeServer = null;
+
+// ============ PARSE CLI ARGUMENTS ============
+function parseCustomArgs(argv = []) {
+  const result = {};
+  for (const arg of argv) {
+    if (typeof arg === 'string') {
+      if (arg.startsWith('--open-project=')) {
+        result.proyekId = parseInt(arg.split('=')[1], 10);
+      } else if (arg.startsWith('--tab=')) {
+        result.tab = arg.split('=')[1];
+      }
+    }
+  }
+  return result;
+}
+
+// ============ LOCAL HTTP BRIDGE FOR MCP ============
+function startLocalBridge() {
+  const server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    if (req.url === '/health' || req.url === '/status') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'running', app: 'freepls-indonesia' }));
+      return;
+    }
+
+    if (req.url === '/open-project' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.show();
+            mainWindow.focus();
+            mainWindow.webContents.send('buka-proyek-otomatis', payload);
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, message: 'FreePLS window focused and project opened' }));
+        } catch(e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    res.writeHead(404);
+    res.end();
+  });
+
+  server.on('error', (err) => {
+    console.warn('[FreePLS Bridge] Port 48123 info:', err.message);
+  });
+
+  server.listen(48123, '127.0.0.1', () => {
+    console.log('[FreePLS Bridge] Local bridge listening on http://127.0.0.1:48123');
+  });
+
+  bridgeServer = server;
+}
 
 // ============ DATABASE SETUP ============
 async function initDatabase() {
@@ -161,14 +234,46 @@ function createWindow() {
   
   // Remove default menu
   Menu.setApplicationMenu(null);
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    const parsed = parseCustomArgs(process.argv);
+    if (parsed.proyekId || parsed.tab) {
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('buka-proyek-otomatis', parsed);
+        }
+      }, 500);
+    }
+  });
 }
 
-app.whenReady().then(async () => {
-  await initDatabase();
-  createWindow();
-});
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      const parsed = parseCustomArgs(commandLine);
+      if (parsed.proyekId || parsed.tab) {
+        mainWindow.webContents.send('buka-proyek-otomatis', parsed);
+      }
+    }
+  });
+
+  app.whenReady().then(async () => {
+    await initDatabase();
+    createWindow();
+    startLocalBridge();
+  });
+}
 
 app.on('window-all-closed', () => {
+  if (bridgeServer) {
+    try { bridgeServer.close(); } catch (e) {}
+  }
   saveDb();
   app.quit();
 });

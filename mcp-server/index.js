@@ -39,6 +39,7 @@ function getAppPath(...segments) {
 // ── Engine ────────────────────────────────────────────────────────────────────
 const { PLSEngine } = require(getAppPath('src', 'pls-engine.js'));
 const { analyzeFile } = require(path.join(__dirname, 'analyze-runner.js'));
+const { launchOrFocusApp } = require(path.join(__dirname, 'app-bridge.js'));
 
 // ── Database (sql.js) ─────────────────────────────────────────────────────────
 let db = null;
@@ -548,6 +549,17 @@ Perfect for AI agents: send a file path, get back a full academic analysis.`,
       properties: { proyek_id: { type: 'integer' } },
     },
   },
+  {
+    name: 'pls_open_app',
+    description: 'Buka dan tampilkan jendela visual aplikasi desktop FreePLS Indonesia di layar komputer secara otomatis, memuat proyek yang dipilih, serta membuka tab editor/hasil/data.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        proyek_id: { type: 'integer', description: 'ID proyek yang ingin dimuat (opsional)' },
+        tab:       { type: 'string', enum: ['beranda', 'editor', 'data', 'analisis', 'hasil'], default: 'hasil', description: 'Halaman tab yang ingin dibuka (default: hasil)' },
+      },
+    },
+  },
 ];
 
 // ── Tool execution ─────────────────────────────────────────────────────────────
@@ -609,6 +621,11 @@ async function callTool(name, args) {
       if (run_bootstrap) {
         out.bootstrap = engine.runBootstrap(options);
       }
+
+      // Auto-launch / focus FreePLS agar visual proyek langsung tampil di layar
+      try {
+        await launchOrFocusApp({ proyekId: proyek_id, tab: 'hasil' });
+      } catch (e) {}
 
       return out;
     }
@@ -772,6 +789,21 @@ async function callTool(name, args) {
       }
 
       return result;
+    }
+
+    case 'pls_open_app': {
+      const { proyek_id = null, tab = 'hasil' } = args;
+      const res = await launchOrFocusApp({ proyekId: proyek_id, tab });
+      return {
+        success: true,
+        action: res.mode === 'focused_running_app' ? 'focused_existing_window' : 'spawned_application_process',
+        message: res.mode === 'focused_running_app'
+          ? `Jendela FreePLS yang sedang berjalan berhasil diangkat ke depan dan membuka tab "${tab}" (Proyek ID: ${proyek_id || 'aktif'}).`
+          : `Aplikasi desktop FreePLS berhasil diluncurkan otomatis dan membuka tab "${tab}" (Proyek ID: ${proyek_id || 'aktif'}).`,
+        proyek_id,
+        tab,
+        details: res
+      };
     }
 
     default:

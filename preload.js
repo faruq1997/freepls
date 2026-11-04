@@ -51,7 +51,8 @@ contextBridge.exposeInMainWorld('api', {
   // External Links & Email
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
-  // MCP
+  // MCP & Auto Launch
   getAppPath: () => ipcRenderer.invoke('get-app-path'),
+  onBukaProyekOtomatis: (callback) => ipcRenderer.on('buka-proyek-otomatis', (_, data) => callback(data)),
 });
 

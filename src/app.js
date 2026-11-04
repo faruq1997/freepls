@@ -219,9 +219,32 @@ document.addEventListener('DOMContentLoaded', () => {
   initAnalysisHandlers();
   initResultsHandlers();
   initSettingsHandlers();
+  initMcpAutoOpenListener();
   updateProjectStateUI();
   loadDashboard();
 });
+
+// ============ MCP AUTO-LAUNCH & FOCUS LISTENER ============
+function initMcpAutoOpenListener() {
+  window.api?.onBukaProyekOtomatis?.(async (payload) => {
+    try {
+      const { proyekId, tab = 'hasil' } = payload || {};
+      if (proyekId) {
+        const proyek = await window.api.proyekAmbil(proyekId);
+        if (proyek) {
+          await setActiveProject(proyek);
+          navigateTo(tab);
+          showToast(`Proyek "${proyek.nama}" dibuka otomatis oleh AI Agent (MCP)`, 'sukses');
+        }
+      } else if (tab) {
+        navigateTo(tab);
+        showToast(`Membuka tab "${tab}" dari AI Agent (MCP)`, 'info');
+      }
+    } catch (err) {
+      console.error('Error auto-opening project from MCP:', err);
+    }
+  });
+}
 
 // ============ THEME MANAGEMENT ============
 function initTheme() {

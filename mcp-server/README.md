@@ -89,6 +89,59 @@ npm install          # install sql.js untuk MCP server
 | `pls_list_projects` | Daftar proyek tersimpan di database FreePLS lokal |
 | `pls_get_project` | Detail model & dataset proyek tersimpan |
 | `pls_get_results` | Hasil analisis tersimpan untuk suatu proyek |
+| `pls_mardia_normality` | Uji normalitas multivariat Mardia (Skewness χ², Kurtosis Z) + narasi akademik |
+| `pls_formative_assessment` | Evaluasi model formatif Mode B: Indicator VIF, Outer Weights (Hair et al.) |
+| `pls_hoc_analysis` | Higher-Order Constructs (HOC) Two-Stage Approach: LOC → HOC |
+| `pls_nca_analysis` | Necessary Condition Analysis (NCA): CE-FDH ceiling, bottleneck table |
+| `pls_open_app` | Buka / fokuskan jendela desktop FreePLS secara otomatis |
+
+---
+
+## 🚀 Auto-Launch Desktop App
+
+Saat tool analisis (`pls_analyze_file`, `pls_run_from_project`) atau `pls_open_app` dipanggil, MCP server **otomatis membuka aplikasi FreePLS** di desktop pengguna.
+
+### Cara Kerja
+
+```
+Agent → MCP tool call → mcp-server/index.js → app-bridge.js
+  ├─ App BERJALAN  → HTTP POST 127.0.0.1:48123/open-project → FreePLS window muncul ke depan
+  └─ App MATI      → spawn electron . --open-project=<id>   → Electron start + muat proyek
+```
+
+- **Bridge port:** `127.0.0.1:48123` (lokal saja, tidak terekspos ke jaringan)
+- **CLI arg:** `--open-project=<proyekId>` (opsional, muat proyek langsung setelah launch)
+- **Single instance:** Jika sudah berjalan, instance kedua diteruskan ke instance pertama via IPC
+
+### Konfigurasi untuk User Baru
+
+Ganti `<PATH_TO_FREEPLS>` dengan path absolut ke folder FreePLS di komputer Anda:
+
+**Windows:**
+```json
+{
+  "servers": {
+    "freepls": {
+      "command": "node",
+      "args": ["C:/Users/NamaUser/Desktop/smartPLS/mcp-server/index.js"]
+    }
+  }
+}
+```
+
+**macOS / Linux:**
+```json
+{
+  "servers": {
+    "freepls": {
+      "command": "node",
+      "args": ["/home/namauser/freepls-indonesia/mcp-server/index.js"]
+    }
+  }
+}
+```
+
+> **Catatan:** Pastikan aplikasi FreePLS sudah pernah dijalankan minimal satu kali agar database lokal terbentuk.
 
 ---
 

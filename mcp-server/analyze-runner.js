@@ -543,7 +543,15 @@ async function analyzeFile({ filePath, variabels, jalurs, targetIPMA, options={}
   let proyekId = null;
   if (db) proyekId = saveToDatabase(db, filename, variabels, jalurs, data, plsResult, bootstrapRaw, dbPath);
 
-  // 9. Return summary
+  // 9. Auto-launch / focus FreePLS Desktop App so user sees the results visually!
+  try {
+    const { launchOrFocusApp } = require('./app-bridge');
+    await launchOrFocusApp({ proyekId, tab: 'hasil' });
+  } catch(e) {
+    // Non-blocking fallback
+  }
+
+  // 10. Return summary
   return {
     success:    true,
     filename,
