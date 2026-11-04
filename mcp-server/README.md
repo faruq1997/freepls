@@ -1,11 +1,11 @@
-# FreePLS Indonesia – MCP Server
+# FreePLS – MCP Server
 
 MCP server yang mengekspos kemampuan PLS-SEM FreePLS ke AI agent seperti **Claude CLI**, **Cursor**, **Windsurf**, **Antigravity**, dan host MCP lainnya.
 
 ## Instalasi
 
 ```bash
-# Di root folder FreePLS Indonesia
+# Di root folder FreePLS
 npm install          # jika belum
 
 # Masuk ke folder mcp-server
@@ -147,7 +147,7 @@ Ganti `<PATH_TO_FREEPLS>` dengan path absolut ke folder FreePLS di komputer Anda
 
 ## ⚖️ Disclaimer Etis & Hukum (Legal & Ethical Disclaimer)
 
-1. **Independensi Perangkat Lunak**: **FreePLS Indonesia** adalah proyek independen dan sumber terbuka (*open-source*) yang didedikasikan untuk kemajuan sains terbuka (*Open Science*) dan edukasi.
+1. **Independensi Perangkat Lunak**: **FreePLS** adalah proyek independen dan sumber terbuka (*open-source*) yang didedikasikan untuk kemajuan sains terbuka (*Open Science*) dan edukasi.
 2. **Bukan Afiliasi**: Proyek ini **TIDAK berafiliasi, tidak disponsori, dan tidak didukung oleh SmartPLS GmbH** atau pemegang merek komersial lainnya.
 3. **Implementasi Mandiri**: Seluruh perhitungan statistika dibangun secara independen (*clean-room implementation*) berdasarkan literatur ilmiah publik (Wold 1982, Lohmöller 1989, Hair et al. 2022, Henseler et al. 2015).
 

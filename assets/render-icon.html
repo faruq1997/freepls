@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; }
+html, body { width: 1024px; height: 1024px; overflow: hidden; background: transparent; }
+svg { display: block; width: 1024px; height: 1024px; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e3a5f"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 z" fill="#38bdf8"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="200" ry="200" fill="url(#bg)"/>
+
+  <!-- Subtle diagonal grid -->
+  <line x1="0" y1="340" x2="1024" y2="340" stroke="#1e3a5f" stroke-width="1.5" opacity="0.4"/>
+  <line x1="0" y1="680" x2="1024" y2="680" stroke="#1e3a5f" stroke-width="1.5" opacity="0.4"/>
+  <line x1="340" y1="0" x2="340" y2="1024" stroke="#1e3a5f" stroke-width="1.5" opacity="0.4"/>
+  <line x1="680" y1="0" x2="680" y2="1024" stroke="#1e3a5f" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- ═══ PATH DIAGRAM ═══ -->
+  <!-- Nodes: X(left,middle) → M(top-right), X → Y(bottom-right), M → Y -->
+
+  <!-- Paths / arrows -->
+  <!-- X → M -->
+  <line x1="318" y1="410" x2="618" y2="302" stroke="#38bdf8" stroke-width="10" stroke-linecap="round" marker-end="url(#arrow)" opacity="0.95"/>
+  <!-- X → Y -->
+  <line x1="318" y1="560" x2="618" y2="668" stroke="#38bdf8" stroke-width="10" stroke-linecap="round" marker-end="url(#arrow)" opacity="0.95"/>
+  <!-- M → Y -->
+  <line x1="716" y1="358" x2="716" y2="618" stroke="#38bdf8" stroke-width="10" stroke-linecap="round" marker-end="url(#arrow)" opacity="0.95"/>
+
+  <!-- Indicator stubs on X (reflective) -->
+  <line x1="192" y1="440" x2="276" y2="470" stroke="#64748b" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+  <line x1="175" y1="484" x2="270" y2="484" stroke="#64748b" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+  <line x1="192" y1="528" x2="276" y2="498" stroke="#64748b" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Indicator stubs on Y (reflective) -->
+  <line x1="850" y1="655" x2="782" y2="668" stroke="#64748b" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+  <line x1="850" y1="700" x2="782" y2="700" stroke="#64748b" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+  <line x1="850" y1="745" x2="782" y2="732" stroke="#64748b" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Node X -->
+  <circle cx="295" cy="484" r="72" fill="#0d1b2e" stroke="#38bdf8" stroke-width="7"/>
+  <text x="295" y="494" font-family="'Helvetica Neue',Arial,sans-serif" font-size="48" font-weight="800" fill="#38bdf8" text-anchor="middle" dominant-baseline="middle">X</text>
+
+  <!-- Node M -->
+  <circle cx="716" cy="284" r="72" fill="#0d1b2e" stroke="#38bdf8" stroke-width="7"/>
+  <text x="716" y="294" font-family="'Helvetica Neue',Arial,sans-serif" font-size="48" font-weight="800" fill="#38bdf8" text-anchor="middle" dominant-baseline="middle">M</text>
+
+  <!-- Node Y -->
+  <circle cx="716" cy="700" r="72" fill="#0d1b2e" stroke="#38bdf8" stroke-width="7"/>
+  <text x="716" y="710" font-family="'Helvetica Neue',Arial,sans-serif" font-size="48" font-weight="800" fill="#38bdf8" text-anchor="middle" dominant-baseline="middle">Y</text>
+
+  <!-- ═══ BRAND TEXT ═══ -->
+  <text x="512" y="880" font-family="'Helvetica Neue',Arial,sans-serif" font-size="94" font-weight="800" fill="white" text-anchor="middle" letter-spacing="1">Free<tspan fill="#38bdf8">PLS</tspan></text>
+</svg>
+</body>
+</html>
+

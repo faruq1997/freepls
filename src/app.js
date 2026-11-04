@@ -1,6 +1,6 @@
 /**
  * ============================================
- * FreePLS Indonesia - Aplikasi Utama
+ * FreePLS - Aplikasi Utama
  * ============================================
  */
 
@@ -404,7 +404,7 @@ function initNavigation() {
 
   // Kirim Email Support
   document.getElementById('btnKirimEmailSupport')?.addEventListener('click', async () => {
-    const mailUrl = 'mailto:faruq.fqs@nusamandiri.ac.id?subject=Bantuan%20FreePLS%20Indonesia&body=Halo%20Tim%20FreePLS%20Indonesia,%0A%0ASaya%20membutuhkan%20bantuan%20mengenai:%0A';
+    const mailUrl = 'mailto:faruq.fqs@nusamandiri.ac.id?subject=Bantuan%20FreePLS&body=Halo%20Tim%20FreePLS,%0A%0ASaya%20membutuhkan%20bantuan%20mengenai:%0A';
     try {
       if (window.api && window.api.openExternal) {
         await window.api.openExternal(mailUrl);

@@ -1,6 +1,6 @@
 /**
  * ============================================
- * FreePLS Indonesia - PLS-SEM Engine
+ * FreePLS - PLS-SEM Engine
  * Mesin perhitungan PLS-SEM Lengkap & Komprehensif
  * (Wold, Lohmöller, Henseler, Hair et al.)
  * ============================================

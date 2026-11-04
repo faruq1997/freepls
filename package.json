@@ -1,7 +1,7 @@
 {
-  "name": "freepls-indonesia",
+  "name": "freepls",
   "version": "1.0.0",
-  "description": "FreePLS Indonesia - Open Source PLS-SEM Desktop Software for Research & Education",
+  "description": "FreePLS - Open Source PLS-SEM Desktop Software for Research & Education",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -10,15 +10,15 @@
     "mcp:test": "node mcp-server/test-mcp.js"
   },
   "keywords": ["freepls", "pls-sem", "sem-pls", "statistik", "penelitian", "open-science"],
-  "author": "FreePLS Indonesia Contributors",
+  "author": "FreePLS Contributors",
   "license": "CC-BY-NC-4.0",
   "type": "commonjs",
   "build": {
     "appId": "org.freepls.indonesia",
-    "productName": "FreePLS Indonesia",
+    "productName": "FreePLS",
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,

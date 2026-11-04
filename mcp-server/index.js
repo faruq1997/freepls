@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * FreePLS Indonesia – MCP Server
+ * FreePLS – MCP Server
  *
  * Transport: stdio — works with Claude Desktop, Cursor, Windsurf, AGY, etc.
  *
@@ -88,7 +88,7 @@ function interpretResults(hasil, bootstrap = null) {
   const bad  = (msg) => `  ❌ ${msg}`;
   const val  = (n, d = 3) => (typeof n === 'number' ? n.toFixed(d) : '–');
 
-  lines.push('# Interpretasi Hasil PLS-SEM (FreePLS Indonesia)\n');
+  lines.push('# Interpretasi Hasil PLS-SEM (FreePLS)\n');
 
   // ── Outer Model ──────────────────────────────────────────────────────────
   lines.push('## 1. Outer Model (Model Pengukuran)\n');
@@ -208,7 +208,7 @@ function interpretResults(hasil, bootstrap = null) {
     if (vifIssues)        lines.push(`   - ${vifIssues} prediktor dengan VIF ≥ 5`);
   }
 
-  lines.push(`\n---\n_Dihasilkan oleh FreePLS Indonesia MCP Server — n = ${hasil.sampleSize ?? '?'}, iterasi = ${hasil.iterations ?? '?'}, konvergen: ${hasil.converged ? 'Ya' : 'Tidak'}_`);
+  lines.push(`\n---\n_Dihasilkan oleh FreePLS MCP Server — n = ${hasil.sampleSize ?? '?'}, iterasi = ${hasil.iterations ?? '?'}, konvergen: ${hasil.converged ? 'Ya' : 'Tidak'}_`);
 
   return lines.join('\n');
 }
@@ -525,7 +525,7 @@ Perfect for AI agents: send a file path, get back a full academic analysis.`,
   },
   {
     name: 'pls_list_projects',
-    description: 'List all saved projects from the FreePLS Indonesia database on this machine.',
+    description: 'List all saved projects from the FreePLS database on this machine.',
     inputSchema: { type: 'object', properties: {} },
   },
   {
@@ -551,7 +551,7 @@ Perfect for AI agents: send a file path, get back a full academic analysis.`,
   },
   {
     name: 'pls_open_app',
-    description: 'Buka dan tampilkan jendela visual aplikasi desktop FreePLS Indonesia di layar komputer secara otomatis, memuat proyek yang dipilih, serta membuka tab editor/hasil/data.',
+    description: 'Buka dan tampilkan jendela visual aplikasi desktop FreePLS di layar komputer secara otomatis, memuat proyek yang dipilih, serta membuka tab editor/hasil/data.',
     inputSchema: {
       type: 'object',
       properties: {

@@ -46,7 +46,7 @@ function startLocalBridge() {
 
     if (req.url === '/health' || req.url === '/status') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'running', app: 'freepls-indonesia' }));
+      res.end(JSON.stringify({ status: 'running', app: 'freepls' }));
       return;
     }
 
@@ -219,8 +219,8 @@ function createWindow() {
     height: 900,
     minWidth: 1100,
     minHeight: 700,
-    title: 'FreePLS Indonesia',
-    icon: path.join(__dirname, 'assets', 'icon.png'),
+    title: 'FreePLS',
+    icon: path.join(__dirname, 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -384,7 +384,7 @@ ipcMain.handle('proyek-ekspor-file', async (_, proyekId) => {
   const hasil = dbAll('SELECT * FROM hasil_analisis WHERE proyek_id = ?', [proyekId]);
 
   const bundle = {
-    format: 'FreePLS_Indonesia_Project',
+    format: 'FreePLS_Project',
     version: '2.0',
     export_time: new Date().toISOString(),
     proyek: {

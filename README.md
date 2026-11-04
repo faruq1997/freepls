@@ -1,4 +1,4 @@
-# FreePLS Indonesia 🇮🇩
+# FreePLS 🇮🇩
 
 Aplikasi desktop *open-source* modern untuk analisis **Partial Least Squares - Structural Equation Modeling (PLS-SEM)** dengan antarmuka penuh Bahasa Indonesia, dirancang khusus untuk mendukung kegiatan penelitian, skripsi, tesis, disertasi, dan pembelajaran statistika.
 
@@ -6,7 +6,7 @@ Aplikasi desktop *open-source* modern untuk analisis **Partial Least Squares - S
 
 ## ⚖️ Disclaimer Etis & Hukum (Legal & Ethical Disclaimer)
 
-1. **Independensi Perangkat Lunak**: **FreePLS Indonesia** adalah proyek independen dan sumber terbuka (*open-source*) yang didedikasikan untuk kemajuan sains terbuka (*Open Science*) dan edukasi.
+1. **Independensi Perangkat Lunak**: **FreePLS** adalah proyek independen dan sumber terbuka (*open-source*) yang didedikasikan untuk kemajuan sains terbuka (*Open Science*) dan edukasi.
 2. **Bukan Afiliasi**: Proyek ini **TIDAK berafiliasi, tidak disponsori, dan tidak didukung oleh SmartPLS GmbH** atau pemegang merek komersial lainnya.
 3. **Implementasi Mandiri**: Seluruh perhitungan statistika (Algoritma PLS-SEM, Bootstrapping, Uji Reliabilitas & Validitas) dibangun secara independen (*clean-room implementation*) berdasarkan literatur ilmiah dan publikasi domain publik (Wold, Lohmöller, Hair et al.).
 
