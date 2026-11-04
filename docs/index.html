@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FreePLS Indonesia - Software PLS-SEM Desktop Gratis untuk Riset Akademik</title>
-  <meta name="description" content="FreePLS Indonesia adalah software Partial Least Squares Structural Equation Modeling (PLS-SEM) berbasis desktop untuk analisis riset akademik, skripsi, tesis, dan publikasi ilmiah di Indonesia.">
+  <title>FreePLS - Software PLS-SEM Desktop Gratis untuk Riset Akademik</title>
+  <meta name="description" content="FreePLS adalah software Partial Least Squares Structural Equation Modeling (PLS-SEM) berbasis desktop untuk analisis riset akademik, skripsi, tesis, dan publikasi ilmiah di Indonesia.">
   <meta name="author" content="Faruq Aziz">
   <meta name="keywords" content="FreePLS, PLS-SEM, SmartPLS alternatif, Partial Least Squares, Analisis Jalur, Structural Equation Modeling, Riset Akademik, Metodologi Penelitian">
   <link rel="canonical" href="https://faruq1997.github.io/freepls-indonesia/">
@@ -13,13 +13,13 @@
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://faruq1997.github.io/freepls-indonesia/">
-  <meta property="og:title" content="FreePLS Indonesia - Software PLS-SEM Desktop Gratis untuk Riset Akademik">
+  <meta property="og:title" content="FreePLS - Software PLS-SEM Desktop Gratis untuk Riset Akademik">
   <meta property="og:description" content="Aplikasi desktop analisis PLS-SEM lengkap dengan algoritma Wold, Bootstrapping, HTMT, AVE, CR, Model Fit, serta integrasi AI Agent via MCP Server.">
   <meta property="og:locale" content="id_ID">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="FreePLS Indonesia - Software PLS-SEM Desktop Gratis">
+  <meta name="twitter:title" content="FreePLS - Software PLS-SEM Desktop Gratis">
   <meta name="twitter:description" content="Aplikasi desktop analisis PLS-SEM lengkap untuk riset akademik dan mahasiswa di Indonesia.">
 
   <!-- Structured Data (JSON-LD) -->
@@ -27,7 +27,7 @@
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "FreePLS Indonesia",
+    "name": "FreePLS",
     "operatingSystem": "Windows 10, Windows 11 (64-bit)",
     "applicationCategory": "EducationalApplication",
     "offers": {
@@ -746,8 +746,8 @@
   <header>
     <div class="container">
       <div class="nav-inner">
-        <a href="#hero" class="brand-link" aria-label="FreePLS Indonesia Halaman Utama">
-          <span>FreePLS Indonesia</span>
+        <a href="#hero" class="brand-link" aria-label="FreePLS Halaman Utama">
+          <span>FreePLS</span>
           <span class="brand-tag">v1.0</span>
         </a>
 
@@ -774,9 +774,9 @@
     <section class="hero-section" id="hero">
       <div class="container">
         <div class="hero-content">
-          <h1>Software PLS-SEM Desktop Gratis untuk Riset Akademik di Indonesia</h1>
+          <h1>Software PLS-SEM Desktop Gratis untuk Riset Akademik</h1>
           <p class="hero-lead">
-            FreePLS Indonesia dirancang untuk memudahkan mahasiswa, dosen, dan peneliti dalam melakukan estimasi model persamaan struktural berbasis varian (PLS-SEM) secara mandiri, akurat, dan tanpa batasan lisensi komersial.
+            FreePLS dirancang untuk memudahkan mahasiswa, dosen, dan peneliti dalam melakukan estimasi model persamaan struktural berbasis varian (PLS-SEM) secara mandiri, akurat, dan tanpa batasan lisensi komersial.
           </p>
 
           <div class="hero-cta-group">
@@ -851,6 +851,30 @@
               Hasil analisis dapat diekspor langsung dalam format tabel CSV untuk Microsoft Excel, diagram jalur berformat SVG beresolusi tinggi, dokumen Markdown, dan laporan HTML siap lampir untuk dokumen tugas akhir.
             </p>
           </article>
+
+          <article class="feature-card">
+            <span class="feature-tag">Metodologi Akademik</span>
+            <h3>Uji Normalitas Multivariat Mardia</h3>
+            <p>
+              Menghitung Mardia's Skewness (uji Chi-square) dan Mardia's Kurtosis (uji Z) beserta generator narasi ilmiah Bahasa Indonesia otomatis untuk menjustifikasi penggunaan PLS-SEM atas data non-normal ke reviewer jurnal.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-tag">Pemodelan Lanjutan</span>
+            <h3>Higher-Order Constructs & Mode B</h3>
+            <p>
+              Dukungan Higher-Order Constructs (HOC) Two-Stage Approach (ekstraksi skor konstruk lower-order ke stage 2) serta asesmen model formatif Mode B lengkap: Indicator VIF, Outer Weights, dan decision rules Hair et al.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-tag">Analisis Komplementer</span>
+            <h3>Necessary Condition Analysis (NCA)</h3>
+            <p>
+              Mengidentifikasi kondisi keharusan (bottleneck) melengkapi kecukupan PLS-SEM menggunakan garis batas CE-FDH, kalkulasi effect size (d), serta tabel bottleneck akurat untuk rekomendasi kebijakan praktis.
+            </p>
+          </article>
         </div>
       </div>
     </section>
@@ -922,15 +946,15 @@
         <div class="mcp-layout">
           <div class="mcp-info">
             <p>
-              FreePLS Indonesia menyertakan paket MCP Server bawaan yang berlokasi pada direktori <code>mcp-server/</code>. Server ini menyediakan tool analitik siap panggil:
+              FreePLS menyertakan paket MCP Server bawaan dengan <strong>22 tools statistik</strong> dan fitur <strong>Desktop Auto-Launch</strong>:
             </p>
             <ul class="mcp-list">
-              <li><strong>pls_full_pipeline:</strong> Membaca file data, mengelompokkan variabel, menjalankan iterasi PLS dan Bootstrapping, lalu menulis laporan lengkap (HTML, CSV, SVG) secara otonom.</li>
-              <li><strong>pls_calculate:</strong> Menjalankan estimasi matriks PLS murni pada model yang telah terkonfigurasi.</li>
-              <li><strong>pls_bootstrap:</strong> Menghasilkan uji signifikansi empiris dengan sampling acak berulang.</li>
+              <li><strong>pls_analyze_file & pls_full_pipeline:</strong> Membaca file data, mengelompokkan variabel, menjalankan PLS-SEM + Bootstrap + IPMA + CMV, dan otomatis membuka visualisasi di aplikasi desktop FreePLS.</li>
+              <li><strong>pls_open_app:</strong> Membuka dan memfokuskan jendela desktop FreePLS secara otomatis dari prompt AI Agent.</li>
+              <li><strong>Alat Analisis Spesifik:</strong> Uji Mardia, Evaluasi Formatif Mode B, HOC Two-Stage, NCA, MGA, PLSpredict, dan ekspor tabel format APA 7th Edition.</li>
             </ul>
             <p>
-              Dengan protokol MCP, AI Agent dapat membantu memeriksa anomali data, memverifikasi kriteria validitas, dan mendokumentasikan hasil temuan penelitian secara terstruktur.
+              FreePLS dilengkapi local HTTP bridge (port 48123) sehingga saat agent mengeksekusi analisis, aplikasi FreePLS langsung menyala di desktop Anda dan memuat visual modelnya.
             </p>
           </div>
 
@@ -944,7 +968,7 @@
     "freepls": {
       "command": "node",
       "args": [
-        "C:\\Users\\Username\\AppData\\Local\\Programs\\FreePLS Indonesia\\resources\\mcp-server\\index.js"
+        "C:\\Users\\Username\\AppData\\Local\\Programs\\FreePLS\\resources\\mcp-server\\index.js"
       ]
     }
   }
@@ -964,7 +988,7 @@
           </p>
         </div>
 
-        <table class="specs-table" aria-label="Tabel Kebutuhan Sistem FreePLS Indonesia">
+        <table class="specs-table" aria-label="Tabel Kebutuhan Sistem FreePLS">
           <tbody>
             <tr>
               <th scope="row">Sistem Operasi</th>
@@ -1003,7 +1027,7 @@
     <section id="unduh">
       <div class="container">
         <div class="section-header">
-          <h2>Unduh FreePLS Indonesia</h2>
+          <h2>Unduh FreePLS</h2>
           <p class="section-subtitle">
             Dapatkan berkas installer resmi versi terbaru langsung dari repositori GitHub Releases.
           </p>
@@ -1012,7 +1036,7 @@
         <div class="download-card">
           <div class="download-header">
             <div>
-              <h3 class="download-title">FreePLS Indonesia untuk Windows</h3>
+              <h3 class="download-title">FreePLS untuk Windows</h3>
               <p>Paket installer resmi dengan seluruh library statistik dan MCP server terintegrasi.</p>
             </div>
             <span class="version-pill">Rilis v1.0.0</span>
@@ -1020,7 +1044,7 @@
 
           <div class="download-details">
             <div class="detail-item">
-              <strong>Nama Berkas:</strong> <span>FreePLS Indonesia Setup 1.0.0.exe</span>
+              <strong>Nama Berkas:</strong> <span>FreePLS Setup 1.0.0.exe</span>
             </div>
             <div class="detail-item">
               <strong>Arsitektur:</strong> <span>x64 (Windows 64-bit)</span>
@@ -1044,9 +1068,10 @@
         </div>
 
         <div class="disclaimer-card" id="lisensi">
-          <div class="disclaimer-title">Pernyataan Hukum & Penafian Merek (Disclaimer)</div>
+          <div class="disclaimer-title">Pernyataan Hukum & Penafian Merek (Legal & Ethical Disclaimer)</div>
           <p class="disclaimer-text">
-            FreePLS Indonesia adalah perangkat lunak independen yang dikembangkan oleh Faruq Aziz untuk tujuan penelitian ilmiah dan pendidikan. Perangkat lunak ini tidak berafiliasi, disponsori, atau didukung oleh SmartPLS GmbH. Merek dagang "SmartPLS" adalah milik sah dari SmartPLS GmbH. Penggunaan nama "PLS" merujuk pada metodologi statistik umum Partial Least Squares.
+            <strong>FreePLS</strong> adalah perangkat lunak independen dan sumber terbuka (open-source) yang dikembangkan untuk tujuan penelitian ilmiah, kemajuan sains terbuka (Open Science), dan edukasi akademis. Seluruh algoritma dibangun secara mandiri (clean-room implementation) berdasarkan literatur ilmiah publik (Wold 1982, Lohmöller 1989, Hair et al. 2022, Henseler et al. 2015).<br><br>
+            <strong>Perangkat lunak ini TIDAK berafiliasi dengan, disponsori, atau didukung oleh SmartPLS GmbH</strong> atau pemegang merek komersial lainnya. Merek dagang "SmartPLS" adalah milik sah dari SmartPLS GmbH. Penggunaan nama "PLS" merujuk murni pada metodologi statistik umum <em>Partial Least Squares</em>.
           </p>
         </div>
       </div>
@@ -1064,9 +1089,9 @@
 
         <div class="faq-container">
           <details class="faq-item">
-            <summary class="faq-summary">Apakah FreePLS Indonesia benar-benar gratis untuk mahasiswa?</summary>
+            <summary class="faq-summary">Apakah FreePLS benar-benar gratis untuk mahasiswa?</summary>
             <div class="faq-answer">
-              Ya. FreePLS Indonesia dilisensikan di bawah Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0). Mahasiswa, dosen, dan peneliti independen dapat menggunakannya secara cuma-cuma tanpa batas waktu untuk penyusunan skripsi, tesis, disertasi, maupun artikel jurnal non-komersial.
+              Ya. FreePLS dilisensikan di bawah Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0). Mahasiswa, dosen, dan peneliti independen dapat menggunakannya secara cuma-cuma tanpa batas waktu untuk penyusunan skripsi, tesis, disertasi, maupun artikel jurnal non-komersial.
             </div>
           </details>
 
@@ -1085,9 +1110,9 @@
           </details>
 
           <details class="faq-item">
-            <summary class="faq-summary">Bagaimana cara mengutip FreePLS Indonesia dalam karya tulis ilmiah?</summary>
+            <summary class="faq-summary">Bagaimana cara mengutip FreePLS dalam karya tulis ilmiah?</summary>
             <div class="faq-answer">
-              Anda dapat mencantumkan rujukan berikut pada bagian metodologi penelitian: "Aziz, F. (2026). FreePLS Indonesia: Perangkat Lunak Analisis Partial Least Squares Structural Equation Modeling (Versi 1.0.0). Tersedia di https://github.com/faruq1997/freepls-indonesia".
+              Anda dapat mencantumkan rujukan berikut pada bagian metodologi penelitian: "Aziz, F. (2026). FreePLS: Perangkat Lunak Analisis Partial Least Squares Structural Equation Modeling (Versi 1.0.0). Tersedia di https://github.com/faruq1997/freepls-indonesia".
             </div>
           </details>
         </div>
@@ -1100,9 +1125,9 @@
     <div class="container">
       <div class="footer-content">
         <div class="footer-col">
-          <h4>FreePLS Indonesia</h4>
+          <h4>FreePLS</h4>
           <p style="max-width: 320px; font-size: 0.88rem;">
-            Aplikasi analisis PLS-SEM desktop independen untuk mendukung keterbukaan riset dan pendidikan statistika di Indonesia.
+            Aplikasi analisis PLS-SEM desktop independen dan terbuka untuk riset akademik dan pendidikan statistika.
           </p>
         </div>
 
