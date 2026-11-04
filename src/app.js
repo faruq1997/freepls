@@ -4743,6 +4743,39 @@ function drawPLSDiagram(ctx, options = {}) {
     ctx.textBaseline = 'middle';
     ctx.fillText(v.nama, cx, labelY);
     
+    // Canvas Summarize Badge untuk Variabel yang Sedang Terpilih
+    if (isSelected && !isExport) {
+      const inPaths = state.jalurs.filter(j => j.ke_variabel_id == v.id || j.ke === v.nama);
+      const outPaths = state.jalurs.filter(j => j.dari_variabel_id == v.id || j.dari === v.nama);
+      const totalPaths = inPaths.length + outPaths.length;
+      
+      let sumText = `${totalPaths} Jalur (${inPaths.length} Masuk, ${outPaths.length} Keluar)`;
+      if (totalPaths === 0) sumText = '0 Jalur Terhubung';
+      
+      const badgeY = (showIndicators && orientasi === 'bawah') ? labelY - 17 : labelY + 17;
+      ctx.save();
+      ctx.font = '600 10px ' + PLS_STYLE.fontFamily;
+      const bW = ctx.measureText(sumText).width + 14;
+      const bH = 17;
+      ctx.fillStyle = isDark ? 'rgba(30, 41, 59, 0.92)' : 'rgba(241, 245, 249, 0.94)';
+      ctx.strokeStyle = isDark ? '#475569' : '#cbd5e1';
+      ctx.lineWidth = 1;
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(cx - bW / 2, badgeY - bH / 2, bW, bH, 8);
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillRect(cx - bW / 2, badgeY - bH / 2, bW, bH);
+        ctx.strokeRect(cx - bW / 2, badgeY - bH / 2, bW, bH);
+      }
+      ctx.fillStyle = isDark ? '#94a3b8' : '#475569';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(sumText, cx, badgeY);
+      ctx.restore();
+    }
+    
     ctx.restore();
   }
 
@@ -6237,12 +6270,108 @@ function showVariableProperties(v) {
     { hex: '#8b5cf6', name: 'Purple Violet' },
     { hex: '#64748b', name: 'Slate Neutral' }
   ];
+
+  // Hitung summarize jalur yang terhubung ke variabel ini (kemana saja nyambung)
+  const inPaths = state.jalurs.filter(j => j.ke_variabel_id == v.id || j.ke === v.nama);
+  const outPaths = state.jalurs.filter(j => j.dari_variabel_id == v.id || j.dari === v.nama);
+  const totalPaths = inPaths.length + outPaths.length;
+
+  let peranText = 'Belum Terhubung';
+  let peranClass = 'badge-secondary';
+  if (inPaths.length === 0 && outPaths.length > 0) {
+    peranText = 'Eksogen (Prediktor Murni)';
+    peranClass = 'badge-sukses';
+  } else if (inPaths.length > 0 && outPaths.length === 0) {
+    peranText = 'Endogen (Target Akhir)';
+    peranClass = 'badge-info';
+  } else if (inPaths.length > 0 && outPaths.length > 0) {
+    peranText = 'Mediasi (Intervening)';
+    peranClass = 'badge-peringatan';
+  }
+
+  const jalurSummaryHtml = `
+    <div class="form-group" style="background: var(--bg-hover); border: 1.5px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; margin-top: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <label style="margin-bottom: 0; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 5px;">
+          <span class="material-icons-round" style="font-size: 16px; color: #ec4899;">alt_route</span>
+          Ringkasan Jalur (${totalPaths})
+        </label>
+        <span class="badge ${peranClass}" style="font-size: 10px; padding: 2px 7px;">${peranText}</span>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-bottom: 10px; font-size: 11.5px; padding-bottom: 6px; border-bottom: 1px solid var(--border-light);">
+        <span>Masuk (←): <strong>${inPaths.length}</strong></span>
+        <span>•</span>
+        <span>Keluar (→): <strong>${outPaths.length}</strong></span>
+      </div>
+
+      ${totalPaths === 0 ? `
+        <div style="font-size: 11.5px; color: var(--text-muted); font-style: italic; padding: 4px 0;">
+          Variabel ini belum memiliki jalur terhubung.
+        </div>
+      ` : `
+        <div style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; padding-right: 2px;">
+          ${inPaths.map(j => {
+            const dariName = j.dari || state.variabels.find(x => x.id == j.dari_variabel_id)?.nama || 'X';
+            return `
+              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); font-size: 11.5px;">
+                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <span style="color: #10b981; font-weight: 800; font-size: 13px;">←</span>
+                  <span style="font-weight: 700; color: var(--text-primary);" title="Dipengaruhi oleh ${escapeHtml(dariName)}">${escapeHtml(dariName)}</span>
+                  <span style="color: var(--text-muted); font-size: 11px;">➔ ${escapeHtml(v.nama)}</span>
+                  ${j.label ? `<span class="badge" style="font-size: 9.5px; padding: 1px 5px; background: rgba(236,72,153,0.15); color: #ec4899; font-weight: 600;">${escapeHtml(j.label)}</span>` : ''}
+                </div>
+                <div style="display: flex; gap: 2px;">
+                  <button type="button" class="btn btn-xs btn-ghost" onclick="sorotJalurDiCanvas(${j.id})" title="Sorot jalur ini di kanvas" style="padding: 2px 4px;">
+                    <span class="material-icons-round" style="font-size: 15px; color: var(--color-primary);">visibility</span>
+                  </button>
+                  <button type="button" class="btn btn-xs btn-ghost" onclick="hapusJalurDariPanel(${j.id}, ${v.id})" title="Hapus jalur ini" style="padding: 2px 4px;">
+                    <span class="material-icons-round" style="font-size: 15px; color: var(--color-danger);">close</span>
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+
+          ${outPaths.map(j => {
+            const keName = j.ke || state.variabels.find(x => x.id == j.ke_variabel_id)?.nama || 'Y';
+            return `
+              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); font-size: 11.5px;">
+                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <span style="color: #0ea5e9; font-weight: 800; font-size: 13px;">→</span>
+                  <span style="color: var(--text-muted); font-size: 11px;">${escapeHtml(v.nama)} ➔</span>
+                  <span style="font-weight: 700; color: var(--text-primary);" title="Mempengaruhi ke ${escapeHtml(keName)}">${escapeHtml(keName)}</span>
+                  ${j.label ? `<span class="badge" style="font-size: 9.5px; padding: 1px 5px; background: rgba(236,72,153,0.15); color: #ec4899; font-weight: 600;">${escapeHtml(j.label)}</span>` : ''}
+                </div>
+                <div style="display: flex; gap: 2px;">
+                  <button type="button" class="btn btn-xs btn-ghost" onclick="sorotJalurDiCanvas(${j.id})" title="Sorot jalur ini di kanvas" style="padding: 2px 4px;">
+                    <span class="material-icons-round" style="font-size: 15px; color: var(--color-primary);">visibility</span>
+                  </button>
+                  <button type="button" class="btn btn-xs btn-ghost" onclick="hapusJalurDariPanel(${j.id}, ${v.id})" title="Hapus jalur ini" style="padding: 2px 4px;">
+                    <span class="material-icons-round" style="font-size: 15px; color: var(--color-danger);">close</span>
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `}
+
+      <div style="margin-top: 10px;">
+        <button type="button" class="btn btn-xs btn-outline btn-block" onclick="mulaiSambungDariVariabel(${v.id})" style="font-size: 11px; padding: 4px 8px; display: flex; align-items: center; justify-content: center; gap: 5px;">
+          <span class="material-icons-round" style="font-size: 14px; color: #ec4899;">trending_flat</span> + Sambungkan Jalur dari "${escapeHtml(v.nama)}"
+        </button>
+      </div>
+    </div>
+  `;
   
   panel.innerHTML = `
     <div class="form-group">
       <label>Nama Variabel</label>
       <input type="text" id="editPropNamaVar" class="form-input" value="${escapeHtml(v.nama)}" placeholder="Nama variabel laten">
     </div>
+
+    ${jalurSummaryHtml}
 
     <div class="form-group">
       <label>Tema Warna Konstruk</label>
@@ -6326,6 +6455,47 @@ function showVariableProperties(v) {
     ${reliabilityHtml}
   `;
 }
+
+// Global helpers untuk Ringkasan Jalur Variabel
+window.sorotJalurDiCanvas = function(jalurId) {
+  const jalur = state.jalurs.find(j => j.id == jalurId);
+  if (!jalur) return;
+  state.selectedPath = jalur.id;
+  state.selectedNode = null;
+  state.selectedCatatan = null;
+  state.selectedNodes = [];
+  state.selectedPaths = [jalur.id];
+  renderModel();
+  showPathProperties(jalur);
+  showToast(`Jalur "${jalur.dari} ➔ ${jalur.ke}" disorot di kanvas`, 'info');
+};
+
+window.hapusJalurDariPanel = function(jalurId, varId) {
+  const idx = state.jalurs.findIndex(j => j.id == jalurId);
+  if (idx >= 0) {
+    const deleted = state.jalurs[idx];
+    saveHistoryState(`Hapus Jalur ${deleted.dari} -> ${deleted.ke}`);
+    state.jalurs.splice(idx, 1);
+    saveModelToDb();
+    updateModelValidationStatus();
+    renderModel();
+    showToast(`Jalur "${deleted.dari} ➔ ${deleted.ke}" dihapus`, 'sukses');
+    const v = state.variabels.find(x => x.id == varId);
+    if (v) showVariableProperties(v);
+  }
+};
+
+window.mulaiSambungDariVariabel = function(varId) {
+  const v = state.variabels.find(x => x.id == varId);
+  if (!v) return;
+  if (window.setEditorActiveTool) {
+    window.setEditorActiveTool('jalur');
+    state.pathFrom = v.id;
+    if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
+    renderModel();
+    showToast(`Mode Jalur: Dari "${v.nama}". Klik variabel tujuan (Y) di kanvas untuk menyambungkan.`, 'info');
+  }
+};
 
 function switchArahIndikator(id) {
   const v = state.variabels.find(vv => vv.id === id);
