@@ -780,7 +780,10 @@ async function setActiveProject(proyek, forceVersiId = null) {
   if (modelToLoad) {
     try {
       const model = typeof modelToLoad === 'string' ? JSON.parse(modelToLoad) : modelToLoad;
-      state.variabels = model.variabels || [];
+      state.variabels = (model.variabels || []).map(v => ({
+        ...v,
+        indikator: (v.indikator || []).filter(i => typeof i === 'string' && i.trim() !== '')
+      }));
       state.jalurs = model.jalurs || [];
       state.catatans = model.catatans || [];
 
@@ -2714,6 +2717,43 @@ window.terapkanTemplateModel = terapkanTemplateModel;
   document.getElementById('btnTambahIndikator')?.addEventListener('click', () => {
     tambahIndikatorInput();
     updateDatasetChipsInModal();
+  });
+
+  // Simpan Variabel Baru dari Modal
+  document.getElementById('btnSimpanVariabel')?.addEventListener('click', () => {
+    const nama = document.getElementById('inputNamaVariabel').value.trim();
+    if (!nama) {
+      showToast('Nama variabel tidak boleh kosong', 'peringatan');
+      return;
+    }
+    if (state.variabels.some(v => v.nama.toLowerCase() === nama.toLowerCase())) {
+      showToast(`Nama variabel "${nama}" sudah digunakan`, 'peringatan');
+      return;
+    }
+    const tipe = document.querySelector('input[name="tipeVariabel"]:checked')?.value || 'reflektif';
+    const orientasi = document.querySelector('input[name="orientasiIndikator"]:checked')?.value || 'kiri';
+    const indikator = [];
+    document.querySelectorAll('#indikatorContainer .form-input').forEach(input => {
+      const val = input.value.trim();
+      if (val) indikator.push(val);
+    });
+    const newVar = {
+      id: Date.now(),
+      nama,
+      tipe,
+      indikator,
+      orientasi,
+      posisi_x: 160 + Math.random() * 320,
+      posisi_y: 160 + Math.random() * 240
+    };
+    saveHistoryState(`Tambah Variabel "${nama}"`);
+    state.variabels.push(newVar);
+    hideModal('modalTambahVariabel');
+    renderModel();
+    saveModelToDb();
+    showToast(indikator.length === 0
+      ? `Variabel konseptual "${nama}" ditambahkan (tanpa indikator)`
+      : `Variabel "${nama}" ditambahkan (${indikator.length} indikator)`, 'sukses');
   });
 
   function bukaModalTambahVariabel() {
