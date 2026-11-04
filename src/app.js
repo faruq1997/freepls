@@ -370,7 +370,7 @@ function initNavigation() {
 
   // Salin Email Support
   document.getElementById('btnSalinEmailSupport')?.addEventListener('click', async () => {
-    const email = 'test@gmail.com';
+    const email = 'faruq.fqs@nusamandiri.ac.id';
     try {
       await navigator.clipboard.writeText(email);
       showToast(`Email support "${email}" berhasil disalin ke clipboard!`, 'sukses');
@@ -381,7 +381,7 @@ function initNavigation() {
 
   // Kirim Email Support
   document.getElementById('btnKirimEmailSupport')?.addEventListener('click', async () => {
-    const mailUrl = 'mailto:test@gmail.com?subject=Bantuan%20FreePLS%20Indonesia&body=Halo%20Tim%20FreePLS%20Indonesia,%0A%0ASaya%20membutuhkan%20bantuan%20mengenai:%0A';
+    const mailUrl = 'mailto:faruq.fqs@nusamandiri.ac.id?subject=Bantuan%20FreePLS%20Indonesia&body=Halo%20Tim%20FreePLS%20Indonesia,%0A%0ASaya%20membutuhkan%20bantuan%20mengenai:%0A';
     try {
       if (window.api && window.api.openExternal) {
         await window.api.openExternal(mailUrl);
@@ -390,7 +390,7 @@ function initNavigation() {
       }
       showToast('Membuka aplikasi email klien...', 'info');
     } catch (e) {
-      showToast('Silakan kirim email ke: test@gmail.com', 'info');
+      showToast('Silakan kirim email ke: faruq.fqs@nusamandiri.ac.id', 'info');
     }
   });
 }
@@ -419,6 +419,7 @@ function navigateTo(halaman) {
   if (halaman === 'analisis' && state.proyekAktif) {
     populateIPMASelect();
     populateMGASelect();
+    populateAcademicSelects();
   }
   if (halaman === 'hasil') {
     updateResultsStatusBadge();
@@ -12081,11 +12082,449 @@ document.getElementById('btnEksporAPA')?.addEventListener('click', async () => {
   }
 });
 
+// ──────────────────────────────────────────────────────────────────────────
+// POPULATE DROPDOWNS FITUR STATISTIKA AKADEMIK
+// ──────────────────────────────────────────────────────────────────────────
+async function populateAcademicSelects() {
+  const model = getActiveModelData();
+  const vars = model ? model.variabels || [] : state.variabels || [];
+
+  // 1. formativeTargetVar
+  const formSel = document.getElementById('formativeTargetVar');
+  if (formSel) {
+    const cur = formSel.value;
+    formSel.innerHTML = '<option value="">— Semua Konstruk Formatif —</option>';
+    vars.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.nama;
+      opt.textContent = `${v.nama} (${v.tipe || 'reflektif'})`;
+      formSel.appendChild(opt);
+    });
+    if (cur) formSel.value = cur;
+  }
+
+  // 2. hocLocCheckboxList & hocTargetVar
+  const locList = document.getElementById('hocLocCheckboxList');
+  if (locList) {
+    if (!vars.length) {
+      locList.innerHTML = '<span style="font-size:12px;color:var(--text-secondary)">Belum ada variabel di model. Buat model terlebih dahulu.</span>';
+    } else {
+      locList.innerHTML = vars.map(v => `
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+          <input type="checkbox" name="hocLocCheck" value="${escapeHtml(v.nama)}">
+          <span><strong>${escapeHtml(v.nama)}</strong> <span style="color:var(--text-secondary);font-size:11.5px;">(${(v.indikator || []).length} indikator)</span></span>
+        </label>
+      `).join('');
+    }
+  }
+
+  const hocTargetSel = document.getElementById('hocTargetVar');
+  if (hocTargetSel) {
+    const cur = hocTargetSel.value;
+    hocTargetSel.innerHTML = '<option value="">— Tidak ada (hanya evaluasi HOC) —</option>';
+    vars.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.nama;
+      opt.textContent = `Target: ${v.nama}`;
+      hocTargetSel.appendChild(opt);
+    });
+    if (cur) hocTargetSel.value = cur;
+  }
+
+  // 3. ncaXVar & ncaYVar
+  const ncaX = document.getElementById('ncaXVar');
+  const ncaY = document.getElementById('ncaYVar');
+  if (ncaX && ncaY) {
+    const curX = ncaX.value;
+    const curY = ncaY.value;
+    ncaX.innerHTML = '<option value="">— pilih variabel X (kondisi) —</option>';
+    ncaY.innerHTML = '<option value="">— pilih variabel Y (hasil) —</option>';
+    vars.forEach(v => {
+      const optX = document.createElement('option');
+      optX.value = v.nama;
+      optX.textContent = `Variabel Laten: ${v.nama}`;
+      ncaX.appendChild(optX);
+
+      const optY = document.createElement('option');
+      optY.value = v.nama;
+      optY.textContent = `Variabel Laten: ${v.nama}`;
+      ncaY.appendChild(optY);
+    });
+    if (curX) ncaX.value = curX;
+    if (curY) ncaY.value = curY;
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// 1. HANDLER: Uji Normalitas Multivariat Mardia & Auto-Justifikasi PLS-SEM
+// ──────────────────────────────────────────────────────────────────────────
+document.getElementById('btnJalankanMardia')?.addEventListener('click', async () => {
+  const model = getActiveModelData();
+  if (!model) return;
+  const data = await getActiveDataset();
+  if (!data) return;
+
+  showToast('Menghitung uji normalitas multivariat Mardia...', 'info');
+  try {
+    const engine = new PLSEngine();
+    engine.setData(data, model.variabels, model.jalurs);
+    const hasil = engine.calculateMardiaNormality();
+
+    const isNormal = hasil.isNormalMultivariate;
+    const color = isNormal ? '#10b981' : '#0284c7';
+    const icon = isNormal ? 'check_circle' : 'info';
+
+    const safeJustifikasi = hasil.teksJustifikasi.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+    document.getElementById('hasilMardia').innerHTML = `
+      <div style="text-align:center;padding:16px 0;">
+        <span class="material-icons-round" style="font-size:46px;color:${color}">${icon}</span>
+        <div style="font-size:24px;font-weight:800;color:${color};margin:6px 0">${escapeHtml(hasil.statusRingkas)}</div>
+        <div style="font-size:13.5px;color:var(--text-secondary)">Evaluasi Berdasarkan Mardia's Multivariate Skewness &amp; Kurtosis (α = 0.05)</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+        <!-- Skewness Card -->
+        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <strong style="color:var(--text-primary);font-size:14px;">Mardia Skewness (b1,p)</strong>
+            <span class="status-badge ${hasil.skewness.isNormal ? 'badge-sukses' : 'badge-peringatan'}">
+              ${escapeHtml(hasil.skewness.kesimpulan)}
+            </span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;font-size:12.5px;">
+            <div class="stat-mini"><label>Koefisien (b1,p)</label><span>${hasil.skewness.b1p.toFixed(4)}</span></div>
+            <div class="stat-mini"><label>Chi-Square (χ²)</label><span>${hasil.skewness.chiSquare.toFixed(3)}</span></div>
+            <div class="stat-mini"><label>Degrees of Freedom</label><span>${hasil.skewness.df}</span></div>
+            <div class="stat-mini"><label>p-Value</label><span style="font-weight:700;color:${hasil.skewness.isNormal ? '#10b981' : '#ef4444'}">${hasil.skewness.pValue < 0.0001 ? '< 0.0001' : hasil.skewness.pValue.toFixed(4)}</span></div>
+          </div>
+        </div>
+
+        <!-- Kurtosis Card -->
+        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <strong style="color:var(--text-primary);font-size:14px;">Mardia Kurtosis (b2,p)</strong>
+            <span class="status-badge ${hasil.kurtosis.isNormal ? 'badge-sukses' : 'badge-peringatan'}">
+              ${escapeHtml(hasil.kurtosis.kesimpulan)}
+            </span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;font-size:12.5px;">
+            <div class="stat-mini"><label>Koefisien (b2,p)</label><span>${hasil.kurtosis.b2p.toFixed(4)}</span></div>
+            <div class="stat-mini"><label>Expected Kurtosis</label><span>${hasil.kurtosis.expected}</span></div>
+            <div class="stat-mini"><label>Z-Score</label><span>${hasil.kurtosis.zScore.toFixed(3)}</span></div>
+            <div class="stat-mini"><label>p-Value</label><span style="font-weight:700;color:${hasil.kurtosis.isNormal ? '#10b981' : '#ef4444'}">${hasil.kurtosis.pValue < 0.0001 ? '< 0.0001' : hasil.kurtosis.pValue.toFixed(4)}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kotak Justifikasi Akademik Siap Salin -->
+      <div style="background:linear-gradient(135deg, rgba(2,132,199,0.08), rgba(99,102,241,0.08));border:1px solid rgba(2,132,199,0.3);border-radius:10px;padding:16px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-weight:700;font-size:14px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+            <span class="material-icons-round" style="font-size:18px;color:#0284c7;">auto_stories</span>
+            Narasi Justifikasi Akademik (Siap Salin untuk Skripsi/Tesis/Jurnal)
+          </div>
+          <button class="btn btn-sm btn-primary" id="btnSalinNarasiMardia" style="background:#0284c7;">
+            <span class="material-icons-round" style="font-size:15px;">content_copy</span> Salin Narasi
+          </button>
+        </div>
+        <p id="teksNarasiMardiaContainer" style="font-size:13px;line-height:1.7;color:var(--text-primary);margin:0;white-space:pre-line;background:var(--bg-main);padding:12px 14px;border-radius:8px;border:1px solid var(--border-color);">
+          ${escapeHtml(hasil.teksJustifikasi)}
+        </p>
+      </div>
+
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.5;">
+        <strong>Referensi:</strong> Mardia, K. V. (1970). Measures of multivariate skewness and kurtosis with applications. <em>Biometrika</em>, 57(3), 519-530. | Hair, J. F., et al. (2021). <em>A Primer on Partial Least Squares Structural Equation Modeling (PLS-SEM)</em> (3rd ed.). SAGE.
+      </div>
+    `;
+
+    document.getElementById('btnSalinNarasiMardia')?.addEventListener('click', () => {
+      navigator.clipboard.writeText(hasil.teksJustifikasi).then(() => {
+        showToast('Teks justifikasi akademik berhasil disalin ke clipboard!', 'sukses');
+      }).catch(() => {
+        showToast('Gagal menyalin teks ke clipboard.', 'error');
+      });
+    });
+
+    showModal('modalMardia');
+    showToast('Uji Normalitas Mardia selesai dihitung!', 'sukses');
+  } catch(e) {
+    console.error('Error Mardia:', e);
+    showToast('Gagal menjalankan uji Mardia: ' + e.message, 'error');
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// 2. HANDLER: Evaluasi Model Pengukuran Formatif (Mode B)
+// ──────────────────────────────────────────────────────────────────────────
+document.getElementById('btnJalankanFormative')?.addEventListener('click', async () => {
+  const model = getActiveModelData();
+  if (!model) return;
+  const data = await getActiveDataset();
+  if (!data) return;
+
+  const targetVar = document.getElementById('formativeTargetVar')?.value || null;
+  showToast('Mengevaluasi model pengukuran formatif...', 'info');
+
+  try {
+    const engine = new PLSEngine();
+    engine.setData(data, model.variabels, model.jalurs);
+    engine.runPLS();
+    const evaluasi = engine.evaluateFormativeModel(targetVar);
+
+    const keys = Object.keys(evaluasi);
+    if (!keys.length) {
+      showToast('Tidak ada variabel dengan minimal 2 indikator untuk dievaluasi.', 'peringatan');
+      return;
+    }
+
+    let html = `
+      <div class="alert-box alert-info" style="margin-bottom:14px">
+        <span class="material-icons-round">info</span>
+        <span>Sesuai standar Hair et al. (2017, 2021), evaluasi formatif didasarkan pada <strong>Indicator VIF (&lt; 3.3)</strong>, signifikansi <strong>Outer Weights</strong> (relatif), dan <strong>Outer Loadings</strong> (absolut ≥ 0.50).</span>
+      </div>
+    `;
+
+    keys.forEach(k => {
+      const item = evaluasi[k];
+      const rows = item.indikator.map(r => ({
+        'Indikator': r.indikator,
+        'Outer Weight (Mode B)': r.outerWeight.toFixed(4),
+        'Outer Loading': r.outerLoading.toFixed(4),
+        'Indicator VIF': r.vif.toFixed(3),
+        'Status VIF': r.statusVif,
+        'Rekomendasi (Hair et al.)': r.rekomendasi
+      }));
+
+      const vifColor = item.isVifClean ? '#10b981' : '#f59e0b';
+
+      html += `
+        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:14px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h4 style="margin:0;color:var(--text-primary);font-size:15px;display:flex;align-items:center;gap:6px;">
+              <span class="material-icons-round" style="color:#ea580c;font-size:20px;">checklist</span>
+              Konstruk: <strong>${escapeHtml(item.namaVariabel)}</strong> (${item.jumlahIndikator} Indikator)
+            </h4>
+            <span class="status-badge" style="background:${item.isVifClean ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)'};color:${vifColor};border:1px solid ${vifColor};font-size:12px;">
+              Max VIF = ${item.maxVif.toFixed(3)}
+            </span>
+          </div>
+          <div style="font-size:12.5px;color:${vifColor};margin-bottom:12px;font-weight:600;">
+            ${escapeHtml(item.kesimpulan)}
+          </div>
+          ${renderTable(rows, `Matriks Evaluasi Formatif — ${item.namaVariabel}`)}
+        </div>
+      `;
+    });
+
+    document.getElementById('hasilFormative').innerHTML = html;
+    showModal('modalFormative');
+    showToast('Evaluasi model formatif selesai!', 'sukses');
+  } catch(e) {
+    console.error('Error Formative:', e);
+    showToast('Gagal mengevaluasi model formatif: ' + e.message, 'error');
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// 3. HANDLER: Higher-Order Constructs (HOC / Dimensi)
+// ──────────────────────────────────────────────────────────────────────────
+document.getElementById('btnBukaModalHOC')?.addEventListener('click', () => {
+  populateAcademicSelects();
+  showModal('modalHOC');
+});
+
+document.getElementById('btnEksekusiHitungHOC')?.addEventListener('click', async () => {
+  const model = getActiveModelData();
+  if (!model) return;
+  const data = await getActiveDataset();
+  if (!data) return;
+
+  const hocName = document.getElementById('hocInputNama')?.value?.trim() || 'HOC_Total';
+  const hocType = document.getElementById('hocTipe')?.value || 'reflektif';
+  const targetVar = document.getElementById('hocTargetVar')?.value || null;
+
+  const checkedLocs = Array.from(document.querySelectorAll('input[name="hocLocCheck"]:checked')).map(el => el.value);
+
+  if (checkedLocs.length < 2) {
+    showToast('Pilih minimal 2 dimensi (LOC) untuk membentuk HOC.', 'peringatan');
+    return;
+  }
+
+  showToast(`Menghitung model Higher-Order Construct "${hocName}" (Two-Stage)...`, 'info');
+  try {
+    const engine = new PLSEngine();
+    engine.setData(data, model.variabels, model.jalurs);
+    engine.runPLS();
+
+    const hasil = engine.runHOC({
+      hocName,
+      hocType,
+      locNames: checkedLocs,
+      targetVar
+    });
+
+    const rowsLOC = hasil.tahap1.locs.map(r => ({
+      'Dimensi (LOC)': r.dimensi,
+      'Jml Ind.': r.jumlahIndikator,
+      'Cronbach Alpha': r.cronbachAlpha.toFixed(3),
+      'Composite Rel. (CR)': r.compositeReliability.toFixed(3),
+      'AVE': r.ave.toFixed(3),
+      'Status': r.statusLOC
+    }));
+
+    const rowsHOC = hasil.tahap2.dimensi.map(r => ({
+      'Dimensi (LOC)': r.dimensi,
+      'Loading ke HOC': r.loadingHOC.toFixed(4),
+      'Bobot Relatif (Weight)': r.weightHOC.toFixed(4),
+      'VIF Dimensi': r.vifDimensi.toFixed(3),
+      'Status': r.statusDimensi
+    }));
+
+    let strukturalHtml = '';
+    if (hasil.struktural) {
+      strukturalHtml = `
+        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:14px;margin-top:16px;">
+          <h4 style="margin:0 0 10px 0;color:var(--text-primary);font-size:14px;display:flex;align-items:center;gap:6px;">
+            <span class="material-icons-round" style="color:#10b981;font-size:18px;">trending_flat</span>
+            Pengaruh Struktural HOC → ${escapeHtml(hasil.struktural.targetVar)}
+          </h4>
+          <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;font-size:13px;">
+            <div class="stat-mini"><label>Koefisien Jalur (β)</label><span style="font-weight:700;color:#10b981">${hasil.struktural.beta.toFixed(4)}</span></div>
+            <div class="stat-mini"><label>R² Target</label><span>${hasil.struktural.rSquared.toFixed(4)}</span></div>
+            <div class="stat-mini"><label>Effect Size (f²)</label><span>${hasil.struktural.effectSizeF2.toFixed(4)} (${hasil.struktural.kategoriF2})</span></div>
+          </div>
+        </div>
+      `;
+    }
+
+    const hocMetricHtml = hocType === 'reflektif' ? `
+      <div style="display:flex;gap:12px;margin-bottom:12px;">
+        <div class="stat-mini" style="flex:1;"><label>AVE Konstruk HOC</label><span style="font-weight:700;color:${hasil.tahap2.aveHOC >= 0.50 ? '#10b981' : '#f59e0b'}">${hasil.tahap2.aveHOC} (${hasil.tahap2.aveHOC >= 0.50 ? 'Valid ≥ 0.50' : 'Perlu Evaluasi'})</span></div>
+        <div class="stat-mini" style="flex:1;"><label>Composite Reliability HOC</label><span style="font-weight:700;color:${hasil.tahap2.crHOC >= 0.70 ? '#10b981' : '#f59e0b'}">${hasil.tahap2.crHOC} (${hasil.tahap2.crHOC >= 0.70 ? 'Reliabel ≥ 0.70' : 'Perlu Evaluasi'})</span></div>
+      </div>
+    ` : '';
+
+    document.getElementById('hasilHOC').innerHTML = `
+      <div class="alert-box alert-info" style="margin-bottom:14px">
+        <span class="material-icons-round">info</span>
+        <span>Analisis HOC menggunakan <strong>Two-Stage Approach</strong> (Sarstedt et al., 2019): Tahap 1 mengestimasi skor variabel laten LOC, Tahap 2 menggunakan skor tersebut sebagai manifest indicators dari HOC <strong>${escapeHtml(hocName)}</strong>.</span>
+      </div>
+
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:14px;margin-bottom:16px;">
+        <h4 style="margin:0 0 10px 0;color:var(--text-primary);font-size:14px;">${escapeHtml(hasil.tahap1.judul)}</h4>
+        ${renderTable(rowsLOC, 'Pengukuran Dimensi Orde Rendah')}
+      </div>
+
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:14px;margin-bottom:16px;">
+        <h4 style="margin:0 0 10px 0;color:var(--text-primary);font-size:14px;">${escapeHtml(hasil.tahap2.judul)}</h4>
+        ${hocMetricHtml}
+        ${renderTable(rowsHOC, `Pengukuran Dimensi ke Konstruk HOC (${hocName})`)}
+      </div>
+
+      ${strukturalHtml}
+    `;
+
+    showToast('Analisis Two-Stage HOC berhasil dihitung!', 'sukses');
+  } catch(e) {
+    console.error('Error HOC:', e);
+    showToast('Gagal menghitung HOC: ' + e.message, 'error');
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// 4. HANDLER: Necessary Condition Analysis (NCA)
+// ──────────────────────────────────────────────────────────────────────────
+document.getElementById('btnJalankanNCA')?.addEventListener('click', async () => {
+  const model = getActiveModelData();
+  if (!model) return;
+  const data = await getActiveDataset();
+  if (!data) return;
+
+  const xVar = document.getElementById('ncaXVar')?.value;
+  const yVar = document.getElementById('ncaYVar')?.value;
+
+  if (!xVar || !yVar) {
+    showToast('Pilih variabel kondisi (X) dan hasil (Y) terlebih dahulu.', 'peringatan');
+    return;
+  }
+  if (xVar === yVar) {
+    showToast('Variabel kondisi (X) dan hasil (Y) tidak boleh sama.', 'peringatan');
+    return;
+  }
+
+  showToast(`Menghitung Necessary Condition Analysis (${xVar} → ${yVar})...`, 'info');
+  try {
+    const engine = new PLSEngine();
+    engine.setData(data, model.variabels, model.jalurs);
+    engine.runPLS();
+
+    const hasil = engine.runNCA(xVar, yVar);
+    const badgeColor = hasil.isNecessaryCondition ? '#0284c7' : '#64748b';
+
+    const rowsBottleneck = hasil.bottleneckTable.map(r => ({
+      'Tingkat Hasil (Y)': r.tingkatY,
+      'Syarat Minimal X (CE-FDH)': r.minX_CE,
+      'Syarat Minimal X (CR-FDH)': r.minX_CR
+    }));
+
+    document.getElementById('hasilNCA').innerHTML = `
+      <div style="text-align:center;padding:16px 0;">
+        <span class="material-icons-round" style="font-size:46px;color:${badgeColor}">filter_alt</span>
+        <div style="font-size:24px;font-weight:800;color:${badgeColor};margin:6px 0">
+          ${escapeHtml(xVar)} → ${escapeHtml(yVar)}
+        </div>
+        <div style="font-size:13.5px;color:var(--text-secondary)">Evaluasi Syarat Keharusan (Necessary Condition) — Dul (2016)</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div class="stat-mini" style="padding:14px;">
+          <label>Effect Size Ceiling Envelopment (d_CE-FDH)</label>
+          <span style="font-size:22px;font-weight:800;color:${badgeColor}">${hasil.effectSizeCE.toFixed(4)}</span>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${escapeHtml(hasil.interpretasiEfek)}</div>
+        </div>
+        <div class="stat-mini" style="padding:14px;">
+          <label>Effect Size Ceiling Regression (d_CR-FDH)</label>
+          <span style="font-size:22px;font-weight:800;color:${badgeColor}">${hasil.effectSizeCR.toFixed(4)}</span>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Metode OLS garis batas atas</div>
+        </div>
+      </div>
+
+      <div class="alert-box" style="background:${hasil.isNecessaryCondition ? 'rgba(2,132,199,0.1)' : 'rgba(100,116,139,0.1)'};border-color:${badgeColor};margin-bottom:16px;">
+        <span class="material-icons-round" style="color:${badgeColor}">${hasil.isNecessaryCondition ? 'verified' : 'info'}</span>
+        <span>${escapeHtml(hasil.ringkasan)}</span>
+      </div>
+
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:14px;margin-bottom:16px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+          <span class="material-icons-round" style="font-size:18px;color:#0284c7;">table_rows</span>
+          Tabel Hambatan (Bottleneck Table)
+        </div>
+        <p style="font-size:12px;color:var(--text-secondary);margin:0 0 12px 0;">
+          Tabel ini menunjukkan level minimum <strong>${escapeHtml(xVar)}</strong> yang wajib dipenuhi agar level target <strong>${escapeHtml(yVar)}</strong> dapat tercapai (NN = <em>Not Necessary</em>).
+        </p>
+        ${renderTable(rowsBottleneck, `Bottleneck Table: Kebutuhan Minimal ${xVar} untuk Mencapai ${yVar}`)}
+      </div>
+
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.5;">
+        <strong>Kriteria Effect Size Dul (2016):</strong> d &lt; 0.1 (dapat diabaikan), 0.1 ≤ d &lt; 0.3 (sedang), 0.3 ≤ d &lt; 0.5 (besar), d ≥ 0.5 (sangat besar).
+      </div>
+    `;
+
+    showModal('modalNCA');
+    showToast('Analisis NCA selesai!', 'sukses');
+  } catch(e) {
+    console.error('Error NCA:', e);
+    showToast('Gagal menjalankan NCA: ' + e.message, 'error');
+  }
+});
+
 // Inisialisasi awal saat halaman analisis dibuka
 document.querySelector('[data-halaman="analisis"]')?.addEventListener('click', () => {
   setTimeout(() => {
     populateIPMASelect();
     populateMGASelect();
+    populateAcademicSelects();
   }, 50);
 });
 

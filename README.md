@@ -27,23 +27,35 @@ Aplikasi desktop *open-source* modern untuk analisis **Partial Least Squares - S
 ## 📋 Pengujian Statistika
 
 ### 1. Model Pengukuran (Outer Model)
-- Outer Loadings & Indikator Validitas
+- Outer Loadings & Indikator Validitas (Reflektif)
+- Model Formatif (Mode B): Outer Weights, Outer Loadings, Indicator VIF (< 3.3/5.0), dan Aturan Retensi Indikator
 - Cronbach's Alpha & rho_A (Dijkstra-Henseler)
 - Composite Reliability (CR)
 - Average Variance Extracted (AVE)
-- Validitas Diskriminan (Fornell-Larcker Criterion)
+- Validitas Diskriminan (Fornell-Larcker Criterion & HTMT)
 
 ### 2. Model Struktural (Inner Model)
 - Koefisien Jalur (*Path Coefficients* $\beta$)
-- Koefisien Determinasi ($R^2$)
+- Koefisien Determinasi ($R^2$ & $R^2$ Adjusted)
 - Ukuran Pengaruh (*Effect Size* $f^2$)
+- Uji Mediasi Spesifik & Uji Pengaruh Moderasi (Two-Stage / Simple Slope Plot)
 
-### 3. Bootstrapping (Pengujian Hipotesis)
+### 3. Analisis Lanjutan & Metodologi Mutakhir
+- **Uji Normalitas Multivariat Mardia** (Skewness & Kurtosis) beserta Generator Narasi Justifikasi Ilmiah untuk Skripsi/Tesis/Jurnal
+- **Higher-Order Constructs (HOC / HCM)** - Pemodelan konstruk berdimensi ganda melalui *Two-Stage Approach*
+- **Necessary Condition Analysis (NCA)** - Analisis kondisi keharusan (Dul, 2016), estimasi Ceiling Envelopment (CE-FDH & CR-FDH), dan *Bottleneck Table*
+- **Consistent PLS (PLSc)** - Koreksi *attenuation bias* pada model reflektif
+- **PLSpredict** - Evaluasi relevansi prediktif *out-of-sample* (RMSE, MAE, $Q^2_{\text{predict}}$)
+- **Multi-Group Analysis (MGA)** & **IPMA** (*Importance-Performance Map Analysis*)
+- **Common Method Bias (CMV)** - Harman's Single Factor Test & Full Collinearity VIF
+
+### 4. Bootstrapping (Pengujian Hipotesis)
 - Original Sample ($O$)
 - Sample Mean ($M$)
 - Standard Deviation ($STDEV$)
 - T-Statistics ($|O/STDEV|$)
 - P-Values (Signifikansi 5% / 1%)
+- Bias-Corrected Confidence Intervals (CI)
 
 ---
 

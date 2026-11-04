@@ -2270,6 +2270,591 @@ class PLSEngine {
       catatan: 'Ganti "Table X" dengan nomor tabel. Salin CSV ke Excel/Word untuk format APA 7.',
     };
   }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 1. Uji Normalitas Multivariat Mardia & Auto-Justifikasi PLS-SEM
+  // (Mardia, 1970; Hair et al., 2019, 2021)
+  // ──────────────────────────────────────────────────────────────────────────
+  chiSquareCDF(x, df) {
+    if (x <= 0 || df <= 0) return 0;
+    // Wilson-Hilferty transformation ke standar normal Z
+    const term = Math.pow(x / df, 1 / 3);
+    const mean = 1 - 2 / (9 * df);
+    const sd = Math.sqrt(2 / (9 * df));
+    const z = (term - mean) / sd;
+    return Math.max(0, Math.min(1, this.normalCDF(z)));
+  }
+
+  calculateMardiaNormality(indikatorList = null) {
+    if (!this.data || this.data.length === 0) {
+      throw new Error('Data belum dimuat.');
+    }
+
+    // Tentukan daftar indikator
+    let allInds = [];
+    if (Array.isArray(indikatorList) && indikatorList.length > 0) {
+      allInds = [...indikatorList];
+    } else {
+      for (const v of this.variabels) {
+        for (const ind of (v.indikator || [])) {
+          if (!allInds.includes(ind)) allInds.push(ind);
+        }
+      }
+    }
+
+    const p = allInds.length;
+    const n = this.data.length;
+
+    if (p < 2) {
+      throw new Error('Uji Mardia membutuhkan minimal 2 indikator multivariat.');
+    }
+    if (n <= p + 1) {
+      throw new Error(`Jumlah sampel (N=${n}) harus lebih besar dari jumlah indikator + 1 (p=${p}) agar matriks kovarians tidak singular.`);
+    }
+
+    // Ekstrak data mentah numerik
+    const X = [];
+    for (let i = 0; i < n; i++) {
+      const row = [];
+      for (let j = 0; j < p; j++) {
+        row.push(parseFloat(this.data[i][allInds[j]]) || 0);
+      }
+      X.push(row);
+    }
+
+    // 1. Rata-rata per kolom
+    const means = new Array(p).fill(0);
+    for (let j = 0; j < p; j++) {
+      let sum = 0;
+      for (let i = 0; i < n; i++) sum += X[i][j];
+      means[j] = sum / n;
+    }
+
+    // 2. Matriks Kovarians Sampel S (p x p)
+    const S = [];
+    for (let j = 0; j < p; j++) {
+      S[j] = new Array(p).fill(0);
+      for (let k = 0; k < p; k++) {
+        let cov = 0;
+        for (let i = 0; i < n; i++) {
+          cov += (X[i][j] - means[j]) * (X[i][k] - means[k]);
+        }
+        S[j][k] = cov / (n - 1);
+      }
+    }
+
+    // 3. Invert S dengan ridge jika singular
+    let Sinv = this.invertMatrix(S);
+    if (!Sinv) {
+      for (let j = 0; j < p; j++) S[j][j] += 1e-5;
+      Sinv = this.invertMatrix(S);
+    }
+    if (!Sinv) {
+      throw new Error('Matriks kovarians indikator singular dan tidak dapat diinvers.');
+    }
+
+    // 4. Hitung Jarak Mahalanobis g_ij = (X_i - mean)' * Sinv * (X_j - mean)
+    // Matriks G berukuran n x n
+    const diff = [];
+    for (let i = 0; i < n; i++) {
+      const rowDiff = [];
+      for (let j = 0; j < p; j++) rowDiff.push(X[i][j] - means[j]);
+      diff.push(rowDiff);
+    }
+
+    // Optimasi komputasi G: intermediate = diff * Sinv (n x p)
+    const inter = [];
+    for (let i = 0; i < n; i++) {
+      const rowInter = new Array(p).fill(0);
+      for (let k = 0; k < p; k++) {
+        let sum = 0;
+        for (let j = 0; j < p; j++) sum += diff[i][j] * Sinv[j][k];
+        rowInter[k] = sum;
+      }
+      inter.push(rowInter);
+    }
+
+    // Mardia Skewness: b1p = (1/n^2) * sum_i sum_j (g_ij)^3
+    // Mardia Kurtosis: b2p = (1/n) * sum_i (g_ii)^2
+    let sumG3 = 0;
+    let sumGii2 = 0;
+
+    for (let i = 0; i < n; i++) {
+      // diagonal g_ii
+      let gii = 0;
+      for (let k = 0; k < p; k++) gii += inter[i][k] * diff[i][k];
+      sumGii2 += gii * gii;
+      sumG3 += Math.pow(gii, 3); // j = i
+
+      for (let j = i + 1; j < n; j++) {
+        let gij = 0;
+        for (let k = 0; k < p; k++) gij += inter[i][k] * diff[j][k];
+        const gij3 = Math.pow(gij, 3);
+        sumG3 += 2 * gij3; // simetris g_ij = g_ji
+      }
+    }
+
+    const b1p = sumG3 / (n * n);
+    const b2p = sumGii2 / n;
+
+    // Uji Signifikansi Skewness (Chi-Square)
+    const dfSkew = (p * (p + 1) * (p + 2)) / 6;
+    const chiSquareSkew = (n * b1p) / 6;
+    // Koreksi sampel kecil Mardia (1974)
+    const cSmall = ((n + 1) * (p + 1) * (p + 3)) / (n * ((n + 1) * (p + 1) - 2));
+    const chiSquareSmall = (n * cSmall * b1p) / 6;
+    const pValueSkew = Math.max(0, Math.min(1, 1 - this.chiSquareCDF(chiSquareSkew, dfSkew)));
+
+    // Uji Signifikansi Kurtosis (Standar Normal Z)
+    const expectedKurt = p * (p + 2);
+    const varKurt = (8 * p * (p + 2)) / n;
+    const zKurt = (b2p - expectedKurt) / Math.sqrt(varKurt);
+    const pValueKurt = Math.max(0, Math.min(1, 2 * (1 - this.normalCDF(Math.abs(zKurt)))));
+
+    // Evaluasi Normalitas
+    const isNormalSkew = pValueSkew >= 0.05;
+    const isNormalKurt = pValueKurt >= 0.05;
+    const isNormalMultivariate = isNormalSkew && isNormalKurt;
+
+    // Generator Teks Justifikasi Ilmiah Akademik (Bahasa Indonesia)
+    const teksJustifikasi = isNormalMultivariate
+      ? `Berdasarkan pengujian normalitas multivariat Mardia (1970), data penelitian memenuhi asumsi distribusi normal multivariat baik pada dimensi kemiringan/skewness (b1,p = ${b1p.toFixed(3)}, χ² = ${chiSquareSkew.toFixed(3)}, p = ${pValueSkew.toFixed(4)} > 0.05) maupun kurtosis (b2,p = ${b2p.toFixed(3)}, Z = ${zKurt.toFixed(3)}, p = ${pValueKurt.toFixed(4)} > 0.05). Meskipun data berdistribusi normal, penggunaan Partial Least Squares Structural Equation Modeling (PLS-SEM) tetap valid dan dapat diterapkan untuk tujuan prediksi, pengujian model kompleks, maupun eksplorasi hubungan teoritis (Hair et al., 2019, 2021).`
+      : `Berdasarkan pengujian normalitas multivariat Mardia (1970) terhadap seluruh indikator penelitian (p = ${p}, N = ${n}), diperoleh koefisien multivariate skewness sebesar ${b1p.toFixed(3)} (χ² = ${chiSquareSkew.toFixed(3)}, df = ${Math.round(dfSkew)}, p = ${pValueSkew < 0.001 ? '< 0.001' : pValueSkew.toFixed(4)}) dan multivariate kurtosis sebesar ${b2p.toFixed(3)} (Z = ${zKurt.toFixed(3)}, p = ${pValueKurt < 0.001 ? '< 0.001' : pValueKurt.toFixed(4)}). Nilai signifikansi yang berada di bawah ambang batas α = 0.05 membuktikan bahwa data penelitian TIDAK berdistribusi normal multivariat.\n\nSesuai pedoman metodologis terkini (Hair et al., 2019; Hair et al., 2021; Rigdon et al., 2017), ketika asumsi normalitas multivariat dilanggar, metode Covariance-Based SEM (CB-SEM seperti AMOS/LISREL) berpotensi menghasilkan estimasi parameter yang bias dan inflasi chi-square fit. Oleh karena itu, penerapan Partial Least Squares Structural Equation Modeling (PLS-SEM) yang bersifat non-parametrik (distribution-free) dan berbasis resampling bootstrap merupakan pendekatan yang paling tepat, valid, dan robust untuk menguji hipotesis penelitian ini.`;
+
+    return {
+      n,
+      p,
+      indikator: allInds,
+      skewness: {
+        b1p: Number(b1p.toFixed(4)),
+        chiSquare: Number(chiSquareSkew.toFixed(4)),
+        chiSquareSmallSample: Number(chiSquareSmall.toFixed(4)),
+        df: Math.round(dfSkew),
+        pValue: Number(pValueSkew.toFixed(5)),
+        isNormal: isNormalSkew,
+        kesimpulan: isNormalSkew ? 'Normal (p ≥ 0.05)' : 'Tidak Normal (p < 0.05)',
+      },
+      kurtosis: {
+        b2p: Number(b2p.toFixed(4)),
+        expected: expectedKurt,
+        zScore: Number(zKurt.toFixed(4)),
+        pValue: Number(pValueKurt.toFixed(5)),
+        isNormal: isNormalKurt,
+        kesimpulan: isNormalKurt ? 'Normal (p ≥ 0.05)' : 'Tidak Normal (p < 0.05)',
+      },
+      isNormalMultivariate,
+      statusRingkas: isNormalMultivariate ? 'Data Berdistribusi Normal Multivariat' : 'Data Tidak Berdistribusi Normal Multivariat',
+      rekomendasiMetode: isNormalMultivariate ? 'Dapat menggunakan PLS-SEM maupun CB-SEM' : 'Sangat Direkomendasikan Menggunakan PLS-SEM (Non-Parametrik)',
+      teksJustifikasi,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 2. Evaluasi Model Pengukuran Formatif (Mode B)
+  // (Hair et al., 2017, 2021)
+  // ──────────────────────────────────────────────────────────────────────────
+  evaluateFormativeModel(targetVarName = null) {
+    if (!this.hasil) this.runPLS();
+    const h = this.hasil;
+    const n = this.data.length;
+
+    // Filter variabel yang bertipe formatif atau spesifik target
+    let targetVars = this.variabels.filter(v => v.tipe === 'formatif');
+    if (targetVarName) {
+      const match = this.variabels.find(v => v.nama === targetVarName);
+      if (match) targetVars = [match];
+    }
+    // Jika tidak ada variabel bertipe formatif, evaluasi semua variabel
+    if (targetVars.length === 0) {
+      targetVars = [...this.variabels];
+    }
+
+    const evaluasi = {};
+
+    for (const v of targetVars) {
+      const inds = v.indikator || [];
+      if (inds.length < 2) continue;
+
+      const latentScore = h.latentScores[v.nama];
+      if (!latentScore) continue;
+
+      // 1. Multikolinearitas Indikator (Indicator VIF)
+      const vifMap = {};
+      for (let i = 0; i < inds.length; i++) {
+        const targetInd = inds[i];
+        const predictorInds = inds.filter((_, idx) => idx !== i);
+        const y = this.getColumnData(targetInd);
+        const X = [];
+        for (let r = 0; r < n; r++) {
+          X.push(predictorInds.map(p => parseFloat(this.data[r][p]) || 0));
+        }
+        const reg = this.multipleRegression(X, y);
+        const r2 = Math.min(0.999, Math.max(0, reg.rSquared));
+        const vif = 1 / (1 - r2);
+        vifMap[targetInd] = Number(vif.toFixed(3));
+      }
+
+      // 2. Multiple Regression untuk Outer Weights Mode B
+      // LVS ~ X1 + X2 + ... + Xm
+      const Xmat = [];
+      for (let r = 0; r < n; r++) {
+        Xmat.push(inds.map(ind => parseFloat(this.data[r][ind]) || 0));
+      }
+      const regWeights = this.multipleRegression(Xmat, latentScore);
+      const outerWeightsCalc = {};
+      inds.forEach((ind, i) => {
+        outerWeightsCalc[ind] = Number((regWeights.coefficients[i] || 0).toFixed(4));
+      });
+
+      // 3. Evaluasi per Butir Indikator (Hair et al., 2021 Decision Rules)
+      const indikatorRows = [];
+      let maxVif = 0;
+
+      for (let i = 0; i < inds.length; i++) {
+        const ind = inds[i];
+        const weight = outerWeightsCalc[ind];
+        const loading = Number((h.outerLoadings[v.nama]?.[ind] ?? 0).toFixed(4));
+        const vif = vifMap[ind] || 1.0;
+        if (vif > maxVif) maxVif = vif;
+
+        // Cek signifikansi dari bootstrap jika tersedia
+        const bootStat = this.bootstrapHasil?.loadingResults?.[v.nama]?.[ind];
+        const tStat = bootStat ? bootStat.tStatistic : null;
+        const pValue = bootStat ? bootStat.pValue : null;
+        const isWeightSig = pValue !== null ? pValue < 0.05 : null;
+
+        // Aturan Keputusan Evaluasi Formatif
+        let statusVif = 'Bebas Multikolinearitas';
+        if (vif > 5.0) statusVif = 'Kolinearitas Kritis (> 5.0)';
+        else if (vif > 3.3) statusVif = 'Toleransi Moderat (3.3 - 5.0)';
+
+        let rekomendasi = '';
+        if (isWeightSig === true) {
+          rekomendasi = 'Pertahankan (Outer Weight Signifikan p < 0.05)';
+        } else if (isWeightSig === false) {
+          if (Math.abs(loading) >= 0.50) {
+            rekomendasi = 'Pertahankan (Outer Loading Absolut Kuat ≥ 0.50)';
+          } else {
+            rekomendasi = 'Evaluasi / Pertimbangkan Eliminasi (Weight & Loading < 0.50)';
+          }
+        } else {
+          // Tanpa bootstrap
+          if (Math.abs(weight) >= 0.20 || Math.abs(loading) >= 0.50) {
+            rekomendasi = 'Pertahankan (Bobot / Loading Memadai)';
+          } else {
+            rekomendasi = 'Perlu Konfirmasi Signifikansi via Bootstrapping';
+          }
+        }
+
+        indikatorRows.push({
+          indikator: ind,
+          outerWeight: weight,
+          outerLoading: loading,
+          vif,
+          statusVif,
+          tStat: tStat !== null ? Number(tStat.toFixed(3)) : '-',
+          pValue: pValue !== null ? Number(pValue.toFixed(4)) : '-',
+          isWeightSig,
+          rekomendasi,
+        });
+      }
+
+      evaluasi[v.nama] = {
+        namaVariabel: v.nama,
+        tipe: v.tipe || 'formatif',
+        jumlahIndikator: inds.length,
+        maxVif,
+        isVifClean: maxVif <= 3.3,
+        indikator: indikatorRows,
+        kesimpulan: maxVif <= 3.3
+          ? '✓ Seluruh indikator formatif bebas dari multikolinearitas (VIF ≤ 3.3).'
+          : (maxVif <= 5.0
+            ? '⚠️ Multikolinearitas moderat terdeteksi (3.3 < VIF ≤ 5.0), masih dapat ditoleransi.'
+            : '❌ Terdeteksi multikolinearitas tinggi (VIF > 5.0), pertimbangkan menghapus atau menggabungkan indikator redundant.')
+      };
+    }
+
+    return evaluasi;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 3. Higher-Order Constructs (HOC / HCM) - Two-Stage Approach
+  // (Becker et al., 2012; Sarstedt et al., 2019)
+  // ──────────────────────────────────────────────────────────────────────────
+  runHOC(hocConfig) {
+    if (!this.hasil) this.runPLS();
+    const {
+      hocName = 'HOC',
+      hocType = 'reflektif', // 'reflektif' (Type I) atau 'formatif' (Type II)
+      locNames = [],         // Nama-nama Lower-Order Constructs
+      targetVar = null       // Variabel endogen target (opsional)
+    } = hocConfig;
+
+    if (!Array.isArray(locNames) || locNames.length < 2) {
+      throw new Error('HOC membutuhkan minimal 2 Lower-Order Constructs (LOC/Dimensi).');
+    }
+
+    const h = this.hasil;
+    const n = this.data.length;
+
+    // Validasi keberadaan LOC dalam hasil PLS Tahap 1
+    const locScores = {};
+    const evaluasiLOC = [];
+
+    for (const locName of locNames) {
+      const score = h.latentScores[locName];
+      if (!score) {
+        throw new Error(`Skor laten untuk dimensi LOC "${locName}" tidak ditemukan.`);
+      }
+      locScores[locName] = score;
+
+      const rel = h.reliability[locName] || {};
+      evaluasiLOC.push({
+        dimensi: locName,
+        jumlahIndikator: (this.variabels.find(v => v.nama === locName)?.indikator || []).length,
+        cronbachAlpha: Number((rel.cronbachAlpha || 0).toFixed(3)),
+        compositeReliability: Number((rel.compositeReliability || 0).toFixed(3)),
+        ave: Number((rel.ave || 0).toFixed(3)),
+        statusLOC: (rel.ave || 0) >= 0.50 && (rel.compositeReliability || 0) >= 0.70 ? 'Valid & Reliabel' : 'Perlu Evaluasi'
+      });
+    }
+
+    // ── TAHAP 2: Hitung Skor Laten HOC dari Skor Dimensi LOC ──
+    // Inisialisasi bobot sama rata
+    const initialHocScore = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      for (const locName of locNames) sum += locScores[locName][i];
+      initialHocScore[i] = sum / locNames.length;
+    }
+    const hocScore = this.standardize(initialHocScore);
+
+    // Evaluasi Pengukuran HOC (Stage 2 Measurement Model)
+    const evaluasiDimensiHOC = [];
+    const locScoreMatrix = [];
+    for (let i = 0; i < n; i++) {
+      locScoreMatrix.push(locNames.map(name => locScores[name][i]));
+    }
+
+    // Hitung bobot multiple regression (Mode B / Formatif)
+    const regWeights = this.multipleRegression(locScoreMatrix, hocScore);
+
+    // Hitung VIF antar dimensi LOC
+    const locVifMap = {};
+    for (let i = 0; i < locNames.length; i++) {
+      const targetName = locNames[i];
+      const otherNames = locNames.filter((_, idx) => idx !== i);
+      const y = locScores[targetName];
+      const X = [];
+      for (let r = 0; r < n; r++) {
+        X.push(otherNames.map(name => locScores[name][r]));
+      }
+      const reg = this.multipleRegression(X, y);
+      const r2 = Math.min(0.999, Math.max(0, reg.rSquared));
+      locVifMap[targetName] = Number((1 / (1 - r2)).toFixed(3));
+    }
+
+    let sumLoading2 = 0;
+    let sumLoadings = 0;
+
+    locNames.forEach((locName, idx) => {
+      const loading = Number(this.correlation(locScores[locName], hocScore).toFixed(4));
+      const weight = Number((regWeights.coefficients[idx] || 0).toFixed(4));
+      const vif = locVifMap[locName] || 1.0;
+
+      sumLoadings += loading;
+      sumLoading2 += loading * loading;
+
+      evaluasiDimensiHOC.push({
+        dimensi: locName,
+        loadingHOC: loading,
+        weightHOC: weight,
+        vifDimensi: vif,
+        statusDimensi: hocType === 'reflektif'
+          ? (loading >= 0.70 ? 'Valid (≥ 0.70)' : (loading >= 0.50 ? 'Ditoleransi (≥ 0.50)' : 'Lemah (< 0.50)'))
+          : (vif <= 3.3 ? 'Bebas Multikolinearitas (≤ 3.3)' : 'Kolinearitas Moderat/Tinggi')
+      });
+    });
+
+    // Metrik HOC jika reflektif
+    const aveHOC = Number((sumLoading2 / locNames.length).toFixed(4));
+    const kLoc = locNames.length;
+    const crHOC = Number(((sumLoadings * sumLoadings) / ((sumLoadings * sumLoadings) + (kLoc - sumLoading2))).toFixed(4));
+
+    // Pengaruh Struktural HOC ke Variabel Target (jika ada)
+    let strukturalHOC = null;
+    if (targetVar && h.latentScores[targetVar]) {
+      const yTarget = h.latentScores[targetVar];
+      const regTarget = this.simpleRegression(hocScore, yTarget);
+      const r2Target = Number((regTarget.rSquared || 0).toFixed(4));
+      const betaHOC = Number((regTarget.beta || 0).toFixed(4));
+
+      // f² effect size
+      const f2HOC = (1 - r2Target > 0.001) ? Number((r2Target / (1 - r2Target)).toFixed(4)) : 0;
+
+      strukturalHOC = {
+        targetVar,
+        beta: betaHOC,
+        rSquared: r2Target,
+        effectSizeF2: f2HOC,
+        kategoriF2: f2HOC >= 0.35 ? 'Besar (≥ 0.35)' : (f2HOC >= 0.15 ? 'Sedang (≥ 0.15)' : (f2HOC >= 0.02 ? 'Kecil (≥ 0.02)' : 'Tidak Signifikan (< 0.02)'))
+      };
+    }
+
+    return {
+      hocName,
+      hocType,
+      locNames,
+      tahap1: {
+        judul: 'Evaluasi Tahap 1: Pengukuran Konstruk Orde Rendah (LOC)',
+        locs: evaluasiLOC
+      },
+      tahap2: {
+        judul: `Evaluasi Tahap 2: Konstruk Orde Tinggi (${hocType === 'reflektif' ? 'Reflective-Reflective Type I' : 'Reflective-Formative Type II'})`,
+        aveHOC: hocType === 'reflektif' ? aveHOC : null,
+        crHOC: hocType === 'reflektif' ? crHOC : null,
+        dimensi: evaluasiDimensiHOC
+      },
+      struktural: strukturalHOC
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 4. Necessary Condition Analysis (NCA)
+  // (Dul, 2016; Richter et al., 2020)
+  // ──────────────────────────────────────────────────────────────────────────
+  runNCA(xVarName, yVarName, options = {}) {
+    if (!this.hasil) this.runPLS();
+    const h = this.hasil;
+    const n = this.data.length;
+
+    // Ambil data X dan Y (bisa berupa variabel laten atau indikator mentah)
+    let rawX = h.latentScores[xVarName] || this.getColumnData(xVarName);
+    let rawY = h.latentScores[yVarName] || this.getColumnData(yVarName);
+
+    if (!rawX || !rawY) {
+      throw new Error(`Data untuk variabel "${xVarName}" atau "${yVarName}" tidak ditemukan.`);
+    }
+
+    const minX = Math.min(...rawX);
+    const maxX = Math.max(...rawX);
+    const minY = Math.min(...rawY);
+    const maxY = Math.max(...rawY);
+
+    const rangeX = maxX - minX || 1;
+    const rangeY = maxY - minY || 1;
+
+    // Rescale ke skala 0 - 100
+    const points = [];
+    for (let i = 0; i < n; i++) {
+      const xNorm = ((rawX[i] - minX) / rangeX) * 100;
+      const yNorm = ((rawY[i] - minY) / rangeY) * 100;
+      points.push({ x: xNorm, y: yNorm });
+    }
+
+    // 1. Ceiling Envelopment - Free Disposal Hull (CE-FDH)
+    // Urutkan titik berdasarkan X ascending, lalu Y descending
+    const sorted = [...points].sort((a, b) => a.x - b.x || b.y - a.y);
+
+    const boundaryPoints = [];
+    let currentMaxY = -1;
+    for (const pt of sorted) {
+      if (pt.y > currentMaxY) {
+        boundaryPoints.push({ x: pt.x, y: pt.y });
+        currentMaxY = pt.y;
+      }
+    }
+
+    // Hitung luas area di bawah tangga ceiling CE-FDH
+    let areaBelowCE = 0;
+    for (let i = 0; i < boundaryPoints.length; i++) {
+      const nextX = (i + 1 < boundaryPoints.length) ? boundaryPoints[i + 1].x : 100;
+      const width = Math.max(0, nextX - boundaryPoints[i].x);
+      areaBelowCE += width * boundaryPoints[i].y;
+    }
+
+    const totalScopeArea = 100 * 100; // 10,000
+    const ceilingAreaCE = Math.max(0, totalScopeArea - areaBelowCE);
+    const effectSizeCE = Number((ceilingAreaCE / totalScopeArea).toFixed(4));
+
+    // 2. Ceiling Regression (CR-FDH) melalui boundary points
+    let slopeCR = 0;
+    let interceptCR = 0;
+    if (boundaryPoints.length >= 2) {
+      const bpX = boundaryPoints.map(p => p.x);
+      const bpY = boundaryPoints.map(p => p.y);
+      const meanBpX = this.mean(bpX);
+      const meanBpY = this.mean(bpY);
+      let num = 0, den = 0;
+      for (let i = 0; i < bpX.length; i++) {
+        num += (bpX[i] - meanBpX) * (bpY[i] - meanBpY);
+        den += Math.pow(bpX[i] - meanBpX, 2);
+      }
+      slopeCR = den > 0 ? num / den : 0;
+      interceptCR = meanBpY - slopeCR * meanBpX;
+    } else {
+      slopeCR = 1;
+      interceptCR = 0;
+    }
+
+    // Effect size CR-FDH (integrasi area di atas garis Y = a + bX pada domain [0, 100])
+    let areaBelowCR = 0;
+    for (let x = 0; x < 100; x++) {
+      const yVal = Math.max(0, Math.min(100, interceptCR + slopeCR * (x + 0.5)));
+      areaBelowCR += yVal;
+    }
+    const ceilingAreaCR = Math.max(0, totalScopeArea - areaBelowCR);
+    const effectSizeCR = Number((ceilingAreaCR / totalScopeArea).toFixed(4));
+
+    // 3. Bottleneck Table (Kebutuhan Level Minimal X untuk Mencapai Y)
+    const bottleneckTable = [];
+    const yLevels = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+
+    for (const yTarget of yLevels) {
+      // CE-FDH requirement: cari titik batas pertama di mana Y >= yTarget
+      let minX_CE = 0;
+      const bpMatch = boundaryPoints.find(p => p.y >= yTarget);
+      if (bpMatch) {
+        minX_CE = bpMatch.x;
+      } else {
+        minX_CE = 100;
+      }
+
+      // CR-FDH requirement: X = (Y - intercept) / slope
+      let minX_CR = 0;
+      if (slopeCR > 0) {
+        minX_CR = (yTarget - interceptCR) / slopeCR;
+      }
+      minX_CR = Math.max(0, Math.min(100, minX_CR));
+
+      bottleneckTable.push({
+        tingkatY: `${yTarget}%`,
+        minX_CE: minX_CE <= 0 ? 'NN (Tidak Perlu)' : `${minX_CE.toFixed(1)}%`,
+        minX_CR: minX_CR <= 0 ? 'NN (Tidak Perlu)' : `${minX_CR.toFixed(1)}%`
+      });
+    }
+
+    // Interpretasi Efek Dul (2016)
+    let interpretasiEfek = '';
+    if (effectSizeCE >= 0.50) interpretasiEfek = 'Sangat Besar (d ≥ 0.50)';
+    else if (effectSizeCE >= 0.30) interpretasiEfek = 'Besar (0.30 ≤ d < 0.50)';
+    else if (effectSizeCE >= 0.10) interpretasiEfek = 'Sedang (0.10 ≤ d < 0.30)';
+    else interpretasiEfek = 'Kecil / Dapat Diabaikan (d < 0.10)';
+
+    return {
+      xVarName,
+      yVarName,
+      effectSizeCE,
+      effectSizeCR,
+      interpretasiEfek,
+      isNecessaryCondition: effectSizeCE >= 0.10,
+      boundaryPointsCount: boundaryPoints.length,
+      bottleneckTable,
+      ringkasan: effectSizeCE >= 0.10
+        ? `Variabel "${xVarName}" terbukti merupakan syarat perlu (NECESSARY CONDITION) bagi "${yVarName}" dengan effect size d = ${effectSizeCE.toFixed(3)} (${interpretasiEfek}). Tingkat "${yVarName}" yang tinggi tidak dapat dicapai tanpa keberadaan level minimum dari "${xVarName}".`
+        : `Variabel "${xVarName}" BUKAN merupakan syarat perlu yang substansial bagi "${yVarName}" (effect size d = ${effectSizeCE.toFixed(3)}, ${interpretasiEfek}).`
+    };
+  }
 }
 
 // Export

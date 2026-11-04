@@ -403,6 +403,61 @@ const TOOLS = [
     },
   },
   {
+    name: 'pls_mardia_normality',
+    description: 'Calculate Mardia multivariate skewness and kurtosis tests (Mardia, 1970). Generates p-values and academic justification text in Indonesian explaining why PLS-SEM was chosen over CB-SEM.',
+    inputSchema: {
+      type: 'object', required: ['data'],
+      properties: {
+        data:           { type: 'array', items: { type: 'object' } },
+        variabels:      { type: 'array', items: LATENT_VAR_SCHEMA },
+        indikator_list: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+  {
+    name: 'pls_formative_assessment',
+    description: 'Evaluate formative measurement model (Mode B): indicator VIF collinearity (< 3.3/5.0), outer weights, outer loadings, and Hair et al. (2021) indicator retention decision rules.',
+    inputSchema: {
+      type: 'object', required: ['data', 'variabels', 'jalurs'],
+      properties: {
+        data:        { type: 'array', items: { type: 'object' } },
+        variabels:   { type: 'array', items: LATENT_VAR_SCHEMA },
+        jalurs:      { type: 'array', items: JALUR_SCHEMA },
+        target_var:  { type: 'string', description: 'Optional specific construct name to evaluate' },
+      },
+    },
+  },
+  {
+    name: 'pls_hoc_analysis',
+    description: 'Evaluate Higher-Order Constructs (HOC / HCM) using the Two-Stage Approach (Sarstedt et al., 2019). Stage 1 LOC reliabilities, Stage 2 HOC loadings/weights, AVE/CR, and structural path to target.',
+    inputSchema: {
+      type: 'object', required: ['data', 'variabels', 'jalurs', 'loc_names'],
+      properties: {
+        data:       { type: 'array', items: { type: 'object' } },
+        variabels:  { type: 'array', items: LATENT_VAR_SCHEMA },
+        jalurs:     { type: 'array', items: JALUR_SCHEMA },
+        hoc_name:   { type: 'string', description: 'Name of the HOC' },
+        hoc_type:   { type: 'string', enum: ['reflektif', 'formatif'], description: 'Type I (reflektif) or Type II (formatif)' },
+        loc_names:  { type: 'array', items: { type: 'string' }, description: 'Names of lower-order constructs' },
+        target_var: { type: 'string', description: 'Target endogenous variable (optional)' },
+      },
+    },
+  },
+  {
+    name: 'pls_nca_analysis',
+    description: 'Perform Necessary Condition Analysis (NCA; Dul, 2016). Estimates Ceiling Envelopment (CE-FDH) effect size d, CR-FDH line, and produces the Bottleneck Table.',
+    inputSchema: {
+      type: 'object', required: ['data', 'variabels', 'jalurs', 'x_var', 'y_var'],
+      properties: {
+        data:      { type: 'array', items: { type: 'object' } },
+        variabels: { type: 'array', items: LATENT_VAR_SCHEMA },
+        jalurs:    { type: 'array', items: JALUR_SCHEMA },
+        x_var:     { type: 'string', description: 'Condition variable name (X)' },
+        y_var:     { type: 'string', description: 'Outcome variable name (Y)' },
+      },
+    },
+  },
+  {
     name: 'pls_analyze_file',
     description: `Auto-analyze a CSV or Excel file end-to-end using the FreePLS engine.
 Automatically:
@@ -629,6 +684,33 @@ async function callTool(name, args) {
       engine.setData(data, variabels, jalurs);
       engine.runPLS(options);
       return engine.formatAPA(options);
+    }
+
+    case 'pls_mardia_normality': {
+      const { data, variabels = [], indikator_list = null } = args;
+      engine.setData(data, variabels, []);
+      return engine.calculateMardiaNormality(indikator_list);
+    }
+
+    case 'pls_formative_assessment': {
+      const { data, variabels, jalurs, target_var = null } = args;
+      engine.setData(data, variabels, jalurs);
+      engine.runPLS();
+      return engine.evaluateFormativeModel(target_var);
+    }
+
+    case 'pls_hoc_analysis': {
+      const { data, variabels, jalurs, hoc_name = 'HOC', hoc_type = 'reflektif', loc_names = [], target_var = null } = args;
+      engine.setData(data, variabels, jalurs);
+      engine.runPLS();
+      return engine.runHOC({ hocName: hoc_name, hocType: hoc_type, locNames: loc_names, targetVar: target_var });
+    }
+
+    case 'pls_nca_analysis': {
+      const { data, variabels, jalurs, x_var, y_var, options = {} } = args;
+      engine.setData(data, variabels, jalurs);
+      engine.runPLS();
+      return engine.runNCA(x_var, y_var, options);
     }
 
     case 'pls_analyze_file': {
