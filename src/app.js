@@ -3033,7 +3033,17 @@ window.terapkanTemplateModel = terapkanTemplateModel;
       return;
     }
     
-    // Hubungan Langsung Biasa
+    // Hubungan Langsung Biasa (Cegah penambahan jalur duplikat jika sudah tersedia)
+    const exists = state.jalurs.some(j => 
+      (j.dari_variabel_id == dari || j.dari === dariVar.nama) &&
+      (j.ke_variabel_id == ke || j.ke === keVar.nama)
+    );
+    if (exists) {
+      showToast(`Jalur "${dariVar.nama} → ${keVar.nama}" sudah tersedia (diabaikan agar tidak duplikat)`, 'peringatan');
+      hideModal('modalTambahJalur');
+      return;
+    }
+
     state.jalurs.push({
       id: Date.now(),
       dari: dariVar.nama,
@@ -4430,7 +4440,23 @@ function drawPLSDiagram(ctx, options = {}) {
 
       // Tooltip pill kecil di dekat kursor
       const targetVar = state.variabels.find(v => Math.hypot(v.posisi_x - mx, v.posisi_y - my) <= R + 10 && v.id !== srcVar.id);
-      const tipText = targetVar ? `Sambungkan ke "${targetVar.nama}"` : 'Klik variabel tujuan (Y)';
+      let tipText = 'Klik variabel tujuan (Y)';
+      let tipBg = '#ec4899';
+
+      if (targetVar) {
+        const alreadyExists = state.jalurs.some(j => 
+          (j.dari_variabel_id == srcVar.id || j.dari == srcVar.nama) &&
+          (j.ke_variabel_id == targetVar.id || j.ke == targetVar.nama)
+        );
+        if (alreadyExists) {
+          tipText = `Jalur ke "${targetVar.nama}" sudah ada (diabaikan)`;
+          tipBg = '#f59e0b';
+        } else {
+          tipText = `Sambungkan ke "${targetVar.nama}"`;
+          tipBg = '#10b981';
+        }
+      }
+
       ctx.font = '700 11px ' + PLS_STYLE.fontFamily;
       const tipMetrics = ctx.measureText(tipText);
       const tipW = tipMetrics.width + 16;
@@ -4438,7 +4464,7 @@ function drawPLSDiagram(ctx, options = {}) {
       const tipX = mx + 14;
       const tipY = my - 11;
 
-      ctx.fillStyle = targetVar ? '#10b981' : '#ec4899';
+      ctx.fillStyle = tipBg;
       ctx.shadowColor = 'rgba(0,0,0,0.3)';
       ctx.shadowBlur = 6;
       if (ctx.roundRect) {
@@ -4599,19 +4625,27 @@ function drawPLSDiagram(ctx, options = {}) {
       ctx.fillText(bText, cx, bY);
       ctx.restore();
     } else if (isConnectHoverTarget) {
-      // Halo aktif variabel tujuan Y (Emerald Green Snap)
+      const srcVar = state.variabels.find(x => x.id === state.pathFrom);
+      const isTargetDuplicate = srcVar && state.jalurs.some(j => 
+        (j.dari_variabel_id == srcVar.id || j.dari == srcVar.nama) &&
+        (j.ke_variabel_id == v.id || j.ke == v.nama)
+      );
+
+      const targetStroke = isTargetDuplicate ? '#f59e0b' : '#10b981';
+      const bText = isTargetDuplicate ? '⚠️ SUDAH ADA' : '🎯 TUJUAN (Y)';
+
+      // Halo aktif variabel tujuan Y
       ctx.beginPath();
       ctx.arc(cx, cy, R + 9, 0, Math.PI * 2);
-      ctx.strokeStyle = '#10b981';
+      ctx.strokeStyle = targetStroke;
       ctx.lineWidth = 3.5;
       ctx.stroke();
 
       const bY = cy - R - 18;
       ctx.save();
       ctx.font = '700 10.5px ' + PLS_STYLE.fontFamily;
-      const bText = '🎯 TUJUAN (Y)';
       const bW = ctx.measureText(bText).width + 12;
-      ctx.fillStyle = '#10b981';
+      ctx.fillStyle = targetStroke;
       if (ctx.roundRect) {
         ctx.beginPath();
         ctx.roundRect(cx - bW / 2, bY - 8, bW, 16, 8);
@@ -5009,13 +5043,40 @@ function setupCanvasInteractions() {
             return;
           }
 
-          // Cek apakah jalur sudah ada
-          const exists = state.jalurs.some(j => 
+          // Cek apakah jalur sudah ada (abaikan jika sudah tersedia untuk menghindari duplikasi garis)
+          const existingPath = state.jalurs.find(j => 
             (j.dari_variabel_id == fromVar.id || j.dari == fromVar.nama) &&
             (j.ke_variabel_id == toVar.id || j.ke == toVar.nama)
           );
-          if (exists) {
-            showToast(`Jalur dari "${fromVar.nama}" ke "${toVar.nama}" sudah ada`, 'peringatan');
+          if (existingPath) {
+            showToast(`Jalur "${fromVar.nama} ➔ ${toVar.nama}" sudah tersedia (diabaikan agar tidak membuat garis duplikat)`, 'info');
+            // Pilih dan sorot jalur yang sudah ada di canvas & panel properti
+            state.selectedPath = existingPath.id;
+            state.selectedNode = null;
+            state.selectedNodes = [];
+            state.selectedPaths = [existingPath.id];
+            showPathProperties(existingPath);
+            // Reset variabel asal agar pengguna bisa langsung klik pasangan variabel lainnya
+            state.pathFrom = null;
+            state.connectingMouse = null;
+            state.connectingHoverVarId = null;
+            if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
+            renderModel();
+            return;
+          }
+
+          // Cek apakah jalur arah sebaliknya (Y -> X) sudah ada (menghindari circular loop)
+          const reversePath = state.jalurs.find(j => 
+            (j.dari_variabel_id == toVar.id || j.dari == toVar.nama) &&
+            (j.ke_variabel_id == fromVar.id || j.ke == fromVar.nama)
+          );
+          if (reversePath) {
+            showToast(`Model rekursif PLS-SEM: sudah ada jalur sebaliknya "${toVar.nama} ➔ ${fromVar.nama}" (diabaikan)`, 'peringatan');
+            state.pathFrom = null;
+            state.connectingMouse = null;
+            state.connectingHoverVarId = null;
+            if (window.updateCanvasModeIndicator) window.updateCanvasModeIndicator();
+            renderModel();
             return;
           }
 
